@@ -9,41 +9,100 @@
         Dashboard Administrativo
     </h1>
 
-    <!-- Avisos y Pendientes -->
-    {% if avisos %}
-    <div class="card">
-        <div class="card-header flex items-center justify-between">
-            <span class="flex items-center gap-1.5"><img src="{% static 'svg/alert-box-outline.svg' %}" class="w-4 h-4 icon-darkblue"> Avisos y Pendientes de la Semana</span>
-            <a href="/admin/expedientes/aviso/add/" target="_blank" class="text-xs font-normal text-blue-600 hover:text-blue-800 normal-case">+ Nuevo aviso</a>
+    <!-- Avisos y Pendientes (publicar aviso obligatorio) -->
+    <div class="card" style="border-color: #2563eb;">
+        <div class="card-header flex items-center gap-1.5" style="background:#2563eb; color:white; border-bottom:none;">
+            <img src="{% static 'svg/alert-box-outline.svg' %}" class="w-4 h-4" style="filter: brightness(0) invert(1);">
+            📢 Publicar Aviso / Noticia
+            <span class="badge ml-auto" style="background: rgba(255,255,255,0.2); color:#fff;">Aparece como mensaje obligatorio</span>
         </div>
-        <div class="card-body space-y-2">
-            {% for aviso in avisos %}
-            <div class="px-4 py-3 rounded-lg border
-                {% if aviso.prioridad == 'alta' %}bg-red-50 border-red-200
-                {% elif aviso.prioridad == 'media' %}bg-amber-50 border-amber-200
-                {% else %}bg-green-50 border-green-200{% endif %}">
-                <div class="flex items-start gap-3">
-                    <span class="text-lg flex-shrink-0 mt-0.5">
-                        {% if aviso.prioridad == 'alta' %}🔴{% elif aviso.prioridad == 'media' %}🟡{% else %}🟢{% endif %}
-                    </span>
-                    <div class="flex-1 min-w-0">
-                        <div class="flex items-center justify-between gap-2">
-                            <h3 class="text-sm font-semibold text-gray-800">{{ aviso.titulo }}</h3>
-                            <span class="text-[10px] text-gray-400 flex-shrink-0">{{ aviso.created_at|date:"d/m/Y" }}</span>
-                        </div>
-                        {% if aviso.contenido %}
-                        <p class="text-xs text-gray-600 mt-1">{{ aviso.contenido|linebreaksbr }}</p>
-                        {% endif %}
-                        <p class="text-[10px] text-gray-400 mt-1">Por: {{ aviso.creado_por.get_full_name|default:aviso.creado_por.username }}</p>
+        <div class="card-body">
+            <form method="post" action="{% url 'crear_aviso' %}" class="space-y-3">
+                {% csrf_token %}
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div class="md:col-span-2">
+                        <label class="block text-xs font-semibold text-gray-700 mb-1">Título *</label>
+                        <input type="text" name="titulo" required maxlength="200"
+                               placeholder="Ej: Junta general el viernes 10:00"
+                               class="w-full border border-gray-300 rounded px-3 py-2 text-sm">
                     </div>
-                    <a href="/admin/expedientes/aviso/{{ aviso.pk }}/change/" target="_blank"
-                       class="text-xs text-gray-400 hover:text-gray-600 flex-shrink-0">✏️</a>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1">Prioridad</label>
+                        <select name="prioridad" class="w-full border border-gray-300 rounded px-3 py-2 text-sm">
+                            <option value="alta">🔴 Alta (importante)</option>
+                            <option value="media" selected>🟡 Media</option>
+                            <option value="baja">🟢 Baja</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div class="md:col-span-2">
+                        <label class="block text-xs font-semibold text-gray-700 mb-1">Contenido / Detalle</label>
+                        <textarea name="contenido" rows="3"
+                                  placeholder="Escribe el aviso completo… (los usuarios deberán marcarlo como leído)"
+                                  class="w-full border border-gray-300 rounded px-3 py-2 text-sm"></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1">
+                            ⏳ Vence (opcional)
+                        </label>
+                        <input type="datetime-local" name="fecha_vencimiento"
+                               class="w-full border border-gray-300 rounded px-3 py-2 text-sm">
+                        <p class="text-[10px] text-gray-500 mt-1">
+                            Al llegar esta fecha, el aviso deja de mostrarse automáticamente.
+                        </p>
+                    </div>
+                </div>
+                <div class="flex items-center justify-between">
+                    <p class="text-[11px] text-gray-500">
+                        ⚠️ Al publicar, <strong>todos los usuarios verán este aviso como modal</strong>
+                        hasta que pulsan "Entendido". No se puede cerrar de otra forma.
+                    </p>
+                    <button type="submit" class="btn btn-primary">📢 Publicar aviso</button>
+                </div>
+            </form>
+
+            {% if avisos %}
+            <div class="mt-4 border-t border-gray-200 pt-3">
+                <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Avisos publicados</h3>
+                <div class="space-y-2 max-h-64 overflow-y-auto">
+                    {% for aviso in avisos %}
+                    <div class="px-3 py-2 rounded border flex items-start gap-3
+                        {% if aviso.prioridad == 'alta' %}bg-red-50 border-red-200
+                        {% elif aviso.prioridad == 'media' %}bg-amber-50 border-amber-200
+                        {% else %}bg-green-50 border-green-200{% endif %}">
+                        <span class="flex-shrink-0 mt-0.5">
+                            {% if aviso.prioridad == 'alta' %}🔴{% elif aviso.prioridad == 'media' %}🟡{% else %}🟢{% endif %}
+                        </span>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center justify-between gap-2">
+                                <h4 class="text-sm font-semibold text-gray-800">{{ aviso.titulo }}</h4>
+                                <div class="flex items-center gap-2 flex-shrink-0">
+                                    {% if aviso.fecha_vencimiento %}
+                                    <span class="text-[10px] text-gray-400" title="Vence">⏳ {{ aviso.fecha_vencimiento|date:"d/m/Y H:i" }}</span>
+                                    {% endif %}
+                                    <span class="text-[10px] text-gray-400">{{ aviso.created_at|date:"d/m/Y H:i" }}</span>
+                                    <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded {% if aviso.activo %}bg-green-100 text-green-700{% else %}bg-gray-100 text-gray-500{% endif %}">
+                                        {{ aviso.activo|yesno:'Activo,Inactivo' }}
+                                    </span>
+                                </div>
+                            </div>
+                            {% if aviso.contenido %}
+                            <p class="text-xs text-gray-600 mt-0.5 line-clamp-2">{{ aviso.contenido }}</p>
+                            {% endif %}
+                            <p class="text-[10px] text-gray-400 mt-1">
+                                Por: {{ aviso.creado_por.get_full_name|default:aviso.creado_por.username }}
+                            </p>
+                        </div>
+                        <a href="/admin/expedientes/aviso/{{ aviso.pk }}/change/" target="_blank"
+                           class="text-xs text-gray-400 hover:text-gray-600 flex-shrink-0" title="Editar">✏️</a>
+                    </div>
+                    {% endfor %}
                 </div>
             </div>
-            {% endfor %}
+            {% endif %}
         </div>
     </div>
-    {% endif %}
 
     <!-- Transferencias Pendientes -->
     {% if transferencias_pendientes %}

@@ -1,3 +1,5 @@
+import secrets
+
 from django.db import models
 from django.contrib.auth.models import User
 from django.db.models.signals import post_save
@@ -9,6 +11,7 @@ class UserProfile(models.Model):
         ('superadmin', 'Superadmin'),
         ('admin', 'Administrativo'),
         ('asesor', 'Asesor'),
+        ('abogada', 'Abogada'),
         ('finanzas', 'Finanzas'),
     ]
 
@@ -18,6 +21,10 @@ class UserProfile(models.Model):
     puede_generar_documentos = models.BooleanField(
         '¿Puede generar documentos legales?', default=False,
         help_text='Permite al usuario acceder al generador de demandas, machotes y documentos legales'
+    )
+    api_token = models.CharField(
+        'Token API (extensión Chrome)', max_length=64, blank=True, unique=True,
+        help_text='Token personal para que la extensión de Chrome se comunique con la app'
     )
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -36,6 +43,18 @@ class UserProfile(models.Model):
 
     def es_superadmin(self):
         return self.rol == 'superadmin'
+
+    def regenerar_token(self):
+        """Genera un token nuevo (invalida el anterior)."""
+        self.api_token = secrets.token_urlsafe(32)
+        self.save(update_fields=['api_token'])
+        return self.api_token
+
+    def save(self, *args, **kwargs):
+        # Auto-generar token al crear el perfil si no tiene uno
+        if not self.api_token:
+            self.api_token = secrets.token_urlsafe(32)
+        super().save(*args, **kwargs)
 
 
 class PermisoAuditLog(models.Model):

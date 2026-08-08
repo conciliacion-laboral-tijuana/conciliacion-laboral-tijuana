@@ -1,0 +1,130 @@
+{% extends 'base.html' %}
+{% load static custom_filters %}
+{% block title %}Vista Previa del Acuse - {{ expediente.numero }}{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto space-y-4">
+    <div class="card">
+        <div class="card-header" style="background: #1a6b3c; color: white; border-bottom: none; display: flex; align-items: center; gap: 8px;">
+            <h1 class="text-sm font-bold">📄 Acuse de Conciliación — Vista Previa</h1>
+        </div>
+
+        <div class="card-body space-y-4">
+            <!-- Encabezado del acuse -->
+            <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-4 text-sm text-emerald-900">
+                <div class="flex items-start gap-3">
+                    <div class="text-2xl">🗂️</div>
+                    <div>
+                        <p class="font-semibold">Archivo: <span class="font-mono text-xs">{{ nombre_archivo }}</span></p>
+                        {% if datos.folio %}
+                        <p class="mt-1"><strong>Folio detectado:</strong> <span class="font-mono bg-white px-2 py-0.5 rounded border border-emerald-300">{{ datos.folio }}</span></p>
+                        {% else %}
+                        <p class="mt-1 text-amber-700">⚠️ No se detectó folio en el PDF.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            {% if campos %}
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-900">
+                <strong>¿Qué datos aplicamos al expediente?</strong>
+                <p class="mt-1 text-xs text-blue-700">
+                    Se detectaron <strong>{{ campos|length }} campos</strong> en el acuse. Marca los que quieras
+                    guardar en el expediente. Los campos ya llenos se muestran con su valor actual.
+                </p>
+            </div>
+
+            <form method="post" action="{% url 'confirmar_acuse_datos' expediente.pk %}" id="form-acuse">
+                {% csrf_token %}
+
+                <div class="space-y-2">
+                    {% for campo in campos %}
+                    <label class="flex items-start gap-3 p-3 border rounded-xl cursor-pointer transition-colors {% if campo.nuevo %}bg-emerald-50 border-emerald-200 hover:bg-emerald-100{% elif campo.difiere %}bg-amber-50 border-amber-200 hover:bg-amber-100{% else %}bg-white border-gray-200 hover:bg-gray-50{% endif %}">
+                        <input type="checkbox" name="campos" value="{{ campo.key }}"
+                               class="mt-0.5 h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                               {% if campo.nuevo or campo.difiere %}checked{% endif %}>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2">
+                                <span class="font-semibold text-sm text-gray-800">{{ campo.label }}</span>
+                                {% if campo.nuevo %}
+                                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700">NUEVO</span>
+                                {% elif campo.difiere %}
+                                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">REEMPLAZAR</span>
+                                {% endif %}
+                            </div>
+                            <div class="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-1 text-xs">
+                                <div>
+                                    <span class="text-gray-400">Detectado:</span>
+                                    <span class="font-medium text-gray-800">{{ campo.valor_detectado }}</span>
+                                </div>
+                                {% if campo.valor_actual %}
+                                <div>
+                                    <span class="text-gray-400">Actual:</span>
+                                    <span class="font-medium text-gray-500">{{ campo.valor_actual }}</span>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </label>
+                    {% endfor %}
+                </div>
+
+                <div class="mt-5 flex items-center justify-between gap-3 pt-4 border-t border-gray-200">
+                    <a href="{% url 'expediente_detail' expediente.pk %}"
+                       class="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition">
+                        ← Cancelar (sin guardar)
+                    </a>
+                    <button type="submit"
+                            class="px-5 py-2.5 text-sm font-bold text-white rounded-lg transition shadow"
+                            style="background:#1a6b3c;"
+                            onmouseover="this.style.background='#145530'"
+                            onmouseout="this.style.background='#1a6b3c'">
+                        ✅ Aplicar seleccionados
+                    </button>
+                </div>
+            </form>
+
+            {% else %}
+            <!-- No se detectaron datos -->
+            <div class="bg-amber-50 border border-amber-200 rounded-lg p-5 text-center">
+                <div class="text-3xl mb-2">🤔</div>
+                <p class="text-sm font-semibold text-amber-800">No se pudieron extraer datos de este PDF</p>
+                <p class="text-xs text-amber-700 mt-1">
+                    ¿Es un acuse de solicitud de conciliación del portal del Centro de Conciliación Laboral?
+                    Verifica que el archivo sea el acuse oficial y vuelve a intentarlo.
+                </p>
+                <div class="mt-4 flex flex-wrap items-center justify-center gap-3">
+                    <form method="post" action="{% url 'confirmar_acuse_datos' expediente.pk %}" class="inline">
+                        {% csrf_token %}
+                        <input type="hidden" name="accion" value="solo_guardar">
+                        <button type="submit"
+                                class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-100 rounded-lg transition">
+                            💾 Guardar PDF sin aplicar datos
+                        </button>
+                    </form>
+                    <a href="{% url 'expediente_detail' expediente.pk %}"
+                       class="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition">
+                        ← Volver al expediente
+                    </a>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+// El checkbox "Aplicar seleccionados" requiere al menos 1 campo marcado
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('form-acuse');
+    if (!form) return;
+    form.addEventListener('submit', function(e) {
+        const marcados = form.querySelectorAll('input[name="campos"]:checked');
+        if (marcados.length === 0) {
+            e.preventDefault();
+            alert('Selecciona al menos un campo para aplicar, o cancela.');
+        }
+    });
+});
+</script>
+{% endblock %}

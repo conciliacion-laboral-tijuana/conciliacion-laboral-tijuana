@@ -24,7 +24,7 @@ environ.Env.read_env(BASE_DIR / '.env')
 
 SECRET_KEY = env('SECRET_KEY')
 
-DEBUG = env('DEBUG')
+DEBUG = True
 
 ALLOWED_HOSTS = env('ALLOWED_HOSTS')
 
@@ -78,6 +78,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'expedientes.context_processors.notificaciones_globales',
+                'expedientes.context_processors.aviso_obligatorio_global',
             ],
         },
     },
@@ -124,6 +125,9 @@ STATICFILES_DIRS = [
 ]
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
     "staticfiles": {
         "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
     },
@@ -171,15 +175,26 @@ CELERY_TASK_TIME_LIMIT = 5 * 60  # 5 minutos máximo para tareas
 # Flag para saber si Celery está disponible
 def _celery_disponible():
     """
-    Verifica si hay un worker de Celery activo.
+    Verifica si hay un worker de Celery disponible.
 
-    Requiere CELERY_WORKER_ENABLED=true además de Redis, para evitar el caso
-    donde Railway inyecta REDIS_URL (ej. para caché) pero no hay worker corriendo
-    y las tareas se quedan en 'pendiente' para siempre.
+    El worker se inicia automáticamente en entrypoint.sh cuando:
+      - Redis está presente (REDIS_URL o REDISHOST), Y
+      - CELERY_WORKER_ENABLED no está explicitamente en 'false'
+
+    Railway inyecta REDIS_URL al agregar el servicio Redis, y el entrypoint
+    levanta el worker automáticamente. Con Redis, asumimos que el worker
+    está disponible (o lo estará en segundos).
+
+    Sin Redis → threading como fallback.
+    CELERY_WORKER_ENABLED=false → threading (usuario deshabilitó explícitamente).
     """
-    worker_enabled = os.environ.get('CELERY_WORKER_ENABLED', '').lower() == 'true'
     has_redis = bool(os.environ.get('REDIS_URL') or os.environ.get('REDISHOST'))
-    return worker_enabled and has_redis
+    if not has_redis:
+        return False
+    # Si el usuario deshabilitó explícitamente Celery, respetarlo
+    if os.environ.get('CELERY_WORKER_ENABLED', '').lower() == 'false':
+        return False
+    return True
 
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

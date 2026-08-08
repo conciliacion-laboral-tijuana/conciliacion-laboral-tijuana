@@ -160,19 +160,8 @@
   </div>
 </div>
 
-<!-- Modal de Vista Previa -->
-<div id="previewModal" class="fixed inset-0 bg-black/50 z-50 hidden items-center justify-center p-4 no-print">
-  <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-    <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-      <h3 class="font-semibold text-gray-800">📄 Vista Previa - {{ machote.nombre }}</h3>
-      <button onclick="cerrarPreview()" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
-    </div>
-    <div class="p-6 overflow-y-auto flex-1" id="previewContent"></div>
-    <div class="px-6 py-4 border-t border-gray-200 flex justify-end">
-      <button onclick="cerrarPreview()" class="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm">Cerrar</button>
-    </div>
-  </div>
-</div>
+{# titulo_preview = "Vista Previa - <nombre del machote>" (|add concatena strings) #}
+{% include 'expedientes/_modal_vista_previa.html' with titulo_preview='Vista Previa - '|add:machote.nombre %}
 
 <!-- Form oculto para descargar -->
 <form id="downloadForm" method="post" action="{% url 'machotes_descargar' expediente.pk machote.pk %}" style="display:none;">
@@ -241,33 +230,10 @@
     document.getElementById('downloadForm').submit();
   }
 
-  // ─── Vista Previa ────────────────────────────────────────────────
+  // ─── Vista Previa (usa el modal compartido) ──────────────────────
   function vistaPrevia() {
-    var html = getEditorHTML();
-    var previewHTML = `
-      <div style="font-family: 'Calibri', 'Segoe UI', sans-serif; font-size: 13px; line-height: 1.6; padding: 20px; max-width: 800px; margin: 0 auto;">
-        ${html}
-      </div>
-    `;
-    document.getElementById('previewContent').innerHTML = previewHTML;
-    document.getElementById('previewModal').classList.remove('hidden');
-    document.getElementById('previewModal').classList.add('flex');
+    abrirVistaPrevia(getEditorHTML());
   }
-
-  function cerrarPreview() {
-    document.getElementById('previewModal').classList.add('hidden');
-    document.getElementById('previewModal').classList.remove('flex');
-  }
-
-  // Cerrar modal con Escape
-  document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') cerrarPreview();
-  });
-
-  // Cerrar al hacer clic fuera
-  document.getElementById('previewModal').addEventListener('click', function(e) {
-    if (e.target === this) cerrarPreview();
-  });
 
   // ─── Auto-guardar en localStorage ────────────────────────────────
   function autoGuardar() {

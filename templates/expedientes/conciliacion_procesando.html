@@ -3,7 +3,11 @@
 {% block title %}Enviando a Conciliación - {{ expediente.numero }}{% endblock %}
 
 {% block content %}
-<div class="max-w-2xl mx-auto space-y-4" id="status-container">
+<div class="max-w-3xl mx-auto space-y-4" id="status-container">
+    <div id="celery-warning" class="hidden bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-800">
+        ⚠️ <strong>Modo de respaldo activo</strong> — Redis/Celery no está disponible, la tarea se ejecutará en segundo plano con un hilo. Si la página se queda cargando mucho tiempo, usa <strong>"Subir PDF manualmente"</strong> como alternativa.
+    </div>
+
     <div class="card">
         <div class="card-header" style="background: #2a3340; color: white; border-bottom: none;">
             <h1 class="text-sm font-bold">🚀 Envío al Portal de Conciliación</h1>
@@ -11,7 +15,7 @@
 
         <div class="card-body space-y-6">
             <!-- Estado pendiente/ejecutando -->
-            <div id="loading-state" class="text-center py-8 space-y-4">
+            <div id="loading-state" class="text-center py-4 space-y-4">
                 <div class="flex justify-center">
                     <div class="relative w-20 h-20">
                         <!-- Anillo giratorio -->
@@ -46,6 +50,41 @@
                 <!-- Tiempo transcurrido -->
                 <div class="text-sm text-gray-500">
                     ⏱ Tiempo transcurrido: <span id="elapsed-time">0s</span>
+                    <button onclick="window.location.reload()" class="ml-2 text-xs text-blue-600 hover:text-blue-800 underline">
+                        🔄 Refrescar manualmente
+                    </button>
+                </div>
+
+                <!-- ═══ ESPEJO EN VIVO DEL NAVEGADOR ═══ -->
+                <div id="mirror-panel" class="hidden mt-6 text-left">
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center gap-2">
+                            <span class="relative flex h-2.5 w-2.5">
+                                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+                            </span>
+                            <h3 class="text-xs font-bold text-gray-700 uppercase tracking-wide">🔍 Espejo en vivo — viendo el navegador del servidor</h3>
+                        </div>
+                        <span id="mirror-step" class="text-[10px] text-gray-400">captura 0</span>
+                    </div>
+                    <div class="relative rounded-xl border-2 border-gray-200 overflow-hidden bg-gray-100 shadow-inner">
+                        <img id="mirror-img" src="" alt="Vista en vivo del navegador"
+                             class="w-full h-auto max-h-[420px] object-top object-cover bg-white">
+                        <div id="mirror-loading" class="absolute inset-0 flex items-center justify-center bg-gray-100">
+                            <div class="text-center">
+                                <div class="animate-spin w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full mx-auto"></div>
+                                <p class="text-xs text-gray-500 mt-2">Esperando la primera captura...</p>
+                            </div>
+                        </div>
+                        <div id="mirror-badge" class="hidden absolute top-2 right-2 px-2 py-1 rounded-md text-[10px] font-bold text-white bg-red-600/90">
+                            ● EN VIVO
+                        </div>
+                    </div>
+                    <p class="text-[11px] text-gray-400 mt-1.5 flex items-center gap-1">
+                        <span>👀</span> Esto es lo que hace la automatización en tiempo real. Si al final el acuse aparece en pantalla, usa
+                        <a href="{% url 'subir_conciliacion_pdf' expediente.pk %}" class="text-blue-600 hover:underline font-medium">Subir Acuse Manualmente</a>
+                        para guardarlo (los datos se llenan solos).
+                    </p>
                 </div>
 
                 <!-- Pasos del proceso -->
@@ -84,7 +123,7 @@
                     </div>
                 </div>
 
-                <!-- Botón cancelar/oculto durante ejecución -->
+                <!-- Botón volver -->
                 <div class="text-center">
                     <a href="{% url 'expediente_detail' expediente.pk %}" class="text-sm text-gray-500 hover:text-gray-700 underline">
                         Volver al expediente
@@ -114,7 +153,12 @@
                         <span class="font-semibold text-gray-800" id="result-time">—</span>
                     </div>
                 </div>
-                <div class="flex space-x-3 justify-center">
+                <!-- Última captura del acuse -->
+                <div id="completed-mirror" class="hidden text-left">
+                    <h3 class="text-xs font-bold text-gray-700 uppercase tracking-wide mb-2">📸 Última captura del proceso</h3>
+                    <img id="completed-mirror-img" src="" class="w-full rounded-xl border border-gray-200 shadow">
+                </div>
+                <div class="flex space-x-3 justify-center flex-wrap gap-2">
                     <a href="{% url 'expediente_detail' expediente.pk %}" class="btn btn-primary">
                         📋 Ver Expediente
                     </a>
@@ -127,18 +171,47 @@
             <!-- Estado fallido (inicialmente oculto) -->
             <div id="failed-state" class="hidden text-center py-8 space-y-4">
                 <div class="text-6xl">❌</div>
-                <h2 class="text-xl font-bold text-red-700">Error al enviar la solicitud</h2>
+                <h2 class="text-xl font-bold text-red-700">La automatización no pudo terminar</h2>
                 <div class="bg-red-50 border border-red-200 rounded-lg p-4 text-left">
                     <p class="text-sm font-medium text-red-800" id="result-error">—</p>
                     <p class="text-xs text-red-600 mt-2" id="result-error-detail"></p>
+                    <details class="mt-2">
+                        <summary class="text-xs text-gray-500 cursor-pointer hover:text-gray-700">Ver diagnóstico técnico</summary>
+                        <pre id="error-tech-detail" class="mt-1 text-[10px] text-gray-400 bg-gray-50 p-2 rounded overflow-x-auto max-h-24 whitespace-pre-wrap"></pre>
+                    </details>
                 </div>
-                <div class="flex space-x-3 justify-center">
-                    <a href="{% url 'expediente_detail' expediente.pk %}" class="btn btn-primary">
-                        📋 Ver Expediente
-                    </a>
-                    <a href="{% url 'enviar_conciliacion_automation' expediente.pk %}" class="btn" style="background:#6b7280; color:white;">
-                        🔄 Reintentar
-                    </a>
+
+                <!-- Espejo: mostrar dónde se quedó -->
+                <div id="failed-mirror" class="hidden text-left">
+                    <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800 mb-2">
+                        <strong>🔍 Esto es lo que estaba en pantalla cuando se detuvo:</strong>
+                        <p class="text-xs mt-1">Si ves el acuse o el folio en la captura, la solicitud SÍ se creó. Descarga el acuse desde el portal y súbelo aquí — los datos se llenan automáticamente.</p>
+                    </div>
+                    <img id="failed-mirror-img" src="" class="w-full rounded-xl border border-gray-200 shadow">
+                </div>
+
+                <div class="flex flex-col items-center space-y-2">
+                    <div class="flex space-x-3 flex-wrap justify-center gap-2">
+                        <a href="{% url 'expediente_detail' expediente.pk %}" class="btn btn-primary">
+                            📋 Ver Expediente
+                        </a>
+                        <a href="{% url 'reintentar_conciliacion' task.pk %}" class="btn" style="background:#6b7280; color:white;">
+                            🔄 Reintentar
+                        </a>
+                    </div>
+                    <div class="flex space-x-3 flex-wrap justify-center gap-2">
+                        <a href="{% url 'subir_conciliacion_pdf' expediente.pk %}" class="btn" style="background:#1a6b3c; color:white;">
+                            📄 Subir Acuse Manualmente
+                        </a>
+                        <a href="{% url 'descargar_conciliacion_pdf' expediente.pk %}" class="btn" style="background:#47505e; color:white;">
+                            📥 Formulario Prellenado
+                        </a>
+                    </div>
+                    <p class="text-xs text-gray-400">
+                        <a href="https://app.conciliacionbc.gob.mx/solicitudes/create-public?solicitud=1" target="_blank" rel="noopener" class="text-blue-600 hover:underline">
+                            🌐 Abrir portal de conciliación
+                        </a> en otra pestaña si necesitas terminar manualmente
+                    </p>
                 </div>
             </div>
         </div>
@@ -146,7 +219,7 @@
 </div>
 {% endblock %}
 
-{% block extra_js %}
+{% block extra_scripts %}
 <script>
 (function() {
     const TASK_ID = {{ task.pk }};
@@ -166,6 +239,19 @@
     const progressBar = document.getElementById('progress-bar');
     const progressText = document.getElementById('progress-text');
     const elapsedTime = document.getElementById('elapsed-time');
+
+    // Elementos del espejo
+    const mirrorPanel = document.getElementById('mirror-panel');
+    const mirrorImg = document.getElementById('mirror-img');
+    const mirrorLoading = document.getElementById('mirror-loading');
+    const mirrorBadge = document.getElementById('mirror-badge');
+    const mirrorStep = document.getElementById('mirror-step');
+    let lastScreenshotUrl = '';
+
+    // Mostrar advertencia si Celery no está disponible (modo hilo/respaldo)
+    {% if not celery_disponible %}
+    document.getElementById('celery-warning').classList.remove('hidden');
+    {% endif %}
 
     function updateElapsedTime() {
         if (!loadingState.classList.contains('hidden')) {
@@ -193,6 +279,29 @@
         if (statusIcon) statusIcon.textContent = s.icon;
     }
 
+    // ── Espejo en vivo: actualizar la captura mostrada ──
+    function updateMirror(screenshots) {
+        if (!screenshots || screenshots.length === 0) return;
+
+        // La última captura es la más reciente
+        const url = screenshots[screenshots.length - 1];
+        if (!url) return;
+
+        // Solo recargar la imagen cuando cambia la captura (con cache-busting).
+        // Evita que el navegador re-descargue la misma imagen en cada poll.
+        if (url !== lastScreenshotUrl) {
+            lastScreenshotUrl = url;
+            mirrorImg.src = url + (url.includes('?') ? '&' : '?') + 't=' + Date.now();
+            mirrorImg.onload = function() {
+                if (mirrorLoading) mirrorLoading.classList.add('hidden');
+                if (mirrorBadge) mirrorBadge.classList.remove('hidden');
+            };
+        }
+
+        if (mirrorPanel) mirrorPanel.classList.remove('hidden');
+        if (mirrorStep) mirrorStep.textContent = 'captura ' + screenshots.length;
+    }
+
     function showResult(data) {
         if (data.estado === 'completado') {
             loadingState.classList.add('hidden');
@@ -200,18 +309,38 @@
             document.getElementById('result-folio').textContent = data.folio || 'N/A';
             const elapsed = Math.floor((data.completed_at ? new Date(data.completed_at).getTime() - new Date(data.created_at).getTime() : Date.now() - START_TIME) / 1000);
             document.getElementById('result-time').textContent = elapsed < 60 ? elapsed + 's' : Math.floor(elapsed / 60) + 'm ' + (elapsed % 60) + 's';
-            // Auto-redirigir al expediente después de 3 segundos
+
+            // Mostrar última captura si existe
+            if (data.screenshots && data.screenshots.length) {
+                const img = document.getElementById('completed-mirror-img');
+                if (img) {
+                    img.src = data.screenshots[data.screenshots.length - 1];
+                    document.getElementById('completed-mirror').classList.remove('hidden');
+                }
+            }
+
+            // Auto-redirigir al expediente después de 4 segundos
             setTimeout(function() {
                 var folio = data.folio || 'N/A';
                 var elapsed = document.getElementById('result-time').textContent || '';
                 window.location.href = EXPEDIENTE_URL + '?conciliacion_ok=1&folio=' + encodeURIComponent(folio) + '&tiempo=' + encodeURIComponent(elapsed);
-            }, 3000);
+            }, 4000);
         } else if (data.estado === 'fallido') {
             loadingState.classList.add('hidden');
             failedState.classList.remove('hidden');
             document.getElementById('result-error').textContent = data.error || 'Error desconocido';
             if (data.detalle) {
                 document.getElementById('result-error-detail').textContent = data.detalle;
+                document.getElementById('error-tech-detail').textContent = data.detalle;
+            }
+
+            // Mostrar dónde se quedó el navegador (espejo final)
+            if (data.screenshots && data.screenshots.length) {
+                const img = document.getElementById('failed-mirror-img');
+                if (img) {
+                    img.src = data.screenshots[data.screenshots.length - 1];
+                    document.getElementById('failed-mirror').classList.remove('hidden');
+                }
             }
         } else if (data.estado === 'pendiente') {
             statusTitle.textContent = 'En cola...';
@@ -221,6 +350,8 @@
             statusTitle.textContent = '🤖 Ejecutando automatización...';
             statusMessage.textContent = 'Navegando el portal de conciliación paso a paso.';
             updateProgress('ejecutando');
+            // Espejo en vivo durante la ejecución
+            updateMirror(data.screenshots);
         }
     }
 
@@ -228,7 +359,11 @@
         fetch(STATUS_URL)
             .then(r => r.json())
             .then(data => {
-                if (data.error) {
+                // Error fatal del endpoint (sin estado de tarea válido, ej. 403 No autorizado).
+                // Cuando la tarea está 'fallido', data.error trae el mensaje PERO también
+                // data.estado='fallido' — ese caso debe pasar por showResult para mostrar
+                // el espejo final (dónde se quedó el navegador).
+                if (data.error && !data.estado) {
                     clearInterval(pollInterval);
                     loadingState.classList.add('hidden');
                     failedState.classList.remove('hidden');
@@ -248,7 +383,7 @@
             });
     }
 
-    // Iniciar polling cada 3 segundos
+    // Iniciar polling cada 2.5 segundos (más rápido para el espejo en vivo)
     pollInterval = setInterval(function() {
         // Timeout de seguridad: si pasa más de MAX_WAIT_SECONDS, mostrar error
         if ((Date.now() - START_TIME) / 1000 > MAX_WAIT_SECONDS) {
@@ -260,7 +395,7 @@
             return;
         }
         checkStatus();
-    }, 3000);
+    }, 2500);
 
     // Actualizar tiempo transcurrido cada segundo
     setInterval(updateElapsedTime, 1000);
@@ -269,4 +404,4 @@
     checkStatus();
 })();
 </script>
-{% endblock %}
+{% endblock extra_scripts %}

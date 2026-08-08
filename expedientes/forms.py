@@ -1,5 +1,6 @@
 from django import forms
-from .models import Expediente, Cliente, Documento, Nota, SolicitudConciliacion, WhatsAppMessage, CalculoLaboral
+from .models import (Expediente, Cliente, Documento, Nota, SolicitudConciliacion,
+                    WhatsAppMessage, CalculoLaboral, Machote)
 from django.contrib.auth.models import User
 
 
@@ -218,6 +219,7 @@ class CalculoLaboralForm(forms.ModelForm):
             # Campos de entrada para conceptos
             'dias_vacaciones_vencidos', 'horas_extra_cantidad',
             'salarios_devengados', 'dias_festivos_cantidad',
+            'dias_vacaciones_override',
         ]
         widgets = {
             'periodo_pago': forms.Select(attrs={
@@ -262,14 +264,57 @@ class CalculoLaboralForm(forms.ModelForm):
                 'placeholder': '0 días',
                 'min': '0',
             }),
+            'dias_vacaciones_override': forms.NumberInput(attrs={
+                'class': 'w-24 px-2 py-1 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm',
+                'placeholder': 'auto',
+                'min': '0',
+            }),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Hacer que los campos de entrada no sean requeridos (dependen del checkbox)
         for field_name in ['dias_vacaciones_vencidos', 'horas_extra_cantidad',
-                            'salarios_devengados', 'dias_festivos_cantidad']:
+                            'salarios_devengados', 'dias_festivos_cantidad',
+                            'dias_vacaciones_override']:
             self.fields[field_name].required = False
+
+        # En renuncia voluntaria la demanda no reclama indemnización constitucional
+        # ni prima de antigüedad: deshabilitar esos checkboxes (la vista los fuerza
+        # desmarcados) para que la pantalla coincida siempre con la demanda.
+        expediente = getattr(self.instance, 'expediente', None)
+        if expediente and getattr(expediente, 'tipo_despido', None) == 'voluntario':
+            self.fields['incluir_indemnizacion'].disabled = True
+            self.fields['incluir_prima_antiguedad'].disabled = True
+
+
+class MachoteForm(forms.ModelForm):
+    """Formulario para editar los metadatos de un machote (plantilla)."""
+    class Meta:
+        model = Machote
+        fields = ['nombre', 'descripcion', 'categoria', 'tipo_despido', 'jurisdiccion', 'icono']
+        widgets = {
+            'nombre': forms.TextInput(attrs={
+                'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent',
+            }),
+            'descripcion': forms.Textarea(attrs={
+                'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent',
+                'rows': 3,
+            }),
+            'categoria': forms.Select(attrs={
+                'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent',
+            }),
+            'tipo_despido': forms.Select(attrs={
+                'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent',
+            }),
+            'jurisdiccion': forms.Select(attrs={
+                'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent',
+            }),
+            'icono': forms.TextInput(attrs={
+                'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent',
+                'placeholder': '📄',
+            }),
+        }
 
 
 class SimulacionForm(forms.Form):

@@ -1,0 +1,166 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load custom_filters %}
+{% block title %}Catálogo de Machotes | Conciliacion Laboral Tijuana{% endblock %}
+
+{% block content %}
+<div class="space-y-3">
+    <div class="flex items-center justify-between">
+        <h1 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+            <span>📄</span> Catálogo de Machotes
+            <span class="text-xs font-normal text-gray-500">({{ total_sin_filtros }} plantillas)</span>
+        </h1>
+        <a href="{% url 'machote_importar_web' %}" class="btn btn-primary">
+            <i class="fas fa-upload"></i> Subir nueva demanda (Word)
+        </a>
+    </div>
+
+    <!-- Búsqueda y filtros -->
+    <form method="get" action="{% url 'machotes_catalogo' %}" class="flex flex-wrap items-center gap-2 bg-white border border-gray-200 rounded-xl p-3 shadow-sm">
+        <div class="relative flex-1 min-w-[200px]">
+            <input type="text" name="q" value="{{ q }}" placeholder="Buscar por nombre, descripción o archivo…"
+                   class="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 outline-none transition-shadow"
+                   aria-label="Buscar machotes">
+            <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none"></i>
+        </div>
+        <select name="categoria" onchange="this.form.submit()"
+                class="px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 outline-none cursor-pointer"
+                aria-label="Filtrar por categoría">
+            <option value="">Todas las categorías</option>
+            {% for clave, etiqueta in categorias_disponibles %}
+            <option value="{{ clave }}" {% if categoria_filtro == clave %}selected{% endif %}>
+                {{ etiqueta }} ({{ conteo_categorias|get_item:clave|default:0 }})
+            </option>
+            {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-primary">
+            <i class="fas fa-filter"></i> Buscar
+        </button>
+        {% if q or categoria_filtro %}
+        <a href="{% url 'machotes_catalogo' %}" class="btn btn-sm text-gray-500 hover:text-gray-700">
+            <i class="fas fa-times"></i> Limpiar filtros
+        </a>
+        {% endif %}
+    </form>
+
+    {% if q or categoria_filtro %}
+    <div class="text-xs text-gray-500">
+        <i class="fas fa-info-circle"></i>
+        {{ total_machotes }} resultado{{ total_machotes|pluralize }}
+        {% if q %} para <strong>“{{ q }}”</strong>{% endif %}
+        {% if q and categoria_filtro %} en {% endif %}
+        {% if categoria_filtro %} la categoría <strong>{{ categorias_dict|get_item:categoria_filtro }}</strong>{% endif %}
+    </div>
+    {% endif %}
+
+    {% if machotes_agrupados %}
+        {% for categoria, machotes in machotes_agrupados.items %}
+        <div class="card">
+            <div class="card-header">{{ categoria }} ({{ machotes|length }})</div>
+            <div class="card-body p-0">
+                <div class="divide-y divide-gray-100">
+                    {% for m in machotes %}
+                    <div id="machote-{{ m.pk }}" class="px-4 py-3 hover:bg-gray-50 transition-colors">
+                        <div class="flex items-center gap-3">
+                            <span class="text-xl flex-shrink-0">{{ m.icono }}</span>
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center gap-2">
+                                    <span class="font-semibold text-gray-800 text-sm" id="nombre-machote-{{ m.pk }}">{{ m.nombre }}</span>
+                                    {% if m.favorito %}<span class="text-[10px] text-amber-600">★ Favorito</span>{% endif %}
+                                    {% if m.tipo_despido %}<span class="badge bg-indigo-100 text-indigo-700">{{ m.get_tipo_despido_display }}</span>{% endif %}
+                                    <span class="badge bg-gray-100 text-gray-600">{{ m.get_jurisdiccion_display }}</span>
+                                </div>
+                                {% if m.descripcion %}
+                                <p class="text-[11px] text-gray-500 mt-0.5">{{ m.descripcion }}</p>
+                                {% endif %}
+                                {% if m.archivo_origen %}
+                                <p class="text-[10px] text-gray-400 mt-0.5">📎 {{ m.archivo_origen }}</p>
+                                {% endif %}
+                            </div>
+                            <div class="flex-shrink-0 flex items-center gap-2">
+                                <button onclick="toggleVista({{ m.pk }})" class="btn btn-sm" id="btn-{{ m.pk }}">
+                                    <i class="fas fa-eye"></i> Vista previa
+                                </button>
+                                <a href="{% url 'machote_editar' m.pk %}" class="btn btn-sm" title="Editar plantilla">
+                                    <i class="fas fa-pen"></i> Editar
+                                </a>
+                                <button type="button"
+                                        class="btn btn-sm"
+                                        title="Renombrar plantilla"
+                                        onclick="abrirRenombrar(this)"
+                                        data-pk="{{ m.pk }}"
+                                        data-url="{% url 'machote_renombrar' m.pk %}">
+                                    <i class="fas fa-i-cursor"></i> Renombrar
+                                </button>
+                                <form method="post" action="{% url 'machote_eliminar' m.pk %}"
+                                      onsubmit="return confirm('¿Eliminar el machote \'{{ m.nombre|escapejs }}\'? Esta acción no se puede deshacer.');"
+                                      style="display:inline;margin:0;">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-danger" title="Eliminar plantilla">
+                                        <i class="fas fa-trash"></i> Eliminar
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                        <div id="preview-{{ m.pk }}" class="hidden mt-3 border border-gray-200 rounded p-4 bg-white" style="border-radius: 4px;">
+                            <div class="document-preview">{{ m.contenido_html|safe }}</div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+    <div class="card">
+        <div class="card-body text-center py-10">
+            <div class="text-4xl mb-2">🔍</div>
+            <p class="text-sm text-gray-500 mb-3">
+                {% if q or categoria_filtro %}
+                    No hay machotes que coincidan con los filtros actuales.
+                {% else %}
+                    No hay machotes disponibles.
+                {% endif %}
+            </p>
+            {% if q or categoria_filtro %}
+            <a href="{% url 'machotes_catalogo' %}" class="btn btn-secondary">Limpiar filtros</a>
+            {% else %}
+            <a href="{% url 'machote_importar_web' %}" class="btn btn-primary">Subir el primer machote</a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+{% include 'expedientes/_modal_renombrar_machote.html' %}
+{% endblock %}
+
+{% block extra_scripts %}
+<style>
+    .document-preview {
+        font-family: 'Times New Roman', Times, serif;
+        font-size: 13px;
+        line-height: 1.6;
+        color: #1f2937;
+        max-height: 420px;
+        overflow-y: auto;
+    }
+    .document-preview h2 { text-align: center; font-size: 15px; font-weight: 700; margin: 6px 0; }
+    .document-preview h3 { font-size: 13px; font-weight: 700; margin: 8px 0 4px; color: #1f2937; }
+    .document-preview p { margin: 4px 0; }
+    .document-preview ol, .document-preview ul { margin: 4px 0 4px 18px; }
+</style>
+<script>
+function toggleVista(pk) {
+    const preview = document.getElementById('preview-' + pk);
+    const btn = document.getElementById('btn-' + pk);
+    if (preview.classList.contains('hidden')) {
+        preview.classList.remove('hidden');
+        btn.innerHTML = '<i class="fas fa-eye-slash"></i> Ocultar';
+    } else {
+        preview.classList.add('hidden');
+        btn.innerHTML = '<i class="fas fa-eye"></i> Vista previa';
+    }
+}
+</script>
+{% endblock %}

@@ -86,6 +86,16 @@
                 <form id="calculo-form" method="POST">
                     {% csrf_token %}
 
+                    {% if expediente.tipo_despido == 'voluntario' %}
+                    <div class="mx-4 mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                        <p class="text-sm text-amber-700">
+                            ✍️ <strong>Renuncia voluntaria:</strong> la demanda no reclama
+                            indemnización constitucional (Art. 50 LFT) ni prima de antigüedad
+                            (Art. 162 LFT). Por eso esos conceptos están desmarcados.
+                        </p>
+                    </div>
+                    {% endif %}
+
                     <!-- Datos base -->
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-gray-50 border-b border-gray-200">
                         <div>
@@ -158,8 +168,17 @@
                                         </div>
                                     </td>
                                     <td class="px-3 py-3 text-sm text-gray-500">Art. 76 LFT</td>
-                                    <td class="px-3 py-3 text-right text-sm text-gray-500">
-                                        {{ calculo.dias_vacaciones }} días
+                                    <td class="px-3 py-3 text-right">
+                                        <div class="flex flex-col items-end gap-0.5">
+                                            {{ form.dias_vacaciones_override }}
+                                            <span class="text-[10px] text-gray-400">
+                                                {% if calculo.dias_vacaciones_override %}
+                                                    manual · {{ calculo.dias_vacaciones }} días
+                                                {% else %}
+                                                    auto (tabla LFT) · {{ calculo.dias_vacaciones }} días
+                                                {% endif %}
+                                            </span>
+                                        </div>
                                     </td>
                                     <td class="px-3 py-3 text-right concepto-monto" data-monto="{{ calculo.vacaciones|floatformat:2 }}">
                                         <span class="text-base font-bold text-green-700">${{ calculo.vacaciones|floatformat:2|intcomma }}</span>
@@ -189,7 +208,7 @@
                                 </tr>
 
                                 <!-- Prima de Antigüedad -->
-                                <tr class="hover:bg-gray-50 transition concepto-row" data-concepto="prima_antiguedad">
+                                <tr class="hover:bg-gray-50 transition concepto-row {% if not calculo.incluir_prima_antiguedad %}opacity-50{% endif %}" data-concepto="prima_antiguedad">
                                     <td class="px-3 py-3 text-center">
                                         {{ form.incluir_prima_antiguedad }}
                                     </td>
@@ -214,7 +233,7 @@
                                 </tr>
 
                                 <!-- Indemnización 90 días -->
-                                <tr class="hover:bg-gray-50 transition concepto-row" data-concepto="indemnizacion">
+                                <tr class="hover:bg-gray-50 transition concepto-row {% if not calculo.incluir_indemnizacion %}opacity-50{% endif %}" data-concepto="indemnizacion">
                                     <td class="px-3 py-3 text-center">
                                         {{ form.incluir_indemnizacion }}
                                     </td>

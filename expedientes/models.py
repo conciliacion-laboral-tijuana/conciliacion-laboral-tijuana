@@ -29,9 +29,10 @@ class Cliente(models.Model):
     ]
 
     nombre = models.CharField('Nombre completo', max_length=200)
-    curp = models.CharField('CURP', max_length=18, unique=True)
+    curp = models.CharField('CURP', max_length=18, unique=True, null=True, blank=True,
+                            help_text='Opcional al importar citas CLT; se captura después')
     rfc = models.CharField('RFC', max_length=13, blank=True)
-    telefono = models.CharField('Teléfono', max_length=15)
+    telefono = models.CharField('Teléfono', max_length=15, null=True, blank=True)
     whatsapp = models.CharField('WhatsApp', max_length=15, blank=True)
     email = models.EmailField('Email', blank=True)
 
@@ -87,8 +88,8 @@ class Cliente(models.Model):
 
     OFICINA_CHOICES = [
         ('plaza_patria', 'Plaza Patria'),
-        ('plaza_patria_abajo', 'Plaza Patria Abajo'),
         ('otay', 'Otay'),
+        ('clt', 'CLT'),
     ]
 
     como_supo = models.CharField(
@@ -151,6 +152,52 @@ class Cliente(models.Model):
             raise ValidationError({
                 'fecha_asesoria_gratuita': 'Si el cliente agendó la asesoría, debes proporcionar una fecha.'
             })
+
+
+class Empresa(models.Model):
+    """Catálogo de empresas y domicilios.
+
+    Se importa desde 'Empresas y Domicilios.xlsx' (base de datos que va
+    creciendo). El nombre se guarda normalizado (mayúsculas, sin acentos,
+    espacios compactados) para que la importación sea idempotente al crecer
+    el archivo.
+    """
+
+    TIPO_PERSONA_CHOICES = [
+        ('fisica', 'Persona Física'),
+        ('moral', 'Persona Moral'),
+    ]
+
+    nombre = models.CharField('Empresa', max_length=200, unique=True,
+                               help_text='Nombre normalizado (mayúsculas, sin acentos)')
+    domicilio = models.TextField('Domicilio', blank=True,
+                                  help_text='Domicilio completo tal como viene en el archivo')
+    abogado = models.CharField('Abogado', max_length=200, blank=True,
+                                help_text='Abogado/representante de la empresa (opcional)')
+    telefono = models.CharField('Teléfono', max_length=30, blank=True)
+    tipo_persona = models.CharField('Tipo de persona', max_length=10,
+                                     choices=TIPO_PERSONA_CHOICES, default='moral',
+                                     help_text='Detectado automáticamente al importar')
+
+    # Domicilio desglosado (para autocompletar el formulario del cliente)
+    domicilio_calle = models.CharField('Calle (domicilio)', max_length=200, blank=True)
+    domicilio_numero = models.CharField('Número (domicilio)', max_length=20, blank=True)
+    domicilio_colonia = models.CharField('Colonia (domicilio)', max_length=200, blank=True)
+    domicilio_cp = models.CharField('Código Postal (domicilio)', max_length=10, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Empresa (catálogo)'
+        verbose_name_plural = 'Empresas y Domicilios'
+        ordering = ['nombre']
+        indexes = [
+            models.Index(fields=['nombre']),
+        ]
+
+    def __str__(self):
+        return self.nombre
 
 
 class Expediente(models.Model):
@@ -589,6 +636,10 @@ class CalculoLaboral(models.Model):
     aguinaldo = models.DecimalField('Aguinaldo proporcional', max_digits=12, decimal_places=2, default=0)
     vacaciones = models.DecimalField('Vacaciones proporcionales', max_digits=12, decimal_places=2, default=0)
     dias_vacaciones = models.PositiveIntegerField('Días de vacaciones según antigüedad', default=0)
+    dias_vacaciones_override = models.PositiveIntegerField(
+        'Días de vacaciones a pagar (manual)', null=True, blank=True,
+        help_text='Si el caso no corresponde al total por antigüedad (ej. ya se pagaron o disfrutaron '
+                   'algunos años), captura aquí los días realmente adeudados. Vacío = usa la tabla LFT.')
     prima_vacacional = models.DecimalField('Prima vacacional', max_digits=12, decimal_places=2, default=0)
     prima_antiguedad = models.DecimalField('Prima de antigüedad', max_digits=12, decimal_places=2, default=0)
     tope_salarial_aplicado = models.BooleanField('Tope salarial aplicado', default=False)
@@ -760,6 +811,15 @@ class Aviso(models.Model):
                                   choices=PRIORIDAD_CHOICES, default='media')
     activo = models.BooleanField('Activo', default=True,
                                   help_text='Desmarca para ocultar el aviso')
+    fecha_vencimiento = models.DateTimeField(
+        'Vence', null=True, blank=True,
+        help_text='Opcional. Si se define, el aviso deja de mostrarse automáticamente a partir de esta fecha.'
+    )
+    leido_por = models.ManyToManyField(
+        User, blank=True, related_name='avisos_leidos',
+        verbose_name='Leído por',
+        help_text='Usuarios que ya marcaron el aviso como leído/entendido'
+    )
     creado_por = models.ForeignKey(User, on_delete=models.PROTECT,
                                     verbose_name='Creado por')
     created_at = models.DateTimeField(auto_now_add=True)
@@ -878,7 +938,9 @@ class TareaConciliacion(models.Model):
     screenshots_json = models.TextField('Capturas (JSON)', blank=True,
                                          help_text='Lista de rutas de screenshots en formato JSON')
     modo = models.CharField('Modo', max_length=15, default='automatico',
-                             choices=[('automatico', 'Automático (Headless)'), ('debug', 'Visible (Debug)')])
+                             choices=[('automatico', 'Automático (Headless)'),
+                                      ('debug', 'Visible (Debug)'),
+                                      ('extension', 'Extensión de Chrome')])
     created_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField('Completada en', null=True, blank=True)
 

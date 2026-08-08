@@ -167,9 +167,20 @@ def calcular_todo(
     dias_vacaciones = r.obtener_dias_vacaciones(años_enteros)
     if años_enteros < 1:
         dias_vacaciones_proporcional = max(0, int(dias / 365 * 12))
+        dias_vacaciones_calculados = dias_vacaciones_proporcional
         vac_monto = f.vacaciones_proporcionales(dias, dias_vacaciones_proporcional, sd)
     else:
+        dias_vacaciones_calculados = dias_vacaciones
         vac_monto = f.vacaciones_proporcionales(dias, dias_vacaciones, sd)
+
+    # Override manual: el caso no siempre corresponde al total por antigüedad
+    # (ej. ya se pagaron o disfrutaron algunos años de vacaciones).
+    vacaciones_override_aplicado = False
+    dias_vacaciones_override = datos_extra.get('dias_vacaciones_override')
+    if dias_vacaciones_override not in (None, ''):
+        dias_vacaciones_calculados = int(dias_vacaciones_override)
+        vac_monto = f.vacaciones_vencidas(dias_vacaciones_calculados, sd)
+        vacaciones_override_aplicado = True
 
     if not _incluye('vacaciones'):
         vac_monto = Decimal('0')
@@ -245,7 +256,12 @@ def calcular_todo(
         'años_enteros': años_enteros,
         'periodo_pago': periodo_pago,
         'aguinaldo': {'dias_ley': aguinaldo_dias, 'monto': aguinaldo},
-        'vacaciones': {'dias_segun_antiguedad': dias_vacaciones, 'monto': vac_monto},
+        'vacaciones': {
+            'dias_segun_antiguedad': dias_vacaciones_calculados,
+            'dias_tabla_ley': dias_vacaciones,
+            'override_aplicado': vacaciones_override_aplicado,
+            'monto': vac_monto,
+        },
         'prima_vacacional': {'porcentaje': float(r.ReglasPorDefecto.PRIMA_VACACIONAL_PORCENTAJE * 100), 'monto': prima_vac},
         'prima_antiguedad': {
             'dias_por_año': r.ReglasPorDefecto.PRIMA_ANTIGUEDAD_DIAS_POR_ANO,
@@ -313,7 +329,7 @@ def _resultado_vacio(razon: str = "") -> Dict[str, Any]:
         'dias_trabajados': 0,
         'años_trabajados': Decimal('0'),
         'aguinaldo': {'dias_ley': 15, 'monto': Decimal('0')},
-        'vacaciones': {'dias_segun_antiguedad': 0, 'monto': Decimal('0')},
+        'vacaciones': {'dias_segun_antiguedad': 0, 'dias_tabla_ley': 0, 'override_aplicado': False, 'monto': Decimal('0')},
         'prima_vacacional': {'porcentaje': 25, 'monto': Decimal('0')},
         'prima_antiguedad': {'dias_por_año': 12, 'tope_diario': Decimal('0'), 'tope_aplicado': False, 'monto': Decimal('0')},
         'indemnizacion': {'dias': 90, 'monto': Decimal('0')},

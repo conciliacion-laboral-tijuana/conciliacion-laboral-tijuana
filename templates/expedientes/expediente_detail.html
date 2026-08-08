@@ -41,9 +41,9 @@
                                 <input type="file" name="pdf" accept=".pdf" required
                                        class="w-full text-xs px-2 py-1.5 border border-gray-300 rounded-lg file:mr-2 file:py-1 file:px-3 file:rounded-lg file:border-0 file:bg-blue-50 file:text-blue-700 file:text-xs hover:file:bg-blue-100">
                                 <button type="submit" class="w-full px-3 py-1.5 bg-blue-700 text-white rounded-lg text-xs font-semibold hover:bg-blue-800 transition">
-                                    📥 Subir Acuse y Extraer Folio
+                                    📥 Subir Acuse y Extraer Datos
                                 </button>
-                                <p class="text-[10px] text-gray-400 leading-tight">Descarga el PDF del portal de conciliación y súbelo aquí para extraer el folio automáticamente.</p>
+                                <p class="text-[10px] text-gray-400 leading-tight">Sube el acuse del portal para extraer folio, solicitante, empresa y fechas — revisa y confirma antes de guardar.</p>
                             </form>
                         </div>
                     </div>
@@ -51,9 +51,11 @@
                 {% if user.profile.rol == 'admin' or user.profile.rol == 'superadmin' or user.profile.puede_generar_documentos %}
                 <a href="{% url 'machotes_listar' expediente.pk %}" class="btn btn-success"><img src="{% static 'svg/file-document-multiple-outline.svg' %}" class="w-3.5 h-3.5" style="filter: brightness(0) invert(1);"> Documentos</a>
                 <a href="{% url 'demanda_editor' expediente.pk %}" class="btn" style="background:#47505e; color:white; border-color:#36404f;"><img src="{% static 'svg/file-edit-outline.svg' %}" class="w-3.5 h-3.5" style="filter: brightness(0) invert(1);"> Demanda</a>
+                <a href="{% url 'demanda_asistente' expediente.pk %}" class="btn" style="background:#1D4ED8; color:white; border-color:#1e40af;"><i class="fas fa-list-check"></i> Asistente de Demanda</a>
                 {% endif %}
                 <a href="{% url 'solicitar_transferencia' expediente.pk %}" class="btn" style="background:#8b3a3a; color:white; border-color:#6b2a2a;"><img src="{% static 'svg/file-edit-outline.svg' %}" class="w-3.5 h-3.5" style="filter: brightness(0) invert(1);"> Transferir</a>
                 <a href="{% url 'expediente_update' expediente.pk %}" class="btn btn-primary"><img src="{% static 'svg/application-edit-outline.svg' %}" class="w-3.5 h-3.5" style="filter: brightness(0) invert(1);"> Editar</a>
+                <a href="{% url 'cliente_update' expediente.cliente.pk %}" class="btn"><img src="{% static 'svg/account.svg' %}" class="w-3.5 h-3.5"> Editar Cliente</a>
                 <a href="{% url 'generar_pdf' expediente.pk %}" class="btn btn-danger"><img src="{% static 'svg/printer-outline.svg' %}" class="w-3.5 h-3.5" style="filter: brightness(0) invert(1);"> PDF</a>
             </div>
         </div>
@@ -71,6 +73,10 @@
             <div>
                 <span class="text-[10px] text-gray-500 uppercase tracking-wider">Empresa</span>
                 <p class="text-sm font-medium mt-0.5">{{ expediente.cliente.empresa|default:'—' }}</p>
+            </div>
+            <div>
+                <span class="text-[10px] text-gray-500 uppercase tracking-wider">Oficina</span>
+                <p class="text-sm font-medium mt-0.5">🏢 {{ expediente.cliente.get_oficina_display }}</p>
             </div>
             <div>
                 <span class="text-[10px] text-gray-500 uppercase tracking-wider">Creado</span>

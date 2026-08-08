@@ -1,0 +1,240 @@
+{% extends 'base.html' %}
+{% load static custom_filters %}
+{% block title %}Importar CLT - Conciliacion Laboral Tijuana{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex items-center justify-between">
+        <h1 class="text-base font-bold text-gray-800 flex items-center gap-2">
+            <img src="{% static 'svg/file-upload-outline.svg' %}" class="w-5 h-5 icon-darkblue" onerror="this.style.display='none'">
+            <span>📥 Importar Citas CLT</span>
+        </h1>
+        <a href="{% url 'calendario_audiencias' %}" class="text-xs text-gray-600 hover:text-gray-900 flex items-center gap-1">
+            <i class="fas fa-calendar-alt"></i> Ver calendario
+        </a>
+    </div>
+
+    <!-- ═══════════ PASO 1: SUBIR ARCHIVO ═══════════ -->
+    {% if not vista_previa and not resultado %}
+    <div class="bg-white rounded shadow-sm border border-gray-200">
+        <div class="px-4 py-2.5 border-b border-gray-200 flex items-center justify-between">
+            <h2 class="text-sm font-semibold text-gray-800">1. Subir archivo CLT.xlsx</h2>
+            <span class="badge bg-blue-100 text-blue-700">Hoja de cálculo con las citas de conciliación</span>
+        </div>
+        <div class="p-6">
+            <form method="post" enctype="multipart/form-data" class="space-y-4">
+                {% csrf_token %}
+                <label class="flex flex-col items-center justify-center w-full border-2 border-dashed border-gray-300 rounded-lg p-10 cursor-pointer hover:border-blue-400 hover:bg-blue-50/40 transition-colors" id="drop-zone">
+                    <input type="file" name="archivo" accept=".xlsx" class="hidden" id="archivo-input">
+                    <div class="text-4xl mb-3 text-gray-400" id="drop-icon">📄</div>
+                    <div class="text-sm font-medium text-gray-700" id="drop-text">Arrastra el archivo CLT.xlsx aquí o haz clic para seleccionarlo</div>
+                    <div class="text-xs text-gray-400 mt-1">Formato esperado: trabajador | empresa | fecha | hora | salario | honorario | asesor | ubicación CLT</div>
+                    <div class="text-xs text-gray-500 mt-3 bg-gray-100 px-3 py-1.5 rounded hidden" id="file-name"></div>
+                </label>
+                <div class="flex items-center justify-between">
+                    <div class="text-xs text-gray-500">
+                        <i class="fas fa-info-circle text-blue-500"></i>
+                        El sistema detecta las citas de las hojas del archivo (JULIO, AGOSTO, etc.) y las muestra antes de importar.
+                    </div>
+                    <button type="submit" class="btn btn-primary px-6 py-2">
+                        <i class="fas fa-eye"></i> Previsualizar citas
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ═══════════ PASO 2: VISTA PREVIA ═══════════ -->
+    {% if vista_previa %}
+    <div class="bg-white rounded shadow-sm border border-gray-200">
+        <div class="px-4 py-2.5 border-b border-gray-200 flex items-center justify-between">
+            <h2 class="text-sm font-semibold text-gray-800 flex items-center gap-2">
+                <span>2. Vista previa — {{ nombre_archivo }}</span>
+            </h2>
+            <span class="badge bg-green-100 text-green-700">{{ total_citas }} citas detectadas</span>
+        </div>
+
+        <!-- Resumen por hoja -->
+        <div class="px-4 py-3 border-b border-gray-100 flex flex-wrap gap-3">
+            {% for hoja, count in hojas.items %}
+            <span class="text-xs bg-gray-100 px-2.5 py-1 rounded">
+                <strong class="text-gray-700">{{ hoja }}</strong>
+                <span class="text-gray-500">· {{ count }} citas</span>
+            </span>
+            {% endfor %}
+            <span class="text-xs text-gray-400 ml-auto flex items-center gap-1">
+                <i class="fas fa-lightbulb text-amber-500"></i>
+                Se omitirán las citas que ya existan en el sistema (mismo cliente y fecha)
+            </span>
+        </div>
+
+        <!-- Tabla de citas -->
+        <div class="excel-scroll">
+            <table class="excel-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Trabajador</th>
+                        <th>Empresa / Patrón</th>
+                        <th>Fecha</th>
+                        <th>Hora</th>
+                        <th class="text-right">Salario</th>
+                        <th class="text-right">Honorario est.</th>
+                        <th>Asesor</th>
+                        <th>Ubicación</th>
+                        <th>Hoja</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for f in filas %}
+                    <tr>
+                        <td class="text-gray-400">{{ forloop.counter }}</td>
+                        <td class="font-medium text-gray-800">{{ f.nombre }}</td>
+                        <td class="text-gray-600">{{ f.empresa|default:'—' }}</td>
+                        <td>{{ f.fecha|date:"d/m/Y"|default:'—' }}</td>
+                        <td>{{ f.hora|date:"H:i"|default:'—' }}</td>
+                        <td class="text-right font-mono">${{ f.salario|floatformat:2|default:'—' }}</td>
+                        <td class="text-right font-mono text-blue-700">${{ f.honorario|floatformat:2|default:'—' }}</td>
+                        <td>
+                            <span class="font-medium">{{ f.asesor|default:'—' }}</span>
+                            {% if f.asesor2 %}<span class="text-xs text-gray-400">/ {{ f.asesor2 }}</span>{% endif %}
+                        </td>
+                        <td>{{ f.ubicacion|default:'—' }}</td>
+                        <td class="text-gray-400">{{ f.hoja }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Acciones -->
+        <div class="px-4 py-3 border-t border-gray-200 flex items-center justify-between gap-4 flex-wrap">
+            <a href="{% url 'importar_clt_web' %}" class="btn">
+                <i class="fas fa-arrow-left"></i> Elegir otro archivo
+            </a>
+            <form method="post" class="flex items-center gap-4">
+                {% csrf_token %}
+                <label class="flex items-center gap-2 text-xs text-gray-600 cursor-pointer select-none">
+                    <input type="checkbox" name="crear_asesores" checked class="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                    Crear como usuarios los asesores que falten
+                </label>
+                <button type="submit" name="confirmar" value="1" class="btn btn-success px-6 py-2"
+                        onclick="return confirm('¿Importar {{ total_citas }} citas? Se crearán clientes y expedientes con audiencia programada.');">
+                    <i class="fas fa-check"></i> Confirmar importación
+                </button>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ═══════════ PASO 3: RESULTADO ═══════════ -->
+    {% if resultado %}
+    <div class="bg-white rounded shadow-sm border border-gray-200">
+        <div class="px-4 py-2.5 border-b border-gray-200">
+            <h2 class="text-sm font-semibold text-gray-800 flex items-center gap-2">
+                <span class="text-green-600">✅</span> Importación completada
+            </h2>
+        </div>
+
+        <div class="p-4">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                <div class="bg-gray-50 border border-gray-200 rounded p-3">
+                    <div class="text-xs text-gray-500 mb-1">Citas del archivo</div>
+                    <div class="text-xl font-bold text-gray-800">{{ total_citas }}</div>
+                </div>
+                <div class="bg-gray-50 border border-gray-200 rounded p-3">
+                    <div class="text-xs text-gray-500 mb-1">Expedientes creados</div>
+                    <div class="text-xl font-bold text-green-700">{{ resultado.expedientes_creados }}</div>
+                </div>
+                <div class="bg-gray-50 border border-gray-200 rounded p-3">
+                    <div class="text-xs text-gray-500 mb-1">Omitidos (duplicados)</div>
+                    <div class="text-xl font-bold text-amber-600">{{ resultado.expedientes_omitidos }}</div>
+                </div>
+                <div class="bg-gray-50 border border-gray-200 rounded p-3">
+                    <div class="text-xs text-gray-500 mb-1">Clientes</div>
+                    <div class="text-xl font-bold text-blue-700">{{ resultado.clientes_creados }} <span class="text-xs font-normal text-gray-500">nuevos</span></div>
+                    <div class="text-xs text-gray-500">{{ resultado.clientes_existentes }} existentes</div>
+                </div>
+            </div>
+
+            {% if asesores_creados %}
+            <div class="mb-3 text-xs bg-green-50 border border-green-200 text-green-700 px-3 py-2 rounded">
+                <i class="fas fa-user-plus mr-1"></i>
+                Asesores creados: <strong>{{ asesores_creados|join:", " }}</strong>
+                <span class="text-green-600">(contraseña inicial: <code>Asesor123!</code>)</span>
+            </div>
+            {% endif %}
+            {% if asesores_existentes %}
+            <div class="mb-3 text-xs bg-blue-50 border border-blue-200 text-blue-700 px-3 py-2 rounded">
+                <i class="fas fa-users mr-1"></i>
+                Asesores ya existentes: {{ asesores_existentes|join:", " }}
+            </div>
+            {% endif %}
+            {% if resultado.sin_asesor %}
+            <div class="mb-3 text-xs bg-amber-50 border border-amber-200 text-amber-700 px-3 py-2 rounded">
+                <i class="fas fa-exclamation-triangle mr-1"></i>
+                Citas sin asesor asignado (revisar): {{ resultado.sin_asesor|slice:":10"|join:"; " }}
+                {% if resultado.sin_asesor|length > 10 %} ...{% endif %}
+            </div>
+            {% endif %}
+
+            <div class="flex gap-3 mt-2">
+                <a href="{% url 'calendario_audiencias' %}" class="btn btn-primary">
+                    <i class="fas fa-calendar-alt"></i> Ver calendario de audiencias
+                </a>
+                <a href="{% url 'expediente_list' %}" class="btn">
+                    <i class="fas fa-folder-open"></i> Ver expedientes
+                </a>
+                <a href="{% url 'importar_clt_web' %}" class="btn">
+                    <i class="fas fa-upload"></i> Importar otro archivo
+                </a>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const input = document.getElementById('archivo-input');
+    if (!input) return;
+    const dropZone = document.getElementById('drop-zone');
+    const fileName = document.getElementById('file-name');
+    const dropIcon = document.getElementById('drop-icon');
+    const dropText = document.getElementById('drop-text');
+
+    ['dragover', 'dragenter'].forEach(evt => {
+        dropZone.addEventListener(evt, e => {
+            e.preventDefault();
+            dropZone.classList.add('border-blue-500', 'bg-blue-50');
+        });
+    });
+    ['dragleave', 'drop'].forEach(evt => {
+        dropZone.addEventListener(evt, e => {
+            e.preventDefault();
+            dropZone.classList.remove('border-blue-500', 'bg-blue-50');
+        });
+    });
+    dropZone.addEventListener('drop', e => {
+        if (e.dataTransfer.files.length) {
+            input.files = e.dataTransfer.files;
+            actualizarNombre();
+        }
+    });
+    input.addEventListener('change', actualizarNombre);
+
+    function actualizarNombre() {
+        if (input.files.length) {
+            const f = input.files[0];
+            dropIcon.textContent = '📊';
+            dropText.textContent = f.name;
+            fileName.textContent = f.size > 0 ? (f.size / 1024).toFixed(1) + ' KB' : '';
+            fileName.classList.remove('hidden');
+        }
+    }
+});
+</script>
+{% endblock %}

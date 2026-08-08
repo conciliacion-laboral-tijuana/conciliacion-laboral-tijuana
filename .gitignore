@@ -20,6 +20,12 @@ env/
 media/
 !media/.gitkeep
 
+# Estáticos compilados (collectstatic)
+staticfiles/
+
+# Demandas generadas (datos de clientes)
+demandas_generadas/
+
 # Archivos de entorno
 .env
 

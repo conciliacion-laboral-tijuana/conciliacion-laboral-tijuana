@@ -41,7 +41,14 @@ def ejecutar_conciliacion(self, task_id):
 
     logger.info('[Celery] Ejecutando tarea %s para expediente %s', task_id, tarea.expediente_id)
 
-    from .conciliacion_automation import enviar_y_guardar
+    from .conciliacion_automation import enviar_y_guardar, screenshots_a_urls
+
+    # Directorio servible para screenshots y PDF (media/conciliacion/tarea_X)
+    import json as _json
+    from pathlib import Path as _Path
+    from django.conf import settings as _settings
+    download_dir = _Path(_settings.MEDIA_ROOT) / 'conciliacion' / f'tarea_{task_id}'
+    download_dir.mkdir(parents=True, exist_ok=True)
 
     try:
         # headless=True porque estamos en servidor (sin interfaz gráfica)
@@ -49,6 +56,7 @@ def ejecutar_conciliacion(self, task_id):
             expediente=tarea.expediente,
             usuario=tarea.usuario,
             headless=True,
+            download_dir=str(download_dir),
         )
 
         if resultado.success:
@@ -62,6 +70,12 @@ def ejecutar_conciliacion(self, task_id):
             tarea.error = resultado.error or 'Error desconocido'
             tarea.detalle = resultado.detalle or ''
             logger.warning('[Celery] Tarea %s falló: %s', task_id, resultado.error[:100])
+
+        # Guardar URLs servibles de screenshots (para el espejo en vivo)
+        if resultado.screenshots:
+            tarea.screenshots_json = _json.dumps(screenshots_a_urls(resultado.screenshots))
+        else:
+            tarea.screenshots_json = ''
 
     except Exception as exc:
         logger.exception('[Celery] Error en tarea %s', task_id)

@@ -40,6 +40,14 @@
                 </select>
             </div>
             <div>
+                <select name="oficina" class="w-full">
+                    <option value="">Todas las oficinas</option>
+                    {% for key, label in oficinas %}
+                    <option value="{{ key }}" {% if filtros.oficina == key %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
                 <select name="prioridad" class="w-full">
                     <option value="">Todas las prioridades</option>
                     <option value="alta" {% if filtros.prioridad == 'alta' %}selected{% endif %}>Alta</option>
@@ -59,13 +67,14 @@
 
     <!-- Tabla -->
     <div class="card overflow-hidden">
-        <div class="overflow-x-auto">
-            <table class="w-full">
+        <div class="excel-scroll">
+            <table class="w-full excel-table">
                 <thead>
                     <tr>
                         <th>N° Exp</th>
                         <th>Cliente</th>
                         <th>Empresa</th>
+                        <th>Oficina</th>
                         <th>Asesor</th>
                         <th>Estado</th>
                         <th>Prioridad</th>
@@ -80,6 +89,9 @@
                         <td class="font-medium text-gray-800">{{ exp.numero }}</td>
                         <td>{{ exp.cliente.nombre }}</td>
                         <td class="text-gray-600">{{ exp.cliente.empresa|default:'—' }}</td>
+                        <td>
+                            <span class="badge">{{ exp.cliente.get_oficina_display }}</span>
+                        </td>
                         <td class="text-gray-600">{{ exp.asesor.get_full_name|default:exp.asesor.username }}</td>
                         <td>
                             <span class="badge {{ ESTADO_COLORS|get_item:exp.estado }}">
@@ -103,7 +115,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="9" class="text-center text-gray-400 py-8">
+                        <td colspan="10" class="text-center text-gray-400 py-8">
                             No hay expedientes registrados.
                             <a href="{% url 'expediente_create' %}" class="block text-sm text-blue-700 hover:text-blue-900 mt-1">Crear primer expediente →</a>
                         </td>

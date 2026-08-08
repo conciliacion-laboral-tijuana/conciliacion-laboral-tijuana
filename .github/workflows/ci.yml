@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: ".python-version"
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Django system check
+        run: uv run python manage.py check
+        env:
+          SECRET_KEY: ci-secret-key
+          ALLOWED_HOSTS: "*"
+          CSRF_TRUSTED_ORIGINS: http://localhost
+          DEBUG: "False"
+
+      - name: Run tests (incluye verificación de cálculos laborales y flujo completo)
+        # settings_test: usa StaticFilesStorage simple (en CI no existe el
+        # manifest de collectstatic que exige CompressedManifestStaticFilesStorage)
+        run: uv run python manage.py test expedientes.tests --settings=config.settings_test --verbosity 2
+        env:
+          SECRET_KEY: ci-secret-key
+          ALLOWED_HOSTS: "*"
+          CSRF_TRUSTED_ORIGINS: http://localhost
+          DEBUG: "False"
+
+      - name: Verify demandas cálculos (script CLI)
+        run: uv run python verify_demandas_calculos.py
+        env:
+          SECRET_KEY: ci-secret-key
+          ALLOWED_HOSTS: "*"
+          CSRF_TRUSTED_ORIGINS: http://localhost
+          DEBUG: "False"

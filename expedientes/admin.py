@@ -1,7 +1,20 @@
 from django.contrib import admin
 from django.utils import timezone
 
-from .models import Cliente, Expediente, Documento, Movimiento, Nota, SolicitudConciliacion, WhatsAppMessage, LegalConfig, CalculoLaboral, Machote, Aviso, SolicitudTransferencia, Notificacion, TareaConciliacion
+from .models import Cliente, Expediente, Documento, Movimiento, Nota, SolicitudConciliacion, WhatsAppMessage, LegalConfig, CalculoLaboral, Machote, Aviso, SolicitudTransferencia, Notificacion, TareaConciliacion, Empresa
+
+
+@admin.register(Empresa)
+class EmpresaAdmin(admin.ModelAdmin):
+    list_display = ['nombre', 'domicilio_colonia', 'tipo_persona', 'abogado', 'telefono', 'created_at']
+    list_filter = ['tipo_persona', 'created_at']
+    search_fields = ['nombre', 'domicilio', 'abogado', 'telefono', 'domicilio_colonia']
+    readonly_fields = ['created_at', 'updated_at']
+    fieldsets = [
+        ('Empresa', {'fields': ['nombre', 'domicilio', 'abogado', 'telefono', 'tipo_persona']}),
+        ('Domicilio desglosado', {'fields': ['domicilio_calle', 'domicilio_numero', 'domicilio_colonia', 'domicilio_cp']}),
+        ('Metadatos', {'fields': ['created_at', 'updated_at']}),
+    ]
 
 
 @admin.register(SolicitudTransferencia)
@@ -137,14 +150,14 @@ class NotificacionAdmin(admin.ModelAdmin):
 
 @admin.register(Aviso)
 class AvisoAdmin(admin.ModelAdmin):
-    list_display = ['titulo', 'prioridad', 'activo', 'creado_por', 'created_at']
-    list_filter = ['prioridad', 'activo', 'created_at']
+    list_display = ['titulo', 'prioridad', 'activo', 'fecha_vencimiento', 'creado_por', 'created_at']
+    list_filter = ['prioridad', 'activo', 'created_at', 'fecha_vencimiento']
     search_fields = ['titulo', 'contenido']
     list_editable = ['activo']
     date_hierarchy = 'created_at'
     fieldsets = [
         ('Información', {
-            'fields': ['titulo', 'contenido', 'prioridad', 'activo']
+            'fields': ['titulo', 'contenido', 'prioridad', 'activo', 'fecha_vencimiento']
         }),
         ('Metadatos', {
             'fields': ['creado_por', 'created_at', 'updated_at'],

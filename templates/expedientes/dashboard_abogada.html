@@ -1,0 +1,253 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load custom_filters %}
+{% block title %}Mi Dashboard - Abogada | Conciliacion Laboral Tijuana{% endblock %}
+
+{% block content %}
+<div class="space-y-3">
+    <h1 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+        <img src="{% static 'svg/monitor-dashboard.svg' %}" class="w-5 h-5 icon-darkblue">
+        Mi Dashboard
+        <span class="text-[10px] font-semibold bg-rose-100 text-rose-700 px-2 py-0.5 rounded" style="border-radius: 3px;">Abogada</span>
+    </h1>
+
+    <!-- ─── Stats Cards ─────────────────────────────────────────────── -->
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-2">
+        <div class="card p-3">
+            <div class="text-[10px] text-gray-500 uppercase tracking-wider">Demandas</div>
+            <div class="text-xl font-bold text-rose-700">{{ total_demandas }}</div>
+        </div>
+        <div class="card p-3">
+            <div class="text-[10px] text-gray-500 uppercase tracking-wider">Monto Reclamado</div>
+            <div class="text-xl font-bold text-gray-800">${{ monto_demandas|floatformat:0 }}</div>
+        </div>
+        <div class="card p-3">
+            <div class="text-[10px] text-gray-500 uppercase tracking-wider">Clientes</div>
+            <div class="text-xl font-bold text-gray-800">{{ total_clientes }}</div>
+        </div>
+        <div class="card p-3">
+            <div class="text-[10px] text-gray-500 uppercase tracking-wider">Machotes</div>
+            <div class="text-xl font-bold text-gray-800">{{ total_machotes }}</div>
+        </div>
+        <div class="card p-3">
+            <div class="text-[10px] text-gray-500 uppercase tracking-wider">En Convenio</div>
+            <div class="text-xl font-bold text-green-700">{{ clientes_por_estado.convenio|default:0 }}</div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-3">
+        <!-- ─── Demandas (objeto principal) ─────────────────────────── -->
+        <div class="lg:col-span-2 card">
+            <div class="card-header flex items-center gap-1.5">
+                <span>⚖️ Demandas</span>
+                <a href="{% url 'expediente_list' %}?estado=demanda"
+                   class="ml-auto text-[10px] font-semibold text-rose-700 hover:text-rose-900">Ver todas →</a>
+            </div>
+            <div class="card-body p-0 excel-scroll" style="max-height: 340px;">
+                {% if demandas %}
+                <table class="excel-table">
+                    <thead>
+                        <tr>
+                            <th>N° Exp</th>
+                            <th>Cliente</th>
+                            <th>Empresa</th>
+                            <th>Asesor</th>
+                            <th class="text-right">Monto</th>
+                            <th>Estado</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for exp in demandas %}
+                        <tr>
+                            <td><a href="{% url 'expediente_detail' exp.pk %}" class="text-blue-700 hover:underline font-medium">{{ exp.numero }}</a></td>
+                            <td>{{ exp.cliente.nombre }}</td>
+                            <td>{{ exp.cliente.empresa|default:'—' }}</td>
+                            <td>{{ exp.asesor.get_full_name|default:exp.asesor.username }}</td>
+                            <td class="text-right">${{ exp.monto_reclamado|floatformat:0|default:'—' }}</td>
+                            <td><span class="badge {{ ESTADO_COLORS.demanda }}">{{ exp.get_estado_display }}</span></td>
+                            <td class="text-right whitespace-nowrap">
+                                <a href="{% url 'expediente_detail' exp.pk %}" class="btn btn-sm" title="Ver expediente"><i class="fas fa-eye"></i></a>
+                                <a href="{% url 'calculo_laboral' exp.pk %}" class="btn btn-sm" title="Cálculo laboral"><i class="fas fa-calculator"></i></a>
+                                <a href="{% url 'demanda_editor' exp.pk %}" class="btn btn-sm btn-primary" title="Editor de demanda"><i class="fas fa-file-word"></i></a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div class="p-8 text-center">
+                    <div class="text-3xl mb-2">📂</div>
+                    <p class="text-sm text-gray-500">No hay demandas registradas todavía.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- ─── Calculadora Libre ───────────────────────────────────── -->
+        <div class="card">
+            <div class="card-header flex items-center gap-1.5">
+                <span>🔮 Calculadora Libre</span>
+            </div>
+            <div class="card-body">
+                <p class="text-[10px] text-gray-500 mb-3">Estima prestaciones sin ligarla a ningún expediente.</p>
+                <form id="simulacion-form" method="POST" action="{% url 'simulacion_rapida' %}">
+                    {% csrf_token %}
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">{{ simulacion_form.salario.label }}</label>
+                            {{ simulacion_form.salario }}
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">{{ simulacion_form.fecha_ingreso.label }}</label>
+                            {{ simulacion_form.fecha_ingreso }}
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">{{ simulacion_form.fecha_salida.label }}</label>
+                            {{ simulacion_form.fecha_salida }}
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">{{ simulacion_form.periodo_pago.label }}</label>
+                            {{ simulacion_form.periodo_pago }}
+                        </div>
+                        <button type="submit" class="w-full btn btn-primary justify-center">
+                            🔮 Calcular
+                        </button>
+                    </div>
+                </form>
+                <div id="simulacion-resultado" class="mt-3"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        <!-- ─── Clientes (estado de todos) ──────────────────────────── -->
+        <div class="card">
+            <div class="card-header flex items-center gap-1.5">
+                <span>👥 Estado de Clientes</span>
+                <a href="{% url 'cliente_list' %}" class="ml-auto text-[10px] font-semibold text-gray-600 hover:text-gray-800">Ver todos →</a>
+            </div>
+            <div class="card-body p-0 excel-scroll" style="max-height: 280px;">
+                {% if clientes %}
+                <table class="excel-table">
+                    <thead>
+                        <tr>
+                            <th>Cliente</th>
+                            <th>Empresa</th>
+                            <th>Expediente</th>
+                            <th>Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for cli in clientes %}
+                        {% with exp=cli.expediente_set.first %}
+                        <tr>
+                            <td>{{ cli.nombre }}</td>
+                            <td>{{ cli.empresa|default:'—' }}</td>
+                            <td>
+                                {% if exp %}
+                                <a href="{% url 'expediente_detail' exp.pk %}" class="text-blue-700 hover:underline">{{ exp.numero }}</a>
+                                {% else %}—{% endif %}
+                            </td>
+                            <td>
+                                {% if exp %}
+                                <span class="badge {{ ESTADO_COLORS|get_item:exp.estado }}">{{ exp.get_estado_display }}</span>
+                                {% else %}<span class="text-gray-400 text-[10px]">Sin expediente</span>{% endif %}
+                            </td>
+                        </tr>
+                        {% endwith %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div class="p-8 text-center">
+                    <p class="text-sm text-gray-500">No hay clientes registrados.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- ─── Machotes a la mano ──────────────────────────────────── -->
+        <div class="card">
+            <div class="card-header flex items-center gap-1.5">
+                <span>📄 Machotes a la mano</span>
+                <a href="{% url 'machotes_catalogo' %}" class="ml-auto text-[10px] font-semibold text-gray-600 hover:text-gray-800">Catálogo →</a>
+            </div>
+            <div class="card-body p-0 excel-scroll" style="max-height: 280px;">
+                {% if machotes_demanda %}
+                <table class="excel-table">
+                    <thead>
+                        <tr>
+                            <th>Icono</th>
+                            <th>Machote</th>
+                            <th>Tipo</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for m in machotes_demanda %}
+                        <tr>
+                            <td class="text-center">{{ m.icono }}</td>
+                            <td>
+                                <a href="{% url 'machotes_catalogo' %}#machote-{{ m.pk }}"
+                                   class="text-blue-700 hover:underline font-medium"><span id="nombre-machote-{{ m.pk }}">{{ m.nombre }}</span></a>
+                            </td>
+                            <td class="text-[10px]">{{ m.get_tipo_despido_display|default:'General' }}</td>
+                            <td class="text-right whitespace-nowrap">
+                                <button type="button"
+                                        class="btn btn-sm"
+                                        title="Renombrar plantilla"
+                                        onclick="abrirRenombrar(this)"
+                                        data-pk="{{ m.pk }}"
+                                        data-url="{% url 'machote_renombrar' m.pk %}">
+                                    <i class="fas fa-i-cursor"></i> Renombrar
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div class="p-8 text-center">
+                    <div class="text-3xl mb-2">📄</div>
+                    <p class="text-sm text-gray-500 mb-2">No hay machotes todavía.</p>
+                    <a href="{% url 'machote_importar_web' %}" class="btn btn-primary btn-sm">Subir demanda Word</a>
+                </div>
+                {% endif %}
+                <div class="p-3 border-t border-gray-200 flex justify-end">
+                    <a href="{% url 'machote_importar_web' %}" class="btn btn-sm"><i class="fas fa-upload"></i> Subir nueva demanda (Word)</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% include 'expedientes/_modal_renombrar_machote.html' %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // ─── Simulación libre (mismo patrón que la pantalla de cálculo) ───
+    const form = document.getElementById('simulacion-form');
+    const resultado = document.getElementById('simulacion-resultado');
+    if (form && resultado) {
+        form.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            resultado.innerHTML = '<div class="text-center py-4 text-gray-500">⏳ Calculando...</div>';
+            try {
+                const response = await fetch(this.action, {
+                    method: 'POST',
+                    body: new FormData(this),
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                });
+                const html = await response.text();
+                resultado.innerHTML = html;
+            } catch (error) {
+                resultado.innerHTML = '<div class="text-center py-4 text-red-500">Error al calcular. Intenta de nuevo.</div>';
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

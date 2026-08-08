@@ -1,0 +1,142 @@
+<!-- Buscador de empresas del catálogo (autocompletado del formulario de cliente).
+     Al elegir una empresa se rellenan: razón social, teléfono, domicilio y tipo de persona.
+     Incluir UNA vez por página dentro del formulario que contiene los campos id_empresa_*. -->
+<div class="md:col-span-2 relative" id="empresa-buscador">
+  <label for="empresa-search-input" class="block text-sm font-medium text-gray-700 mb-1">
+    🔍 Buscar empresa en catálogo oficial
+  </label>
+  <div class="relative">
+    <input
+      type="text"
+      id="empresa-search-input"
+      autocomplete="off"
+      placeholder="Escribe el nombre (mín. 2 letras)…"
+      class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent pr-9"
+      data-empresa-actual="{{ empresa_actual }}"
+    />
+    <span id="empresa-search-spinner" class="hidden absolute right-3 top-2.5 text-gray-400 text-sm">⏳</span>
+  </div>
+  <ul
+    id="empresa-search-results"
+    class="hidden absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-y-auto divide-y divide-gray-100"
+  ></ul>
+  <p class="text-xs text-gray-400 mt-0.5">
+    Selecciona una empresa del catálogo y se autocompletará su domicilio oficial.
+  </p>
+</div>
+
+<script>
+(function () {
+  const input = document.getElementById('empresa-search-input');
+  const results = document.getElementById('empresa-search-results');
+  const spinner = document.getElementById('empresa-search-spinner');
+  if (!input || !results) return;
+
+  const URL_BUSCAR = "{% url 'buscar_empresas_catalogo' %}";
+  let timer = null;
+  let items = [];
+  let seleccionado = -1;
+
+  // Al editar un cliente existente, precargar el nombre de su empresa actual
+  if (input.dataset.empresaActual) {
+    input.value = input.dataset.empresaActual;
+  }
+
+  function setCampo(id, valor) {
+    const el = document.getElementById(id);
+    if (el) el.value = (valor === null || valor === undefined) ? '' : String(valor);
+  }
+
+  function ocultar() {
+    results.classList.add('hidden');
+    spinner.classList.add('hidden');
+    seleccionado = -1;
+  }
+
+  function resaltar(idx) {
+    seleccionado = idx;
+    Array.from(results.children).forEach((li, i) => {
+      const activo = i === idx;
+      li.classList.toggle('bg-blue-50', activo);
+      li.classList.toggle('border-l-4', activo);
+      li.classList.toggle('border-blue-600', activo);
+      li.classList.toggle('bg-white', !activo);
+      li.classList.toggle('border-l-0', !activo);
+    });
+  }
+
+  function aplicarEmpresa(e) {
+    setCampo('id_empresa', e.nombre);
+    setCampo('id_empresa_razon_social', e.nombre);
+    setCampo('id_empresa_telefono', e.telefono);
+    setCampo('id_empresa_calle', e.calle);
+    setCampo('id_empresa_numero', e.numero);
+    setCampo('id_empresa_colonia', e.colonia);
+    setCampo('id_empresa_cp', e.cp);
+    const tipo = document.getElementById('id_tipo_persona_citado');
+    if (tipo && e.tipo_persona) {
+      const coincide = Array.from(tipo.options).some(o => o.value === e.tipo_persona);
+      if (coincide) tipo.value = e.tipo_persona;
+    }
+    input.value = e.nombre;
+    ocultar();
+    // Micro-feedback visual
+    input.style.borderColor = '#22c55e';
+    setTimeout(() => { input.style.borderColor = ''; }, 900);
+  }
+
+  function buscar() {
+    const q = input.value.trim();
+    if (q.length < 2) { ocultar(); return; }
+    spinner.classList.remove('hidden');
+    fetch(URL_BUSCAR + '?q=' + encodeURIComponent(q))
+      .then(r => r.json())
+      .then(data => {
+        spinner.classList.add('hidden');
+        items = data.resultados || [];
+        results.innerHTML = '';
+        if (!items.length) {
+          const li = document.createElement('li');
+          li.className = 'px-3 py-2 text-sm text-gray-400';
+          li.textContent = 'Sin resultados en el catálogo.';
+          results.appendChild(li);
+        } else {
+          items.forEach((e, i) => {
+            const li = document.createElement('li');
+            li.className = 'px-3 py-2 cursor-pointer hover:bg-blue-50 transition-colors';
+            li.innerHTML = '<div class="text-sm font-semibold text-gray-800"></div>' +
+                           '<div class="text-xs text-gray-500 truncate"></div>';
+            li.querySelector('div').textContent = e.nombre;
+            li.querySelectorAll('div')[1].textContent =
+              [e.calle, e.numero, e.colonia, e.cp].filter(Boolean).join(', ') || e.domicilio || '';
+            li.addEventListener('click', () => aplicarEmpresa(e));
+            li.addEventListener('mousemove', () => resaltar(i));
+            results.appendChild(li);
+          });
+          resaltar(0);
+        }
+        results.classList.remove('hidden');
+      })
+      .catch(() => { spinner.classList.add('hidden'); ocultar(); });
+  }
+
+  input.addEventListener('input', () => {
+    clearTimeout(timer);
+    timer = setTimeout(buscar, 220);
+  });
+  input.addEventListener('focus', () => { if (input.value.trim().length >= 2) buscar(); });
+  input.addEventListener('keydown', (ev) => {
+    if (results.classList.contains('hidden')) return;
+    if (ev.key === 'ArrowDown') { ev.preventDefault(); resaltar(Math.min(seleccionado + 1, items.length - 1)); }
+    else if (ev.key === 'ArrowUp') { ev.preventDefault(); resaltar(Math.max(seleccionado - 1, 0)); }
+    else if (ev.key === 'Enter') {
+      if (seleccionado >= 0 && items[seleccionado]) { ev.preventDefault(); aplicarEmpresa(items[seleccionado]); }
+    }
+    else if (ev.key === 'Escape') { ocultar(); }
+  });
+  document.addEventListener('click', (ev) => {
+    const cont = document.getElementById('empresa-buscador');
+    if (!cont || !cont.contains(ev.target)) ocultar();
+  });
+})();
+</script>

@@ -128,6 +128,10 @@
               class="px-4 py-2 border border-gray-400 rounded-lg hover:bg-gray-100 transition-colors text-sm flex items-center gap-1.5">
         <i class="fas fa-eye"></i> Vista previa
       </button>
+      <button onclick="abrirModalMachote()"
+              class="px-4 py-2 border border-amber-400 text-amber-700 bg-amber-50 rounded-lg hover:bg-amber-100 transition-colors text-sm flex items-center gap-1.5">
+        <i class="fas fa-bookmark"></i> Guardar como machote
+      </button>
       <button onclick="descargarWord()"
               class="px-5 py-2.5 bg-rose-600 text-white rounded-lg hover:bg-rose-700 transition-colors text-sm font-semibold flex items-center gap-1.5 shadow-sm">
         <i class="fas fa-file-word"></i> Descargar Word
@@ -135,10 +139,25 @@
     </div>
   </div>
 
+  <!-- Alerta de datos críticos faltantes (si el cliente no tiene todo) -->
+  {% if datos_criticos_faltantes %}
+  <div class="bg-red-50 border border-red-200 rounded-lg p-3 mb-4 flex items-start gap-3 print-hidden">
+    <i class="fas fa-exclamation-triangle text-red-500 mt-0.5"></i>
+    <div>
+      <p class="text-sm font-semibold text-red-700">Faltan datos críticos del cliente</p>
+      <p class="text-xs text-red-600 mt-0.5">
+        {% for f in datos_criticos_faltantes %}<span class="inline-block bg-red-100 text-red-700 px-1.5 py-0.5 rounded mr-1 mb-0.5">{{ f.label }}</span>{% endfor %}
+        — la descarga está bloqueada hasta completarlos.
+        <a href="{% url 'demanda_asistente' expediente.pk %}" class="underline font-medium">Completar con el asistente</a>
+      </p>
+    </div>
+  </div>
+  {% endif %}
+
   <!-- Barra de estado -->
   <div class="bg-white border border-gray-200 rounded-lg p-3 mb-4 flex items-center gap-4 text-sm text-gray-600 print-hidden">
     <i class="fas fa-info-circle text-blue-500"></i>
-    <span>Edita libremente el contenido de la demanda. Selecciona una plantilla según el tipo de despido.</span>
+    <span>Edita libremente la demanda. <a href="{% url 'demanda_asistente' expediente.pk %}" class="text-blue-600 underline">¿Empezar con el asistente paso a paso?</a></span>
     <span class="ml-auto text-xs text-gray-400">Última actualización: {{ expediente.updated_at|date:"d/m/Y H:i" }}</span>
   </div>
 
@@ -245,6 +264,10 @@
               class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm">
         <i class="fas fa-eye"></i> Vista previa
       </button>
+      <button onclick="abrirModalMachote()"
+              class="px-4 py-2 border border-amber-400 text-amber-700 bg-amber-50 rounded-lg hover:bg-amber-100 transition-colors text-sm flex items-center gap-1.5">
+        <i class="fas fa-bookmark"></i> Guardar como machote
+      </button>
       <button onclick="descargarWord()"
               class="px-5 py-2.5 bg-rose-600 text-white rounded-lg hover:bg-rose-700 transition-colors text-sm font-semibold flex items-center gap-1.5">
         <i class="fas fa-file-word"></i> Descargar Word
@@ -253,24 +276,41 @@
   </div>
 </div>
 
-<!-- Modal de Vista Previa -->
-<div id="previewModal" class="fixed inset-0 bg-black/50 z-50 hidden items-center justify-center p-4 print-hidden">
-  <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+<!-- Modal Guardar como Machote -->
+<div id="machoteModal" class="fixed inset-0 bg-black/50 z-50 hidden items-center justify-center p-4 print-hidden">
+  <div class="bg-white rounded-xl shadow-2xl max-w-md w-full">
     <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-      <h3 class="font-semibold text-gray-800">📄 Vista Previa de la Demanda</h3>
-      <button onclick="cerrarPreview()" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+      <h3 class="font-semibold text-gray-800">📚 Guardar como Machote</h3>
+      <button onclick="cerrarModalMachote()" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
     </div>
-    <div class="p-6 overflow-y-auto flex-1" id="previewContent">
-      <!-- Se llena con JS -->
-    </div>
-    <div class="px-6 py-4 border-t border-gray-200 flex justify-end">
-      <button onclick="cerrarPreview()"
-              class="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm">
-        Cerrar
-      </button>
-    </div>
+    <form method="post" action="{% url 'demanda_guardar_machote' expediente.pk %}" id="machoteForm">
+      {% csrf_token %}
+      <div class="p-6">
+        <label class="block text-sm font-medium text-gray-700 mb-1">Nombre del machote</label>
+        <input type="text" name="nombre" required maxlength="200"
+               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+               placeholder="Ej: Demanda por despido injustificado con vacaciones vencidas">
+        <input type="hidden" name="contenido" id="machoteContenidoInput">
+        <p class="text-xs text-gray-400 mt-2">
+          💡 Los datos del cliente (nombre, CURP, salario, fechas, empresa) se convertirán automáticamente
+          en marcadores <code class="bg-gray-100 px-1 rounded">&#123;&#123; nombre_cliente &#125;&#125;</code> para reutilizar la plantilla en otros casos.
+        </p>
+      </div>
+      <div class="px-6 py-4 border-t border-gray-200 flex justify-end gap-2">
+        <button type="button" onclick="cerrarModalMachote()"
+                class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm">
+          Cancelar
+        </button>
+        <button type="submit"
+                class="px-5 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors text-sm font-semibold">
+          <i class="fas fa-bookmark"></i> Guardar machote
+        </button>
+      </div>
+    </form>
   </div>
 </div>
+
+{% include 'expedientes/_modal_vista_previa.html' with titulo_preview='Vista Previa de la Demanda' %}
 
 <!-- Form oculto para descargar -->
 <form id="downloadForm" method="post" action="{% url 'demanda_descargar' expediente.pk %}" style="display:none;">
@@ -321,34 +361,22 @@
     document.getElementById('downloadForm').submit();
   }
 
-  // ─── Vista Previa ────────────────────────────────────────────────
-  function vistaPrevia() {
+  // ─── Guardar como Machote ────────────────────────────────────────
+  function abrirModalMachote() {
     var html = getEditorHTML();
-    // Agregar estilos base para la vista previa
-    var previewHTML = `
-      <div style="font-family: 'Calibri', 'Segoe UI', sans-serif; font-size: 13px; line-height: 1.6; padding: 20px; max-width: 800px; margin: 0 auto;">
-        ${html}
-      </div>
-    `;
-    document.getElementById('previewContent').innerHTML = previewHTML;
-    document.getElementById('previewModal').classList.remove('hidden');
-    document.getElementById('previewModal').classList.add('flex');
+    document.getElementById('machoteContenidoInput').value = html;
+    document.getElementById('machoteModal').classList.remove('hidden');
+    document.getElementById('machoteModal').classList.add('flex');
+  }
+  function cerrarModalMachote() {
+    document.getElementById('machoteModal').classList.add('hidden');
+    document.getElementById('machoteModal').classList.remove('flex');
   }
 
-  function cerrarPreview() {
-    document.getElementById('previewModal').classList.add('hidden');
-    document.getElementById('previewModal').classList.remove('flex');
+  // ─── Vista Previa (usa el modal compartido) ──────────────────────
+  function vistaPrevia() {
+    abrirVistaPrevia(getEditorHTML());
   }
-
-  // Cerrar modal con Escape
-  document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') cerrarPreview();
-  });
-
-  // Cerrar modal al hacer clic fuera
-  document.getElementById('previewModal').addEventListener('click', function(e) {
-    if (e.target === this) cerrarPreview();
-  });
 
   // ─── Auto-guardar en localStorage ────────────────────────────────
   function autoGuardar() {

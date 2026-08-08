@@ -1,0 +1,66 @@
+{# ─── Modal compartido: Renombrar machote ───────────────────────────────── #}
+{# Uso: {% include 'expedientes/_modal_renombrar_machote.html' %}           #}
+{#                                                                          #}
+{# Requisitos en la página que lo incluye:                                  #}
+{#   • Un botón con data-pk y data-url que llame a abrirRenombrar(this)     #}
+{#   • Un elemento con id="nombre-machote-<pk>" mostrando el nombre actual  #}
+{#                                                                          #}
+{# Tras renombrar, la vista machote_renombrar devuelve al usuario a la      #}
+{# página actual (request.path); si el destino no es seguro, va al         #}
+{# catálogo por defecto.                                                    #}
+
+<!-- Modal: Renombrar machote -->
+<div id="modal-renombrar" class="fixed inset-0 z-50 items-center justify-center bg-black/50" style="display:none;">
+    <div class="bg-white w-full max-w-md mx-3 shadow-xl border border-gray-200" style="border-radius: 4px;">
+        <div class="px-4 py-3 border-b border-gray-200" style="background:#f5f6f7;">
+            <h3 class="text-sm font-bold text-gray-800">✏️ Renombrar machote</h3>
+        </div>
+        <form method="post" id="renombrar-form" action="">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.path }}">
+            <div class="p-4">
+                <p class="text-xs text-gray-500 mb-3">
+                    Nombre actual: <strong id="renombrar-nombre-actual"></strong>
+                </p>
+                <label class="block text-xs font-medium text-gray-700 mb-1" for="renombrar-input">Nuevo nombre *</label>
+                <input type="text" name="nombre" id="renombrar-input" required maxlength="200"
+                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+            </div>
+            <div class="px-4 py-3 border-t border-gray-200 flex justify-end gap-2" style="background:#f5f6f7;">
+                <button type="button" class="btn" onclick="cerrarRenombrar()">Cancelar</button>
+                <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Guardar nombre</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+// ─── Modal Renombrar machote ───────────────────────────────────────────
+function abrirRenombrar(btn) {
+    const pk = btn.dataset.pk;
+    document.getElementById('renombrar-form').action = btn.dataset.url;
+    const nombreActual = document.getElementById('nombre-machote-' + pk).textContent.trim();
+    document.getElementById('renombrar-nombre-actual').textContent = nombreActual;
+    const input = document.getElementById('renombrar-input');
+    input.value = nombreActual;
+    const modal = document.getElementById('modal-renombrar');
+    modal.style.display = 'flex';
+    input.focus();
+    input.select();
+}
+
+function cerrarRenombrar() {
+    document.getElementById('modal-renombrar').style.display = 'none';
+}
+
+// Cerrar al hacer clic fuera del modal o con Escape
+document.addEventListener('click', function(e) {
+    const modal = document.getElementById('modal-renombrar');
+    if (modal && modal.style.display === 'flex' && e.target === modal) {
+        cerrarRenombrar();
+    }
+});
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') cerrarRenombrar();
+});
+</script>

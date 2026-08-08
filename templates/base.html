@@ -191,6 +191,84 @@
             -webkit-overflow-scrolling: touch;
         }
 
+        /* ═══════════════════════════════════════════════════════════════════
+           EXCEL-STYLE SPREADSHEET TABLES
+           Cuadrícula tipo hoja de cálculo: encabezado gris-azul congelado,
+           bordes de celda finos y filas alternadas (blanco/gris claro).
+           Aplicar la clase `excel-table` a cualquier <table>.
+           ═══════════════════════════════════════════════════════════════════ */
+        table.excel-table {
+            border-collapse: separate !important;
+            border-spacing: 0 !important;
+            width: 100%;
+            font-family: 'Calibri', 'Segoe UI', Tahoma, Arial, sans-serif;
+            font-size: 12px;
+            background: #fff;
+        }
+
+        /* Encabezado: gris-azul estilo Excel, fijo al hacer scroll */
+        table.excel-table thead th {
+            position: sticky !important;
+            top: 0;
+            z-index: 10;
+            background: #d9e1f2 !important;   /* azul grisáceo de Excel */
+            color: #1f3864 !important;
+            font-weight: 700 !important;
+            font-size: 11px !important;
+            text-transform: none !important;
+            letter-spacing: 0.02em !important;
+            padding: 7px 10px !important;
+            border: 1px solid #9db2d6 !important;
+            border-bottom: 2px solid #7b93c4 !important;
+            white-space: nowrap;
+            text-align: left;
+        }
+        table.excel-table thead th.text-right { text-align: right !important; }
+        table.excel-table thead th.text-center { text-align: center !important; }
+
+        /* Celdas: bordes finos tipo rejilla */
+        table.excel-table th,
+        table.excel-table td {
+            border: 1px solid #d0d7e0 !important;
+            padding: 5px 10px !important;
+            vertical-align: middle;
+        }
+        table.excel-table tbody td {
+            font-size: 12px !important;
+        }
+
+        /* Eliminar borde inferior de fila para evitar doble línea */
+        table.excel-table tbody tr {
+            border-bottom: none !important;
+        }
+
+        /* Filas alternadas tipo Excel */
+        table.excel-table tbody tr:nth-child(odd) td {
+            background: #ffffff !important;
+        }
+        table.excel-table tbody tr:nth-child(even) td {
+            background: #f2f6fb !important;
+        }
+
+        /* Hover: resaltado azul claro tipo Excel */
+        table.excel-table tbody tr:hover td {
+            background: #dbe5f5 !important;
+        }
+
+        /* Pie de tabla: totales con fondo gris */
+        table.excel-table tfoot td {
+            background: #e8edf5 !important;
+            font-weight: 700 !important;
+            border-top: 2px solid #7b93c4 !important;
+        }
+
+        /* Contenedor con scroll para que el encabezado se congele */
+        .excel-scroll {
+            max-height: 65vh;
+            overflow: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
         /* ─── Pagination compact ───────────────────────────────────── */
         .px-3\\.py-1 {
             padding: 2px 8px !important;
@@ -457,6 +535,13 @@
             </span>
         </span>
 
+        <a href="{% url 'ajustes' %}"
+           class="flex items-center justify-center text-gray-400 hover:text-white transition-colors px-2 py-0.5 ml-1"
+           style="font-size: 11px;"
+           title="Ajustes">
+            <i class="fas fa-cog" style="font-size: 10px;"></i>
+        </a>
+
         <a href="{% url 'password_reset' %}"
            class="flex items-center justify-center text-gray-400 hover:text-white transition-colors px-2 py-0.5 ml-1"
            style="font-size: 11px;"
@@ -486,9 +571,19 @@
             <li class="{% if request.resolver_match.url_name == 'calendario_audiencias' %}active{% endif %}">
                 <a href="{% url 'calendario_audiencias' %}">Calendario</a>
             </li>
+            <li class="{% if request.resolver_match.url_name == 'generador_curp' %}active{% endif %}">
+                <a href="{% url 'generador_curp' %}">Generador CURP</a>
+            </li>
             {% if user.profile.rol == 'asesor' %}
             <li class="{% if request.resolver_match.url_name == 'dashboard_asesor' %}active{% endif %}">
                 <a href="{% url 'dashboard_asesor' %}">Mi Dashboard</a>
+            </li>
+            {% elif user.profile.rol == 'abogada' %}
+            <li class="{% if request.resolver_match.url_name == 'dashboard_abogada' %}active{% endif %}">
+                <a href="{% url 'dashboard_abogada' %}">Mi Dashboard</a>
+            </li>
+            <li class="{% if request.resolver_match.url_name == 'machotes_catalogo' or request.resolver_match.url_name == 'machote_importar_web' %}active{% endif %}">
+                <a href="{% url 'machotes_catalogo' %}">Machotes</a>
             </li>
             {% elif user.profile.rol == 'admin' or user.profile.rol == 'superadmin' %}
             <li class="{% if request.resolver_match.url_name == 'dashboard_admin' %}active{% endif %}">
@@ -499,6 +594,9 @@
             </li>
             <li class="{% if request.resolver_match.url_name == 'exportar_excel' %}active{% endif %}">
                 <a href="{% url 'exportar_excel' %}">Exportar</a>
+            </li>
+            <li class="{% if request.resolver_match.url_name == 'importar_clt_web' %}active{% endif %}">
+                <a href="{% url 'importar_clt_web' %}">Importar CLT</a>
             </li>
             {% endif %}
             {% if user.profile.rol == 'admin' or user.profile.rol == 'superadmin' or user.profile.rol == 'finanzas' %}
@@ -570,6 +668,71 @@
     </script>
 
     {% block extra_scripts %}{% endblock %}
+
+    {% if aviso_obligatorio %}
+    <!-- ═══ AVISO OBLIGATORIO (modal bloqueante) ═════════════════════════ -->
+    <div id="aviso-obligatorio"
+         style="position:fixed; top:0; left:0; right:0; bottom:0; z-index:99999;
+                background:rgba(15,23,42,0.85); display:flex; align-items:center; justify-content:center;
+                padding:20px;">
+        <div style="background:#fff; max-width:560px; width:100%; border-radius:8px; overflow:hidden;
+                    box-shadow:0 25px 60px rgba(0,0,0,0.5);">
+            <div style="padding:16px 20px; display:flex; align-items:center; gap:10px;
+                        {% if aviso_obligatorio.prioridad == 'alta' %}background:#8b3a3a;{% elif aviso_obligatorio.prioridad == 'baja' %}background:#47505e;{% else %}background:#2563eb;{% endif %}">
+                <span style="font-size:22px;">
+                    {% if aviso_obligatorio.prioridad == 'alta' %}🚨{% elif aviso_obligatorio.prioridad == 'baja' %}📌{% else %}📢{% endif %}
+                </span>
+                <div style="color:#fff;">
+                    <div style="font-size:10px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; opacity:0.85;">
+                        {% if aviso_obligatorio.prioridad == 'alta' %}Aviso importante{% else %}Aviso del administrador{% endif %}
+                    </div>
+                    <div style="font-size:16px; font-weight:700;">{{ aviso_obligatorio.titulo }}</div>
+                </div>
+            </div>
+            <div style="padding:20px; max-height:50vh; overflow-y:auto;">
+                {% if aviso_obligatorio.contenido %}
+                <div style="font-size:14px; line-height:1.6; color:#1f2937; white-space:pre-line;">{{ aviso_obligatorio.contenido }}</div>
+                {% else %}
+                <p style="font-size:14px; color:#6b7280;">No hay detalle adicional.</p>
+                {% endif %}
+                <p style="font-size:11px; color:#9ca3af; margin-top:14px;">
+                    Publicado por {{ aviso_obligatorio.creado_por.get_full_name|default:aviso_obligatorio.creado_por.username }} · {{ aviso_obligatorio.created_at|date:"d/m/Y H:i" }}
+                </p>
+            </div>
+            <div style="padding:14px 20px; border-top:1px solid #e5e7eb; display:flex; justify-content:flex-end;">
+                <button id="aviso-entendido"
+                        style="background:#16a34a; color:#fff; border:none; border-radius:6px;
+                               padding:10px 24px; font-size:14px; font-weight:700; cursor:pointer;">
+                    ✔ Entendido, ya lo leí
+                </button>
+            </div>
+        </div>
+    </div>
+    <script>
+    (function() {
+        var avisoId = {{ aviso_obligatorio.pk }};
+        // Bloquear Escape y clic fuera para que NO haya forma de saltárselo
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') e.stopPropagation();
+        }, true);
+        document.getElementById('aviso-obligatorio').addEventListener('click', function(e) {
+            if (e.target.id === 'aviso-obligatorio') e.stopPropagation();
+        });
+        document.getElementById('aviso-entendido').addEventListener('click', function() {
+            var btn = this;
+            btn.disabled = true;
+            btn.textContent = 'Guardando…';
+            fetch('/avisos/' + avisoId + '/marcar-leido/', {
+                method: 'POST',
+                headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+            }).then(function(r) { return r.json(); }).then(function(d) {
+                if (d.ok) window.location.reload();
+                else btn.disabled = false;
+            }).catch(function() { btn.disabled = false; btn.textContent = 'Reintentar'; });
+        });
+    })();
+    </script>
+    {% endif %}
 
     <script>
     // ─── Toast de conciliación exitosa ──────────────────────────────────

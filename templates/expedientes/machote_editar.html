@@ -1,0 +1,149 @@
+{% extends 'base.html' %}
+{% block title %}Editar Machote - {{ machote.nombre }}{% endblock %}
+
+{% block extra_head %}
+<link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet">
+<style>
+  .editor-wrapper {
+    background: white;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    overflow: hidden;
+  }
+  #machote-editor { min-height: 600px; font-size: 14px; line-height: 1.6; }
+  #machote-editor h2 { font-size: 16px; font-weight: 700; color: #1F2937; margin-top: 16px; }
+  #machote-editor h3 { font-size: 14px; font-weight: 700; color: #1F2937; margin-top: 14px; margin-bottom: 8px; }
+  #machote-editor p { margin-bottom: 6px; }
+  #machote-editor table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+  #machote-editor td, #machote-editor th { border: 1px solid #ccc; padding: 6px 10px; font-size: 13px; }
+  #machote-editor th { background: #1F2937; color: white; font-weight: 600; }
+  .ql-editor { padding: 30px 40px; }
+  .ql-toolbar { background: #f8fafc; border-bottom: 1px solid #e2e8f0 !important; border-radius: 12px 12px 0 0; }
+  .ql-container { border: none !important; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto pb-10">
+  <!-- Header -->
+  <div class="flex items-center justify-between mb-4">
+    <div>
+      <h1 class="text-xl font-bold text-gray-800">{{ machote.icono }} Editar Machote</h1>
+      <p class="text-gray-500 text-sm">Plantilla: <strong>{{ machote.nombre }}</strong></p>
+      <p class="text-gray-400 text-xs mt-0.5">
+        Edita el contenido de la plantilla con marcadores <code class="bg-gray-100 px-1 rounded">&#123;&#123; variable &#125;&#125;</code>
+        para reutilizarla en cualquier expediente.
+      </p>
+    </div>
+    <div class="flex items-center gap-2">
+      <a href="{% url 'machotes_catalogo' %}"
+         class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm flex items-center gap-1.5">
+        <i class="fas fa-arrow-left text-xs"></i> Volver al catálogo
+      </a>
+      <button onclick="guardarMachote()"
+              class="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-semibold flex items-center gap-1.5 shadow-sm">
+        <i class="fas fa-save"></i> Guardar cambios
+      </button>
+    </div>
+  </div>
+
+  <form method="post" id="machoteForm">
+    {% csrf_token %}
+
+    <!-- Metadatos -->
+    <div class="bg-white border border-gray-200 rounded-xl p-5 mb-4">
+      <h2 class="text-sm font-semibold text-gray-700 mb-3">📋 Datos de la plantilla</h2>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="md:col-span-3">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Nombre *</label>
+          {{ form.nombre }}
+          {% if form.nombre.errors %}<p class="text-red-500 text-xs mt-1">{{ form.nombre.errors.0 }}</p>{% endif %}
+        </div>
+        <div class="md:col-span-3">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
+          {{ form.descripcion }}
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Categoría</label>
+          {{ form.categoria }}
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Tipo de despido</label>
+          {{ form.tipo_despido }}
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Jurisdicción</label>
+          {{ form.jurisdiccion }}
+        </div>
+        <div class="md:col-span-3">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Icono (emoji)</label>
+          {{ form.icono }}
+        </div>
+      </div>
+    </div>
+
+    <!-- Editor de contenido -->
+    <div class="editor-wrapper">
+      <div id="machote-editor"></div>
+      <script id="machote-initial-content" type="text/plain">{{ contenido_html|safe }}</script>
+    </div>
+    <input type="hidden" name="contenido" id="contenidoInput">
+  </form>
+
+  <!-- Peligro -->
+  <div class="mt-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-center justify-between">
+    <div>
+      <p class="text-sm font-semibold text-red-700">🗑️ Eliminar plantilla</p>
+      <p class="text-xs text-red-600">Esta acción no se puede deshacer. El machote dejará de estar disponible para todos los expedientes.</p>
+    </div>
+    <form method="post" action="{% url 'machote_eliminar' machote.pk %}"
+          onsubmit="return confirm('¿Eliminar el machote \\'{{ machote.nombre|escapejs }}\\'? Esta acción no se puede deshacer.');">
+      {% csrf_token %}
+      <button type="submit" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-semibold">
+        <i class="fas fa-trash"></i> Eliminar machote
+      </button>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
+<script>
+  var quill = new Quill('#machote-editor', {
+    theme: 'snow',
+    modules: {
+      toolbar: [
+        [{ 'header': [1, 2, 3, false] }],
+        ['bold', 'italic', 'underline', 'strike'],
+        [{ 'color': [] }, { 'background': [] }],
+        [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+        [{ 'align': [] }],
+        [{ 'indent': '-1'}, { 'indent': '+1' }],
+        ['blockquote', 'code-block'],
+        ['clean']
+      ]
+    }
+  });
+
+  var initialContentEl = document.getElementById('machote-initial-content');
+  if (initialContentEl) {
+    var initialHTML = initialContentEl.textContent.trim();
+    if (initialHTML) quill.clipboard.dangerouslyPasteHTML(initialHTML);
+  }
+
+  function guardarMachote() {
+    document.getElementById('contenidoInput').value = quill.root.innerHTML;
+    document.getElementById('machoteForm').submit();
+  }
+
+  // Ctrl+Shift+S para guardar
+  document.addEventListener('keydown', function(e) {
+    if (e.ctrlKey && e.shiftKey && (e.key === 'S' || e.key === 's')) {
+      e.preventDefault();
+      guardarMachote();
+    }
+  });
+</script>
+{% endblock %}

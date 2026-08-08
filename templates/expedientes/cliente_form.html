@@ -33,12 +33,6 @@
                         <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.curp.label }}</label>
                         <div class="flex gap-2">
                             {{ form.curp }}
-                            {% if not object %}
-                            <button type="button" onclick="abrirGeneradorCURP()"
-                                    class="btn btn-primary" style="white-space: nowrap;">
-                                <i class="fas fa-magic"></i> Generar CURP
-                            </button>
-                            {% endif %}
                         </div>
                         {% if form.curp.errors %}<p class="text-red-500 text-xs mt-1">{{ form.curp.errors.0 }}</p>{% endif %}
                     </div>
@@ -118,6 +112,7 @@
             <div>
                 <h2 class="text-sm font-semibold text-gray-800 mb-3 border-b pb-1.5">Empresa / Patrón</h2>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {% include 'expedientes/_empresa_buscador.html' with empresa_actual=form.instance.empresa_razon_social|default:form.instance.empresa %}
                     <div class="md:col-span-2">
                         <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.empresa.label }}</label>
                         {{ form.empresa }}
@@ -143,11 +138,6 @@
                         <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.empresa_telefono.label }}</label>
                         {{ form.empresa_telefono }}
                         {% if form.empresa_telefono.errors %}<p class="text-red-500 text-xs mt-1">{{ form.empresa_telefono.errors.0 }}</p>{% endif %}
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.rfc.label }}</label>
-                        {{ form.rfc }}
-                        {% if form.rfc.errors %}<p class="text-red-500 text-xs mt-1">{{ form.rfc.errors.0 }}</p>{% endif %}
                     </div>
                     <div class="md:col-span-2">
                         <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.empresa_calle.label }}</label>
@@ -262,7 +252,4 @@
 {% endblock %}
 
 {% block extra_scripts %}
-{% if not object %}
-{% include 'expedientes/_curp_generator_modal.html' %}
-{% endif %}
 {% endblock %}

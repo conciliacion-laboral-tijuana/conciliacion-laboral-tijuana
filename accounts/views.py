@@ -31,6 +31,8 @@ class CustomLoginView(LoginView):
             rol = user.profile.rol
             if rol == 'asesor':
                 return reverse_lazy('dashboard_asesor')
+            elif rol == 'abogada':
+                return reverse_lazy('dashboard_abogada')
             elif rol == 'finanzas':
                 return reverse_lazy('dashboard_financiero')
             elif rol in ['admin', 'superadmin']:

@@ -62,7 +62,6 @@ class CashMovementForm(forms.ModelForm):
         self.user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
         self.fields['oficina'].queryset = Office.objects.filter(activa=True)
-        self.fields['semana'].queryset = WorkWeek.objects.filter(estado='abierta')
         # Initial category choices based on default tipo (ingreso)
         self.fields['categoria'].choices = CashMovement.CATEGORIA_INGRESO_CHOICES
 

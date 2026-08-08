@@ -133,14 +133,6 @@ class Expense(models.Model):
                                  verbose_name='Oficina',
                                  help_text='Oficina a la que pertenece el gasto')
 
-    # Semana de trabajo (opcional)
-    semana = models.ForeignKey(
-        'WorkWeek', on_delete=models.SET_NULL,
-        null=True, blank=True,
-        verbose_name='Semana de trabajo',
-        help_text='Semana a la que pertenece este gasto'
-    )
-
     # Auditoría
     registrado_por = models.ForeignKey(User, on_delete=models.PROTECT,
                                        verbose_name='Registrado por',
@@ -579,14 +571,6 @@ class CashMovement(models.Model):
                                     help_text='Detalle del movimiento')
     referencia = models.CharField('Referencia', max_length=200, blank=True,
                                    help_text='Número de expediente, factura o nota relacionada')
-
-    # Semana de trabajo (opcional, para reportes semanales)
-    semana = models.ForeignKey(
-        'WorkWeek', on_delete=models.SET_NULL,
-        null=True, blank=True,
-        verbose_name='Semana de trabajo',
-        help_text='Semana a la que pertenece este movimiento'
-    )
 
     # Auditoría
     registrado_por = models.ForeignKey(User, on_delete=models.PROTECT,

@@ -1,0 +1,351 @@
+{% extends 'base.html' %}
+{% load custom_filters %}
+{% block title %}Asistente de Demanda - {{ expediente.numero }}{% endblock %}
+
+{% block content %}
+<style>
+  .paso-indicador { transition: all 0.2s ease; }
+  .paso-indicador.completado { border-color: #16a34a; color: #16a34a; }
+  .paso-indicador.activo { border-color: #1D4ED8; color: #1D4ED8; box-shadow: 0 0 0 3px rgba(29,78,216,0.15); }
+  .paso-card { animation: fadeIn 0.25s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .campo-error { border-color: #ef4444 !important; }
+</style>
+
+<div class="max-w-4xl mx-auto pb-10">
+  <!-- Header -->
+  <div class="flex items-center justify-between mb-5">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-800">🧭 Asistente de Demanda</h1>
+      <p class="text-gray-500 text-sm">
+        Expediente: <strong>{{ expediente.numero }}</strong> — {{ expediente.cliente.nombre }}
+      </p>
+      <p class="text-gray-400 text-xs mt-0.5">Llena la demanda paso a paso para no omitir ningún dato. Al final podrás editar todo en el editor.</p>
+    </div>
+    <a href="{% url 'expediente_detail' expediente.pk %}"
+       class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm flex items-center gap-1.5">
+      <i class="fas fa-arrow-left text-xs"></i> Volver
+    </a>
+  </div>
+
+  <!-- Indicador de pasos -->
+  <div class="flex items-center gap-2 mb-6 print-hidden">
+    {% for key, info in pasos_info.items %}
+      {% if key == paso %}
+      <div class="paso-indicador activo flex-1 bg-white border-2 border-blue-600 rounded-xl px-3 py-2.5 text-center">
+        <div class="text-[10px] font-bold text-blue-700 uppercase">Paso {{ key }}</div>
+        <div class="text-xs font-semibold text-gray-800 mt-0.5">{{ info.titulo }}</div>
+      </div>
+      {% else %}
+      <div class="paso-indicador flex-1 bg-white border border-gray-200 rounded-xl px-3 py-2.5 text-center opacity-70">
+        <div class="text-[10px] font-bold text-gray-500 uppercase">Paso {{ key }}</div>
+        <div class="text-xs text-gray-600 mt-0.5">{{ info.titulo }}</div>
+      </div>
+      {% endif %}
+      {% if key != '3' %}<i class="fas fa-chevron-right text-gray-300 text-xs"></i>{% endif %}
+    {% endfor %}
+    <div class="paso-indicador {% if paso == '4' %}activo{% endif %} bg-white border {% if paso == '4' %}border-blue-600{% else %}border-gray-200{% endif %} rounded-xl px-3 py-2.5 text-center {% if paso != '4' %}opacity-70{% endif %}">
+      <div class="text-[10px] font-bold {% if paso == '4' %}text-blue-700{% else %}text-gray-500{% endif %} uppercase">Revisión final</div>
+      <div class="text-xs {% if paso == '4' %}text-gray-800 font-semibold{% else %}text-gray-600{% endif %} mt-0.5">Firma y cálculos</div>
+    </div>
+  </div>
+
+  <!-- Card del paso actual -->
+  <div class="paso-card bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+    {% if paso in pasos_info %}
+    <!-- ─── Pasos 1-3: formulario de datos ─────────────────────────── -->
+    <form method="post" action="{% url 'demanda_asistente' expediente.pk %}" id="pasoForm">
+      {% csrf_token %}
+      <input type="hidden" name="paso_actual" value="{{ paso }}">
+
+      <div class="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-white">
+        <h2 class="text-lg font-bold text-gray-800">{{ pasos_info|get_item:paso|get_item:'titulo' }}</h2>
+        <p class="text-sm text-gray-500">{{ pasos_info|get_item:paso|get_item:'descripcion' }}</p>
+      </div>
+
+      <div class="p-6">
+        {% if errores %}
+        <div class="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+          <p class="text-red-600 text-sm font-medium">Corrige los campos marcados en rojo:</p>
+          <ul class="mt-1 list-disc list-inside text-red-600 text-xs">
+            {% for campo, msgs in errores.items %}
+              {% for msg in msgs %}<li>{{ campo }}: {{ msg }}</li>{% endfor %}
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+
+        {% if paso == '1' %}
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="md:col-span-2">
+            <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.nombre.label }} <span class="text-red-500">*</span></label>
+            {{ form.nombre }}
+            {% if errores.nombre %}<p class="text-red-500 text-xs mt-1">{{ errores.nombre.0 }}</p>{% endif %}
+            <p class="text-xs text-gray-400 mt-0.5">Este nombre aparecerá en la parte superior (ACTOR) y en la FIRMA al final de la demanda.</p>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.curp.label }} <span class="text-red-500">*</span></label>
+            {{ form.curp }}
+            {% if errores.curp %}<p class="text-red-500 text-xs mt-1">{{ errores.curp.0 }}</p>{% endif %}
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.rfc.label }}</label>
+            {{ form.rfc }}
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.telefono.label }}</label>
+            {{ form.telefono }}
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.whatsapp.label }}</label>
+            {{ form.whatsapp }}
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.email.label }}</label>
+            {{ form.email }}
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.fecha_nacimiento.label }}</label>
+            {{ form.fecha_nacimiento }}
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.genero.label }}</label>
+            {{ form.genero }}
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.como_supo.label }}</label>
+            {{ form.como_supo }}
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.oficina.label }} <span class="text-red-500">*</span></label>
+            {{ form.oficina }}
+            {% if errores.oficina %}<p class="text-red-500 text-xs mt-1">{{ errores.oficina.0 }}</p>{% endif %}
+          </div>
+        </div>
+
+        {% elif paso == '2' %}
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="md:col-span-3">
+            <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.puesto.label }}</label>
+            {{ form.puesto }}
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.salario.label }} <span class="text-red-500">*</span></label>
+            {{ form.salario }}
+            {% if errores.salario %}<p class="text-red-500 text-xs mt-1">{{ errores.salario.0 }}</p>{% endif %}
+            <p class="text-xs text-gray-400 mt-0.5">Necesario para los cálculos automáticos.</p>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.periodo_pago.label }}</label>
+            {{ form.periodo_pago }}
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.horas_semanales.label }}</label>
+            {{ form.horas_semanales }}
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.jornada.label }}</label>
+            {{ form.jornada }}
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.fecha_ingreso.label }} <span class="text-red-500">*</span></label>
+            {{ form.fecha_ingreso }}
+            {% if errores.fecha_ingreso %}<p class="text-red-500 text-xs mt-1">{{ errores.fecha_ingreso.0 }}</p>{% endif %}
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.fecha_salida.label }} <span class="text-red-500">*</span></label>
+            {{ form.fecha_salida }}
+            {% if errores.fecha_salida %}<p class="text-red-500 text-xs mt-1">{{ errores.fecha_salida.0 }}</p>{% endif %}
+          </div>
+        </div>
+
+        {% elif paso == '3' %}
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {% include 'expedientes/_empresa_buscador.html' with empresa_actual=cliente.empresa_razon_social|default:cliente.empresa %}
+          <div class="md:col-span-2">
+            <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.empresa.label }} <span class="text-red-500">*</span></label>
+            {{ form.empresa }}
+            {% if errores.empresa %}<p class="text-red-500 text-xs mt-1">{{ errores.empresa.0 }}</p>{% endif %}
+          </div>
+          <div class="md:col-span-2">
+            <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.empresa_razon_social.label }}</label>
+            {{ form.empresa_razon_social }}
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.empresa_actividad.label }}</label>
+            {{ form.empresa_actividad }}
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.tipo_persona_citado.label }}</label>
+            {{ form.tipo_persona_citado }}
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.empresa_telefono.label }}</label>
+            {{ form.empresa_telefono }}
+          </div>
+          <div class="md:col-span-2">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+              <div class="md:col-span-2">
+                <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.empresa_calle.label }}</label>
+                {{ form.empresa_calle }}
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.empresa_numero.label }}</label>
+                {{ form.empresa_numero }}
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.empresa_cp.label }}</label>
+                {{ form.empresa_cp }}
+              </div>
+              <div class="md:col-span-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.empresa_colonia.label }}</label>
+                {{ form.empresa_colonia }}
+              </div>
+            </div>
+          </div>
+          <div class="md:col-span-2">
+            <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.empresa_referencias.label }}</label>
+            {{ form.empresa_referencias }}
+          </div>
+        </div>
+        {% endif %}
+      </div>
+
+      <div class="px-6 py-4 border-t border-gray-200 bg-gray-50 flex items-center justify-between">
+        {% if paso == '1' %}
+        <span></span>
+        {% else %}
+        <a href="{% url 'demanda_asistente' expediente.pk %}?paso={% if paso == '2' %}1{% elif paso == '3' %}2{% else %}1{% endif %}"
+           class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors text-sm">
+          <i class="fas fa-arrow-left text-xs"></i> Anterior
+        </a>
+        {% endif %}
+        <button type="submit" name="accion" value="siguiente"
+                class="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-semibold flex items-center gap-1.5">
+          Continuar <i class="fas fa-arrow-right text-xs"></i>
+        </button>
+      </div>
+    </form>
+
+    {% elif paso == '4' %}
+    <!-- ─── Paso 4: Revisión final ───────────────────────────────── -->
+    <form method="post" action="{% url 'demanda_asistente' expediente.pk %}">
+      {% csrf_token %}
+      <input type="hidden" name="paso_actual" value="4">
+      <input type="hidden" name="accion" value="finalizar">
+
+      <div class="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-emerald-50 to-white">
+        <h2 class="text-lg font-bold text-gray-800">✅ Revisión final</h2>
+        <p class="text-sm text-gray-500">Confirma que todo esté correcto antes de generar la demanda. El nombre del cliente se verifica en la firma.</p>
+      </div>
+
+      <div class="p-6 space-y-5">
+        <!-- Datos críticos -->
+        <div>
+          <h3 class="text-sm font-semibold text-gray-700 mb-2">🔒 Datos críticos (obligatorios)</h3>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {% for crit in faltantes_criticos %}
+            <div class="flex items-center gap-2 p-2.5 bg-red-50 border border-red-200 rounded-lg">
+              <i class="fas fa-times-circle text-red-500"></i>
+              <span class="text-sm text-red-700">{{ crit.label }}</span>
+              <span class="ml-auto text-[10px] font-bold bg-red-100 text-red-600 px-1.5 py-0.5 rounded">FALTA</span>
+            </div>
+            {% empty %}
+            <div class="flex items-center gap-2 p-2.5 bg-green-50 border border-green-200 rounded-lg col-span-2">
+              <i class="fas fa-check-circle text-green-600"></i>
+              <span class="text-sm text-green-700">Todos los datos críticos del cliente están completos.</span>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+
+        <!-- Tipo de despido -->
+        <div>
+          <h3 class="text-sm font-semibold text-gray-700 mb-2">⚖️ Tipo de despido</h3>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            {% for key, label in tipos_despido %}
+            <label class="flex items-center gap-2 p-3 border rounded-lg cursor-pointer transition-colors
+                          {% if expediente.tipo_despido == key %}border-blue-500 bg-blue-50{% else %}border-gray-200 hover:border-blue-300{% endif %}">
+              <input type="radio" name="tipo_despido" value="{{ key }}"
+                     {% if expediente.tipo_despido == key %}checked{% endif %}
+                     class="accent-blue-600">
+              <span class="text-sm text-gray-800">{{ label }}</span>
+            </label>
+            {% endfor %}
+          </div>
+          <p class="text-xs text-gray-400 mt-1.5">El tipo de despido define los conceptos que se reclaman (los cálculos se ajustan automáticamente).</p>
+        </div>
+
+        <!-- Cálculo automático -->
+        <div>
+          <h3 class="text-sm font-semibold text-gray-700 mb-2">🧮 Cálculo automático</h3>
+          {% if calculo and calculo.success %}
+          <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
+            <table class="w-full text-sm">
+              <thead class="bg-gray-800 text-white">
+                <tr>
+                  <th class="px-4 py-2 text-left font-medium">Prestación</th>
+                  <th class="px-4 py-2 text-right font-medium">Importe</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100">
+                <tr><td class="px-4 py-2 text-gray-700">Aguinaldo proporcional</td><td class="px-4 py-2 text-right font-medium">${{ calculo.aguinaldo.monto|floatformat:2 }}</td></tr>
+                <tr><td class="px-4 py-2 text-gray-700">Vacaciones ({{ calculo.vacaciones.dias_segun_antiguedad }} días)</td><td class="px-4 py-2 text-right font-medium">${{ calculo.vacaciones.monto|floatformat:2 }}</td></tr>
+                <tr><td class="px-4 py-2 text-gray-700">Prima vacacional 25%</td><td class="px-4 py-2 text-right font-medium">${{ calculo.prima_vacacional.monto|floatformat:2 }}</td></tr>
+                {% if calculo.prima_antiguedad.monto %}
+                <tr><td class="px-4 py-2 text-gray-700">Prima de antigüedad</td><td class="px-4 py-2 text-right font-medium">${{ calculo.prima_antiguedad.monto|floatformat:2 }}</td></tr>
+                {% endif %}
+                {% if calculo.indemnizacion.monto %}
+                <tr><td class="px-4 py-2 text-gray-700">Indemnización constitucional (90 días)</td><td class="px-4 py-2 text-right font-medium">${{ calculo.indemnizacion.monto|floatformat:2 }}</td></tr>
+                {% endif %}
+                <tr class="bg-blue-50">
+                  <td class="px-4 py-2 font-bold text-gray-800">TOTAL</td>
+                  <td class="px-4 py-2 text-right font-bold text-blue-700">${{ calculo.total|floatformat:2 }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+          <div class="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700">
+            ⚠️ No se pudo calcular: faltan salario o fechas. Completa los datos críticos.
+          </div>
+          {% endif %}
+        </div>
+
+        <!-- Firma (nombre arriba y abajo) -->
+        <div>
+          <h3 class="text-sm font-semibold text-gray-700 mb-2">✍️ Verificación de la firma</h3>
+          <div class="bg-white border border-gray-200 rounded-xl p-5 text-center">
+            <div class="text-sm font-bold text-gray-800">{{ cliente.nombre|upper }}</div>
+            <div class="text-[11px] text-gray-500 mt-0.5">ACTOR (parte superior de la demanda)</div>
+            <div class="my-4 border-t-2 border-dashed border-gray-300"></div>
+            <div class="inline-block border-t border-gray-400 pt-2 px-10">
+              <div class="text-sm font-bold text-gray-800">{{ cliente.nombre|upper }}</div>
+            </div>
+            <div class="text-[11px] text-gray-500 mt-0.5">FIRMA (parte inferior)</div>
+            {% if cliente.nombre %}
+            <p class="mt-3 text-xs text-green-600 font-medium"><i class="fas fa-check-circle"></i> El nombre aparece arriba y abajo: no se quedará el de una demanda anterior.</p>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <div class="px-6 py-4 border-t border-gray-200 bg-gray-50 flex items-center justify-between">
+        <a href="{% url 'demanda_asistente' expediente.pk %}?paso=3"
+           class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors text-sm">
+          <i class="fas fa-arrow-left text-xs"></i> Anterior
+        </a>
+        <button type="submit"
+                class="px-6 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-sm font-semibold flex items-center gap-1.5 shadow-sm">
+          <i class="fas fa-magic"></i> Generar demanda y editar
+        </button>
+      </div>
+    </form>
+    {% endif %}
+  </div>
+
+  <p class="text-center text-xs text-gray-400 mt-4">
+    Después de generar, podrás <strong>editar cualquier parte</strong> de la demanda y <strong>guardarla como machote</strong> en la librería.
+  </p>
+</div>
+{% endblock %}

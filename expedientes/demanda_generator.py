@@ -21,7 +21,7 @@ from docx.oxml import parse_xml
 from django.utils import timezone
 
 from .models import Expediente
-from .laboral_calculator import calcular_desde_expediente
+from .laboral_calculator import calcular_desde_expediente, _conceptos_por_defecto
 
 
 # ─── Meses en español ──────────────────────────────────────────────────────
@@ -123,7 +123,7 @@ def _agregar_encabezado_tribunal(doc: Document) -> None:
 
     p2 = doc.add_paragraph()
     p2.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run2 = p2.add_run("CIUDAD DE MÉXICO")
+    run2 = p2.add_run("TIJUANA, BAJA CALIFORNIA")
     run2.font.size = SUBTITLE_FONT_SIZE
     run2.font.color.rgb = COLOR_GRAY
 
@@ -261,6 +261,23 @@ def _narrativa_despido(tipo_despido_key: str) -> str:
                           "el demandado dio por terminada la relación laboral de manera injustificada")
 
 
+def _conceptos_para_demanda(tipo_despido_key: str) -> dict:
+    """Selección de conceptos que se reclaman en la demanda según el tipo de despido.
+
+    Parte de los conceptos base del sistema (_conceptos_por_defecto) y
+    aplica excepciones legales por tipo de despido. En la renuncia voluntaria
+    el trabajador solo reclama prestaciones proporcionales adeudadas
+    (aguinaldo, vacaciones, prima vacacional); NO procede reclamar la
+    indemnización constitucional (Art. 50 LFT) ni la prima de antigüedad
+    (Art. 162 LFT).
+    """
+    conceptos = _conceptos_por_defecto()
+    if tipo_despido_key == 'voluntario':
+        conceptos['incluir_prima_antiguedad'] = False
+        conceptos['incluir_indemnizacion'] = False
+    return conceptos
+
+
 def _agregar_hechos(doc: Document, expediente: Expediente, tipo_despido: str = 'injustificado') -> None:
     """Agrega la sección de HECHOS con narrativa legal."""
     cliente = expediente.cliente
@@ -296,7 +313,8 @@ CUARTO.- A la fecha de presentación de esta demanda, el demandado no ha cubiert
     doc.add_paragraph()
 
 
-def _agregar_prestaciones(doc: Document, expediente: Expediente, calculo: dict) -> None:
+def _agregar_prestaciones(doc: Document, expediente: Expediente, calculo: dict,
+                          tipo_despido: str = 'injustificado') -> None:
     """Agrega la sección de PRESTACIONES RECLAMADAS con tabla de montos."""
     p = doc.add_paragraph()
     run = p.add_run("—  P R E S T A C I O N E S   R E C L A M A D A S  —")
@@ -324,18 +342,23 @@ def _agregar_prestaciones(doc: Document, expediente: Expediente, calculo: dict) 
                      f"${c['vacaciones']['monto']:,.2f}"))
         rows.append(("Prima Vacacional (25%)", "Art. 80 LFT",
                      f"${c['prima_vacacional']['monto']:,.2f}"))
-        tope = " (con tope)" if c['prima_antiguedad']['tope_aplicado'] else ""
-        rows.append(("Prima de Antigüedad", f"Art. 162 LFT{tope}",
-                     f"${c['prima_antiguedad']['monto']:,.2f}"))
-        rows.append(("Indemnización Constitucional (3 meses)", "Art. 50 LFT",
-                     f"${c['indemnizacion']['monto']:,.2f}"))
+        # En renuncia voluntaria no procede prima de antigüedad ni
+        # indemnización constitucional (Art. 50 LFT)
+        if c['prima_antiguedad']['monto'] > 0:
+            tope = " (con tope)" if c['prima_antiguedad']['tope_aplicado'] else ""
+            rows.append(("Prima de Antigüedad", f"Art. 162 LFT{tope}",
+                         f"${c['prima_antiguedad']['monto']:,.2f}"))
+        if c['indemnizacion']['monto'] > 0:
+            rows.append(("Indemnización Constitucional (3 meses)", "Art. 50 LFT",
+                         f"${c['indemnizacion']['monto']:,.2f}"))
         rows.append(("", "TOTAL:", f"${c['total']:,.2f}"))
     else:
         rows.append(("Aguinaldo Proporcional", "Art. 87 LFT", "—"))
         rows.append(("Vacaciones Proporcionales", "Art. 76 LFT", "—"))
         rows.append(("Prima Vacacional (25%)", "Art. 80 LFT", "—"))
-        rows.append(("Prima de Antigüedad", "Art. 162 LFT", "—"))
-        rows.append(("Indemnización Constitucional (3 meses)", "Art. 50 LFT", "—"))
+        if tipo_despido != 'voluntario':
+            rows.append(("Prima de Antigüedad", "Art. 162 LFT", "—"))
+            rows.append(("Indemnización Constitucional (3 meses)", "Art. 50 LFT", "—"))
         if expediente.monto_reclamado:
             rows.append(("", "MONTO RECLAMADO:", f"${expediente.monto_reclamado:,.2f}"))
         else:
@@ -440,7 +463,7 @@ def _agregar_firma(doc: Document, expediente: Expediente) -> None:
     fecha_str = _fecha_espanol(hoy)
 
     p = doc.add_paragraph()
-    run = p.add_run(f"Presentado en la Ciudad de México, a los {fecha_str}.")
+    run = p.add_run(f"Presentado en Tijuana, Baja California, a los {fecha_str}.")
     run.font.size = BODY_FONT_SIZE
 
     doc.add_paragraph()
@@ -517,13 +540,16 @@ def generar_demanda_word(expediente: Expediente, desde_cero=True,
 
     if desde_cero:
         tipo_despido = tipo_despido_override or expediente.tipo_despido or 'injustificado'
-        calculo = calcular_desde_expediente(expediente)
+        calculo = calcular_desde_expediente(
+            expediente,
+            conceptos_seleccionados=_conceptos_para_demanda(tipo_despido),
+        )
         _agregar_encabezado_tribunal(doc)
         _agregar_materia(doc, expediente)
         _agregar_actor(doc, expediente)
         _agregar_demandado(doc, expediente)
         _agregar_hechos(doc, expediente, tipo_despido)
-        _agregar_prestaciones(doc, expediente, calculo)
+        _agregar_prestaciones(doc, expediente, calculo, tipo_despido)
         _agregar_derecho(doc, tipo_despido)
         _agregar_puntos_petitorios(doc, expediente, calculo)
         _agregar_firma(doc, expediente)
@@ -649,12 +675,14 @@ def generar_demanda_html(expediente: Expediente, tipo_despido_override: str | No
                                en lugar del que tiene el expediente.
     """
     cliente = expediente.cliente
-    calculo = calcular_desde_expediente(expediente)
+    tipo_despido = tipo_despido_override or expediente.tipo_despido or 'injustificado'
+    calculo = calcular_desde_expediente(
+        expediente,
+        conceptos_seleccionados=_conceptos_para_demanda(tipo_despido),
+    )
     hoy = timezone.now()
     asesor = expediente.asesor.get_full_name() or expediente.asesor.username
     ahora_str = hoy.strftime('%d/%m/%Y %H:%M')
-
-    tipo_despido = tipo_despido_override or expediente.tipo_despido or 'injustificado'
 
     # ─── Fechas ───
     f_ingreso = _fecha_espanol_html(cliente.fecha_ingreso)
@@ -671,24 +699,52 @@ def generar_demanda_html(expediente: Expediente, tipo_despido_override: str | No
     prestaciones_rows = ""
     if calculo.get('success'):
         c = calculo
-        prestaciones_rows = f"""
-        <tr><td>Aguinaldo Proporcional</td><td>Art. 87 LFT</td><td style="text-align:right">${c['aguinaldo']['monto']:,.2f}</td></tr>
-        <tr><td>Vacaciones Proporcionales</td><td>Art. 76 LFT ({c['vacaciones']['dias_segun_antiguedad']} días)</td><td style="text-align:right">${c['vacaciones']['monto']:,.2f}</td></tr>
-        <tr><td>Prima Vacacional (25%)</td><td>Art. 80 LFT</td><td style="text-align:right">${c['prima_vacacional']['monto']:,.2f}</td></tr>
-        <tr><td>Prima de Antigüedad</td><td>Art. 162 LFT{' (con tope)' if c['prima_antiguedad']['tope_aplicado'] else ''}</td><td style="text-align:right">${c['prima_antiguedad']['monto']:,.2f}</td></tr>
-        <tr><td>Indemnización Constitucional (3 meses)</td><td>Art. 50 LFT</td><td style="text-align:right">${c['indemnizacion']['monto']:,.2f}</td></tr>
-        <tr style="font-weight:bold;border-top:2px solid #000"><td></td><td style="text-align:right">TOTAL:</td><td style="text-align:right">${c['total']:,.2f}</td></tr>
-        """
+        filas = [
+            ("Aguinaldo Proporcional", "Art. 87 LFT", c['aguinaldo']['monto']),
+            ("Vacaciones Proporcionales",
+             f"Art. 76 LFT ({c['vacaciones']['dias_segun_antiguedad']} días)",
+             c['vacaciones']['monto']),
+            ("Prima Vacacional (25%)", "Art. 80 LFT", c['prima_vacacional']['monto']),
+        ]
+        # En renuncia voluntaria no procede prima de antigüedad ni
+        # indemnización constitucional (Art. 50 LFT)
+        if c['prima_antiguedad']['monto'] > 0:
+            tope = " (con tope)" if c['prima_antiguedad']['tope_aplicado'] else ""
+            filas.append(("Prima de Antigüedad", f"Art. 162 LFT{tope}",
+                          c['prima_antiguedad']['monto']))
+        if c['indemnizacion']['monto'] > 0:
+            filas.append(("Indemnización Constitucional (3 meses)", "Art. 50 LFT",
+                          c['indemnizacion']['monto']))
+        for nombre, fundamento, monto in filas:
+            prestaciones_rows += (
+                f'<tr><td>{nombre}</td><td>{fundamento}</td>'
+                f'<td style="text-align:right">${monto:,.2f}</td></tr>\n'
+            )
+        prestaciones_rows += (
+            '<tr style="font-weight:bold;border-top:2px solid #000"><td></td>'
+            '<td style="text-align:right">TOTAL:</td>'
+            f'<td style="text-align:right">${c["total"]:,.2f}</td></tr>'
+        )
     else:
         total_str = f"${expediente.monto_reclamado:,.2f}" if expediente.monto_reclamado else "—"
-        prestaciones_rows = f"""
-        <tr><td>Aguinaldo Proporcional</td><td>Art. 87 LFT</td><td style="text-align:right">—</td></tr>
-        <tr><td>Vacaciones Proporcionales</td><td>Art. 76 LFT</td><td style="text-align:right">—</td></tr>
-        <tr><td>Prima Vacacional (25%)</td><td>Art. 80 LFT</td><td style="text-align:right">—</td></tr>
-        <tr><td>Prima de Antigüedad</td><td>Art. 162 LFT</td><td style="text-align:right">—</td></tr>
-        <tr><td>Indemnización Constitucional (3 meses)</td><td>Art. 50 LFT</td><td style="text-align:right">—</td></tr>
-        <tr style="font-weight:bold;border-top:2px solid #000"><td></td><td style="text-align:right">MONTO RECLAMADO:</td><td style="text-align:right">{total_str}</td></tr>
-        """
+        filas = [
+            ("Aguinaldo Proporcional", "Art. 87 LFT"),
+            ("Vacaciones Proporcionales", "Art. 76 LFT"),
+            ("Prima Vacacional (25%)", "Art. 80 LFT"),
+        ]
+        if tipo_despido != 'voluntario':
+            filas.append(("Prima de Antigüedad", "Art. 162 LFT"))
+            filas.append(("Indemnización Constitucional (3 meses)", "Art. 50 LFT"))
+        for nombre, fundamento in filas:
+            prestaciones_rows += (
+                f'<tr><td>{nombre}</td><td>{fundamento}</td>'
+                '<td style="text-align:right">—</td></tr>\n'
+            )
+        prestaciones_rows += (
+            '<tr style="font-weight:bold;border-top:2px solid #000"><td></td>'
+            '<td style="text-align:right">MONTO RECLAMADO:</td>'
+            f'<td style="text-align:right">{total_str}</td></tr>'
+        )
 
     total_petitorio = f"${calculo['total']:,.2f}" if calculo.get('success') and calculo['total'] > 0 else (f"${expediente.monto_reclamado:,.2f}" if expediente.monto_reclamado else "la cantidad que resulte")
 
@@ -725,7 +781,7 @@ def generar_demanda_html(expediente: Expediente, tipo_despido_override: str | No
 
     html = f"""
 <h2 style="text-align:center;color:#1F2937;">TRIBUNAL LABORAL COMPETENTE</h2>
-<p style="text-align:center;color:#6B7280;">CIUDAD DE MÉXICO</p>
+<p style="text-align:center;color:#6B7280;">TIJUANA, BAJA CALIFORNIA</p>
 <hr style="border:none;border-top:1px solid #1D4ED8;width:70%;margin:10px auto;">
 
 <table style="width:100%;border-collapse:collapse;margin:15px 0;">
@@ -790,7 +846,7 @@ def generar_demanda_html(expediente: Expediente, tipo_despido_override: str | No
 
 <h3 style="color:#1F2937;">—  F I R M A  —</h3>
 
-<p>Presentado en la Ciudad de México, a los {fecha_str}.</p>
+<p>Presentado en Tijuana, Baja California, a los {fecha_str}.</p>
 
 <br>
 <p style="text-align:center;">________________________________________</p>

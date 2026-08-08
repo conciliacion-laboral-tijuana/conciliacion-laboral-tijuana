@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      width: 380px; font-family: system-ui, -apple-system, sans-serif;
+      font-size: 13px; color: #1f2937; background: #f8fafc;
+    }
+    header {
+      background: #2563eb; color: #fff; padding: 14px 16px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    header h1 { font-size: 15px; font-weight: 700; }
+    header a { color: #dbeafe; font-size: 12px; text-decoration: none; }
+    header a:hover { text-decoration: underline; }
+    .content { padding: 14px 16px; }
+    .aviso {
+      background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af;
+      border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; font-size: 12px;
+    }
+    .aviso.error { background: #fef2f2; border-color: #fecaca; color: #991b1b; }
+    .card {
+      background: #fff; border: 1px solid #e5e7eb; border-radius: 10px;
+      padding: 12px; margin-bottom: 10px;
+    }
+    .card .titulo { font-weight: 600; font-size: 13px; margin-bottom: 4px; }
+    .card .sub { color: #6b7280; font-size: 11px; }
+    .card .folio { color: #2563eb; font-weight: 700; font-size: 12px; margin-top: 4px; }
+    .btn {
+      display: block; width: 100%; padding: 10px; border: none; border-radius: 8px;
+      font-weight: 600; font-size: 13px; cursor: pointer; margin-top: 8px;
+    }
+    .btn-primario { background: #16a34a; color: #fff; }
+    .btn-primario:hover { background: #15803d; }
+    .btn-primario:disabled { background: #9ca3af; cursor: not-allowed; }
+    .btn-secundario { background: #e5e7eb; color: #374151; }
+    .btn-secundario:hover { background: #d1d5db; }
+    .vacío { color: #6b7280; text-align: center; padding: 20px 0; font-size: 12px; }
+    .spinner {
+      border: 3px solid #e5e7eb; border-top: 3px solid #2563eb; border-radius: 50%;
+      width: 20px; height: 20px; animation: spin 0.8s linear infinite; margin: 10px auto;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .pasos { font-size: 11px; color: #6b7280; margin-top: 6px; }
+    footer { padding: 10px 16px; border-top: 1px solid #e5e7eb; font-size: 11px; color: #9ca3af; text-align: center; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🤖 Conciliación BC</h1>
+    <a href="#" id="btn-opciones">⚙️ Opciones</a>
+  </header>
+
+  <div class="content">
+    <div id="aviso-config" class="aviso error" style="display:none;">
+      ⚠️ La extensión no está configurada. Abre <strong>Opciones</strong> y pega la URL de la app y tu token.
+    </div>
+
+    <div id="cargando"><div class="spinner"></div><p class="vacío">Cargando tareas…</p></div>
+
+    <div id="lista" style="display:none;"></div>
+
+    <div id="vacío" class="vacío" style="display:none;">
+      No hay tareas pendientes.<br><br>
+      En la app: abre un expediente → <strong>Enviar a Conciliación</strong> →
+      elige <strong>"📲 Desde mi navegador (Extensión)"</strong>.
+    </div>
+  </div>
+
+  <footer>El llenado ocurre en TU navegador. Tú das el clic final.</footer>
+
+  <script src="popup.js"></script>
+</body>
+</html>

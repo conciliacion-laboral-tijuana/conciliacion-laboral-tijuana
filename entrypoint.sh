@@ -83,6 +83,35 @@ uv run python manage.py seed_datos 2>&1 || echo ">>> (Aviso: no se pudieron semb
 #
 # ══════════════════════════════════════════════════════════════════════
 
+# ─── Celery Worker ──────────────────────────────────────────
+# ESTRATEGIA:
+#   - Si hay Redis configurado (REDIS_URL o REDISHOST), iniciar Celery Worker
+#     automáticamente. Railway inyecta REDIS_URL al agregar el servicio Redis.
+#   - CELERY_WORKER_ENABLED=false explícitamente lo deshabilita.
+#   - CELERY_WORKER_ENABLED=true lo fuerza incluso sin Redis (fallará).
+# ─────────────────────────────────────────────────────────────────
+
+_celery_redis="${REDIS_URL:-${REDISHOST:-}}"
+_celery_worker_force="${CELERY_WORKER_ENABLED:-}"
+
+should_start_celery=false
+if [ "$_celery_worker_force" = "true" ]; then
+    should_start_celery=true
+    echo ">>> [worker] Celery forzado por CELERY_WORKER_ENABLED=true"
+elif [ -n "$_celery_redis" ] && [ "$_celery_worker_force" != "false" ]; then
+    should_start_celery=true
+    echo ">>> [worker] Redis detectado, iniciando Celery Worker automáticamente"
+fi
+
+if [ "$should_start_celery" = true ]; then
+    echo ">>> [worker] Iniciando Celery Worker..."
+    uv run celery -A config worker --loglevel=info --concurrency=1 &
+    CELERY_PID=$!
+    echo ">>> [worker] Celery Worker PID: $CELERY_PID"
+else
+    echo ">>> [worker] Celery Worker deshabilitado (sin Redis o CELERY_WORKER_ENABLED=false)"
+fi
+
 # Trap para shutdown graceful
 cleanup() {
     echo ">>> Deteniendo servicios..."
@@ -92,16 +121,6 @@ cleanup() {
 }
 # Signal names WITHOUT 'SIG' prefix (dash/POSIX compatible)
 trap cleanup TERM INT
-
-# Iniciar Celery Worker en background (si está habilitado)
-if [ "${CELERY_WORKER_ENABLED:-false}" = "true" ]; then
-    echo ">>> [worker] Iniciando Celery Worker..."
-    uv run celery -A config worker --loglevel=info --concurrency=1 &
-    CELERY_PID=$!
-    echo ">>> [worker] Celery Worker PID: $CELERY_PID"
-else
-    echo ">>> [worker] Celery Worker deshabilitado (CELERY_WORKER_ENABLED != true)"
-fi
 
 # Iniciar Gunicorn (foreground — proceso principal)
 echo ">>> [web] Iniciando Gunicorn en 0.0.0.0:${PORT:-8000}..."

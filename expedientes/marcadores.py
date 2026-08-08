@@ -170,10 +170,13 @@ def get_marcadores(expediente: Expediente, calculo: Dict[str, Any] | None = None
     # ─── Construir diccionario ────────────────────────────────────────
     marcadores = {
         # Datos del cliente (formato largo)
-        'nombre_cliente': cliente.nombre,
-        'curp_cliente': cliente.curp,
+        # Nota: los campos sin fallback usan placeholders para que NUNCA llegue
+        # None al reemplazo (str.replace() crashea con None → TypeError) y el
+        # documento muestre qué dato falta en lugar de un espacio en blanco.
+        'nombre_cliente': cliente.nombre or '[NOMBRE]',
+        'curp_cliente': cliente.curp or '[CURP]',
         'rfc_cliente': cliente.rfc or '[RFC]',
-        'telefono_cliente': cliente.telefono,
+        'telefono_cliente': cliente.telefono or '[TELÉFONO]',
         'email_cliente': cliente.email or '[EMAIL]',
         'direccion_cliente': direccion_cliente,
         'puesto_trabajador': cliente.puesto or '[PUESTO]',
@@ -207,9 +210,9 @@ def get_marcadores(expediente: Expediente, calculo: Dict[str, Any] | None = None
 
         # Alias cortos (para compatibilidad con machotes importados)
         'salario': salario_mensual,
-        'curp': cliente.curp,
+        'curp': cliente.curp or '[CURP]',
         'rfc': cliente.rfc or '[RFC]',
-        'telefono': cliente.telefono,
+        'telefono': cliente.telefono or '[TELÉFONO]',
         'email': cliente.email or '[EMAIL]',
         'direccion': direccion_cliente,
         'puesto': cliente.puesto or '[PUESTO]',
@@ -251,9 +254,13 @@ def reemplazar_marcadores(html: str, expediente: Expediente,
     """
     marcadores = get_marcadores(expediente, calculo)
 
+    # Guarda defensiva: aunque un marcador llegue como None (cliente con datos
+    # incompletos), se reemplaza por cadena vacía en vez de crashear con
+    # TypeError (str.replace() no acepta None).
     for key, value in marcadores.items():
-        html = html.replace('{{ ' + key + ' }}', value)
-        html = html.replace('{{' + key + '}}', value)
+        valor = value if value is not None else ''
+        html = html.replace('{{ ' + key + ' }}', valor)
+        html = html.replace('{{' + key + '}}', valor)
 
     return html
 

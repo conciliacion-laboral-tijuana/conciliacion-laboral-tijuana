@@ -18,7 +18,8 @@
 
     <!-- Tabla -->
     <div class="bg-white rounded shadow-sm border border-gray-200 overflow-hidden">
-        <table class="w-full">
+        <div class="excel-scroll">
+        <table class="w-full excel-table">
             <thead>
                 <tr>
                     <th>Nombre</th>
@@ -57,6 +58,7 @@
                 {% endfor %}
             </tbody>
         </table>
+        </div>
     </div>
 
     {% if is_paginated %}

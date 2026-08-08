@@ -3,7 +3,9 @@ import logging
 import re
 import threading
 from datetime import datetime, timedelta
+from pathlib import Path
 
+from django.conf import settings
 from django.contrib.auth.decorators import login_required
 
 logger = logging.getLogger(__name__)
@@ -13,7 +15,7 @@ from django.contrib.auth.models import User
 from django.contrib import messages
 from django.core.mail import send_mail
 from django.db.models import Q, Count, Sum
-from django.http import HttpResponse, JsonResponse
+from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.urls import reverse, reverse_lazy
@@ -25,37 +27,19 @@ from django.views.generic import (
 
 from .forms import (ClienteForm, DocumentoForm, ExpedienteForm, NotaForm,
                        SolicitudConciliacionForm, WhatsAppMessageForm,
-                       CalculoLaboralForm, SimulacionForm)
+                       CalculoLaboralForm, SimulacionForm, MachoteForm)
 from .models import (Cliente, Documento, Expediente, Movimiento, Nota,
                       SolicitudConciliacion, WhatsAppMessage, TareaConciliacion,
                       CalculoLaboral, LegalConfig, Aviso,
-                      SolicitudTransferencia, Notificacion)
+                      SolicitudTransferencia, Notificacion, Empresa)
 from .signals import registrar_movimiento
 
 
-def _extraer_folio_pdf(nombre_archivo, contenido_bytes=None):
-    """
-    Extrae el folio de conciliación del nombre del PDF o su contenido.
-    Busca patrones como CCL-2024-12345, 2024-12345, folio_12345.
-    """
-    import re
-    for patron in [r'(CCL[\s/-][\w\-/.]+)', r'(\d{4}[\s-]\d{3,6})', r'(folio[\s_:.-]*[\w\-]+)']:
-        match = re.search(patron, nombre_archivo, re.IGNORECASE)
-        if match:
-            return match.group(1).strip()
-    if contenido_bytes:
-        try:
-            texto = contenido_bytes.decode('latin-1', errors='ignore')
-            for patron in [r'(CCL[\s/-][\w\-/.]+)', r'(\d{4}[\s-]\d{3,6})']:
-                match = re.search(patron, texto, re.IGNORECASE)
-                if match:
-                    return match.group(1).strip()
-        except Exception:
-            pass
-    return None
+
 from .whatsapp import (enviar_whatsapp, generar_deep_link, renderizar_plantilla,
                         MENSAJES_TEMPLATE)
-from .laboral_calculator import calcular_desde_expediente, recalcular_calculo
+from .laboral_calculator import (calcular_desde_expediente, recalcular_calculo,
+                                 _aplicar_conceptos_excluidos)
 from .demanda_generator import generar_demanda_word, generar_demanda_html, html_a_docx, PLANTILLAS_INFO
 from .models import Machote
 from .marcadores import get_marcadores, get_datos_faltantes, get_completitud_stats, reemplazar_marcadores
@@ -66,6 +50,7 @@ def _get_machotes_queryset():
     return Machote.objects.filter(activo=True).order_by('-favorito', 'orden', 'nombre')
 from core.laboral.calculators import simular
 from .conciliacion_automation import enviar_y_guardar as enviar_conciliacion
+from .conciliacion_automation import _validar_curp, CurpInvalidoError, screenshots_a_urls
 from .tasks import ejecutar_conciliacion as ejecutar_conciliacion_task
 from config.settings import _celery_disponible
 
@@ -94,14 +79,14 @@ class StaffRequiredMixin(UserPassesTestMixin):
 
 def get_expedientes_queryset(user):
     """Retorna queryset de expedientes según el rol del usuario."""
-    if hasattr(user, 'profile') and user.profile.rol in ['admin', 'superadmin']:
+    if hasattr(user, 'profile') and user.profile.rol in ['admin', 'superadmin', 'abogada']:
         return Expediente.objects.select_related('cliente', 'asesor').all()
     return Expediente.objects.select_related('cliente', 'asesor').filter(asesor=user)
 
 
 def get_clientes_queryset(user):
     """Retorna queryset de clientes según el rol."""
-    if hasattr(user, 'profile') and user.profile.rol in ['admin', 'superadmin']:
+    if hasattr(user, 'profile') and user.profile.rol in ['admin', 'superadmin', 'abogada']:
         return Cliente.objects.all()
     return Cliente.objects.filter(expediente__asesor=user).distinct()
 
@@ -128,6 +113,8 @@ def dashboard_redirect(request):
         rol = request.user.profile.rol
         if rol == 'asesor':
             return redirect('dashboard_asesor')
+        elif rol == 'abogada':
+            return redirect('dashboard_abogada')
         elif rol == 'finanzas':
             return redirect('dashboard_financiero')
     return redirect('dashboard_admin')
@@ -166,7 +153,9 @@ class DashboardAsesorView(LoginRequiredMixin, TemplateView):
 
         # Avisos activos para todos (ordenados por prioridad: alta, media, baja)
         from django.db.models import Case, When, IntegerField, Value
-        context['avisos'] = Aviso.objects.filter(activo=True).annotate(
+        context['avisos'] = Aviso.objects.filter(activo=True).filter(
+            Q(fecha_vencimiento__isnull=True) | Q(fecha_vencimiento__gte=timezone.now())
+        ).annotate(
             prioridad_num=Case(
                 When(prioridad='alta', then=Value(0)),
                 When(prioridad='media', then=Value(1)),
@@ -240,7 +229,9 @@ class DashboardAdminView(LoginRequiredMixin, StaffRequiredMixin, TemplateView):
 
         # Avisos activos ordenados por prioridad (alta, media, baja)
         from django.db.models import Case, When, IntegerField, Value
-        context['avisos'] = Aviso.objects.filter(activo=True).annotate(
+        context['avisos'] = Aviso.objects.filter(activo=True).filter(
+            Q(fecha_vencimiento__isnull=True) | Q(fecha_vencimiento__gte=timezone.now())
+        ).annotate(
             prioridad_num=Case(
                 When(prioridad='alta', then=Value(0)),
                 When(prioridad='media', then=Value(1)),
@@ -253,6 +244,159 @@ class DashboardAdminView(LoginRequiredMixin, StaffRequiredMixin, TemplateView):
 
         return context
 
+
+class DashboardAbogadaView(LoginRequiredMixin, TemplateView):
+    """
+    Dashboard exclusivo para la abogada.
+
+    Objeto principal: TODAS las demandas (expedientes en estado 'demanda').
+    Además muestra el estado de todos los clientes, una calculadora libre
+    (no ligada a ningún expediente) y los machotes a la mano.
+    """
+    template_name = 'expedientes/dashboard_abogada.html'
+
+    def get(self, request, *args, **kwargs):
+        if not hasattr(request.user, 'profile') or request.user.profile.rol != 'abogada':
+            return redirect('dashboard_admin')
+        return super().get(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user = self.request.user
+
+        # ── Demandas: objeto principal ────────────────────────────────
+        demandas = Expediente.objects.filter(estado='demanda').select_related(
+            'cliente', 'asesor'
+        ).order_by('-created_at')
+        context['demandas'] = demandas
+        context['total_demandas'] = demandas.count()
+
+        # Monto total reclamado en demandas
+        context['monto_demandas'] = demandas.aggregate(
+            total=Sum('monto_reclamado')
+        )['total'] or 0
+
+        # ── Clientes: estado de todos ─────────────────────────────────
+        context['total_clientes'] = Cliente.objects.count()
+        context['clientes'] = Cliente.objects.select_related().order_by('-created_at')[:15]
+
+        # Estado agregado por estado de expediente (para el resumen)
+        context['clientes_por_estado'] = {
+            key: Expediente.objects.filter(estado=key).count()
+            for key, label in Expediente.ESTADO_CHOICES
+        }
+
+        # ── Calculadora libre (no ligada a ningún expediente) ────────
+        context['simulacion_form'] = SimulacionForm()
+
+        # ── Machotes a la mano ───────────────────────────────────────
+        machotes = _get_machotes_queryset()
+        context['machotes'] = machotes
+        context['machotes_demanda'] = machotes.filter(categoria='demanda')[:6]
+        context['total_machotes'] = machotes.count()
+
+        context['ESTADO_COLORS'] = ESTADO_COLORS
+        return context
+
+
+# ─── Avisos Obligatorios (admin → usuarios) ──────────────────────────────
+
+@login_required
+@require_POST
+def crear_aviso(request):
+    """
+    Crea un aviso desde el dashboard del admin.
+
+    Al enviarse, aparece como modal bloqueante en TODA la app para cada
+    usuario que aún no lo ha leído (context processor aviso_obligatorio_global).
+    """
+    if not hasattr(request.user, 'profile') or request.user.profile.rol not in ['admin', 'superadmin']:
+        return JsonResponse({'error': 'No autorizado'}, status=403)
+
+    titulo = (request.POST.get('titulo') or '').strip()
+    contenido = (request.POST.get('contenido') or '').strip()
+    prioridad = request.POST.get('prioridad', 'media')
+
+    if not titulo:
+        messages.error(request, 'El título del aviso es obligatorio.')
+        return redirect('dashboard_admin')
+
+    if prioridad not in dict(Aviso.PRIORIDAD_CHOICES):
+        prioridad = 'media'
+
+    # Fecha de vencimiento opcional (datetime-local del navegador, hora local)
+    fecha_vencimiento = None
+    raw_fecha = (request.POST.get('fecha_vencimiento') or '').strip()
+    if raw_fecha:
+        try:
+            # fromisoformat acepta 2026-08-10T14:30 y 2026-08-10T14:30:00
+            fecha_vencimiento = datetime.fromisoformat(raw_fecha)
+            if 'T' not in raw_fecha:
+                # Solo fecha (2026-08-10) → el aviso es válido todo ese día
+                fecha_vencimiento = fecha_vencimiento.replace(hour=23, minute=59, second=59)
+            # El navegador envía hora LOCAL (America/Mexico_City). Se hace aware
+            # con la zona del sistema para guardarlo en UTC sin desfases (USE_TZ=True).
+            # Nota: si el admin viaja con otra zona horaria del navegador, el
+            # vencimiento puede desviarse algunas horas (limitación de datetime-local).
+            fecha_vencimiento = timezone.make_aware(fecha_vencimiento)
+        except (ValueError, OverflowError):
+            messages.error(request, '⚠️ La fecha de vencimiento no tiene un formato válido. El aviso se publicó sin fecha de vencimiento.')
+            fecha_vencimiento = None
+
+    aviso = Aviso.objects.create(
+        titulo=titulo,
+        contenido=contenido,
+        prioridad=prioridad,
+        activo=True,
+        fecha_vencimiento=fecha_vencimiento,
+        creado_por=request.user,
+    )
+    # El creador no necesita leer su propio aviso
+    aviso.leido_por.add(request.user)
+
+    logger.info('Aviso creado por %s: %s', request.user.username, titulo)
+    if fecha_vencimiento:
+        messages.success(
+            request,
+            f'✅ Aviso "{titulo}" publicado. Aparecerá como mensaje obligatorio '
+            f'hasta el {fecha_vencimiento.strftime("%d/%m/%Y %H:%M")}.'
+        )
+    else:
+        messages.success(request, f'✅ Aviso "{titulo}" publicado. Aparecerá como mensaje obligatorio para todos los usuarios.')
+    return redirect('dashboard_admin')
+
+
+@login_required
+@require_POST
+def marcar_aviso_leido(request, aviso_pk):
+    """Marca un aviso como leído para el usuario actual (botón "Entendido")."""
+    aviso = get_object_or_404(Aviso, pk=aviso_pk, activo=True)
+    aviso.leido_por.add(request.user)
+    return JsonResponse({'ok': True, 'aviso': aviso.pk})
+
+
+@login_required
+def ajustes(request):
+    """
+    Módulo de Ajustes (ícono de engrane en el header).
+
+    Incluye la sección de la Extensión de Chrome: token personal,
+    descarga del paquete e instrucciones de instalación.
+    """
+    from accounts.models import UserProfile
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    if not profile.api_token:
+        profile.save()
+        profile.refresh_from_db()
+
+    return render(request, 'expedientes/ajustes.html', {
+        'token': profile.api_token,
+        'tareas_pendientes': TareaConciliacion.objects.filter(
+            expediente__in=get_expedientes_queryset(request.user),
+            estado='pendiente',
+        ).select_related('expediente', 'expediente__cliente').order_by('-created_at')[:10],
+        'ESTADO_COLORS': ESTADO_COLORS,
+    })
 
 # ─── Búsqueda Global ───────────────────────────────────────────────────────
 
@@ -292,6 +436,7 @@ class ExpedienteListView(LoginRequiredMixin, ListView):
         q = self.request.GET.get('q', '')
         estado = self.request.GET.get('estado', '')
         asesor_id = self.request.GET.get('asesor', '')
+        oficina = self.request.GET.get('oficina', '')
         fecha_desde = self.request.GET.get('fecha_desde', '')
         fecha_hasta = self.request.GET.get('fecha_hasta', '')
         prioridad = self.request.GET.get('prioridad', '')
@@ -308,6 +453,8 @@ class ExpedienteListView(LoginRequiredMixin, ListView):
             qs = qs.filter(estado=estado)
         if asesor_id:
             qs = qs.filter(asesor_id=asesor_id)
+        if oficina:
+            qs = qs.filter(cliente__oficina=oficina)
         if prioridad:
             qs = qs.filter(prioridad=prioridad)
         if fecha_desde:
@@ -321,6 +468,7 @@ class ExpedienteListView(LoginRequiredMixin, ListView):
         context = super().get_context_data(**kwargs)
         context['estados'] = Expediente.ESTADO_CHOICES
         context['asesores_filtro'] = User.objects.filter(profile__rol='asesor')
+        context['oficinas'] = Cliente.OFICINA_CHOICES
         context['filtros'] = {k: v for k, v in self.request.GET.items() if v}
         context['ESTADO_COLORS'] = ESTADO_COLORS
         return context
@@ -556,6 +704,36 @@ class ClienteUpdateView(LoginRequiredMixin, UpdateView):
     form_class = ClienteForm
     template_name = 'expedientes/cliente_form.html'
     success_url = reverse_lazy('cliente_list')
+
+
+@login_required
+def buscar_empresas_catalogo(request):
+    """
+    Búsqueda AJAX en el catálogo de empresas (Empresa) para autocompletar
+    el formulario del cliente: al elegir una empresa del catálogo se
+    rellenan la razón social, teléfono, domicilio y tipo de persona.
+    """
+    from .management.commands.importar_clt import _normalizar
+    # Normalizar la consulta (mayúsculas, sin acentos) para que coincida
+    # con los nombres normalizados del catálogo ("soriana"/"Soríana" → "SORIANA")
+    q = _normalizar(request.GET.get('q', ''))
+    resultados = []
+    if len(q) >= 2:
+        resultados = [
+            {
+                'id': e.pk,
+                'nombre': e.nombre,
+                'domicilio': e.domicilio,
+                'telefono': e.telefono,
+                'tipo_persona': e.tipo_persona,
+                'calle': e.domicilio_calle,
+                'numero': e.domicilio_numero,
+                'colonia': e.domicilio_colonia,
+                'cp': e.domicilio_cp,
+            }
+            for e in Empresa.objects.filter(nombre__icontains=q).order_by('nombre')[:8]
+        ]
+    return JsonResponse({'resultados': resultados})
 
 
 # ─── Documentos ────────────────────────────────────────────────────────────
@@ -909,7 +1087,9 @@ def calculo_laboral(request, pk):
         form = CalculoLaboralForm(request.POST, instance=calculo)
         if form.is_valid():
             calculo = form.save(commit=False)
-            # Recalcular con los parámetros actualizados
+            # Alinear los conceptos excluidos con la demanda (renuncia voluntaria)
+            # y recalcular con los parámetros actualizados
+            _aplicar_conceptos_excluidos(calculo, expediente)
             recalcular_calculo(calculo)
             calculo.save()
 
@@ -924,8 +1104,10 @@ def calculo_laboral(request, pk):
         else:
             messages.error(request, 'Corrige los errores del formulario.')
     else:
-        # Si es nuevo o el cálculo está vacío, recalcular automáticamente
-        if created or calculo.total == 0:
+        # Alinear conceptos excluidos con la demanda y ver si cambió algo
+        cambio_conceptos = _aplicar_conceptos_excluidos(calculo, expediente)
+        # Si es nuevo, el cálculo está vacío o se alinearon conceptos, recalcular
+        if created or calculo.total == 0 or cambio_conceptos:
             recalcular_calculo(calculo)
             calculo.save()
         form = CalculoLaboralForm(instance=calculo)
@@ -1030,7 +1212,7 @@ def _puede_generar_documentos(request):
     if not hasattr(request.user, 'profile'):
         return False
     perfil = request.user.profile
-    return perfil.rol in ['admin', 'superadmin'] or perfil.puede_generar_documentos
+    return perfil.rol in ['admin', 'superadmin', 'abogada'] or perfil.puede_generar_documentos
 
 
 @login_required
@@ -1099,8 +1281,257 @@ def demanda_editor(request, pk):
         'plantillas_info': PLANTILLAS_INFO,
         'machotes_demanda': machotes_renderizados,
         'tipo_actual': expediente.tipo_despido or 'injustificado',
+        'datos_criticos_faltantes': _verificar_datos_criticos(expediente),
         'ESTADO_COLORS': ESTADO_COLORS,
     })
+
+
+# ─── Asistente paso a paso para llenar la demanda ────────────────────────
+
+# Campos del cliente por paso del asistente
+WIZARD_PASOS = {
+    '1': {
+        'titulo': 'Datos personales del cliente',
+        'descripcion': 'Nombre completo, CURP y contacto del trabajador.',
+        'campos': ['nombre', 'curp', 'rfc', 'telefono', 'whatsapp', 'email',
+                   'fecha_nacimiento', 'genero', 'como_supo', 'oficina'],
+    },
+    '2': {
+        'titulo': 'Información laboral',
+        'descripcion': 'Puesto, salario y fechas de ingreso/salida (requeridos para los cálculos).',
+        'campos': ['puesto', 'salario', 'periodo_pago', 'horas_semanales', 'jornada',
+                   'fecha_ingreso', 'fecha_salida'],
+    },
+    '3': {
+        'titulo': 'Empresa / Patrón (demandado)',
+        'descripcion': 'Datos de la empresa a la que se demandará.',
+        'campos': ['empresa', 'empresa_razon_social', 'empresa_actividad', 'tipo_persona_citado',
+                   'empresa_telefono', 'empresa_calle', 'empresa_numero',
+                   'empresa_colonia', 'empresa_cp', 'empresa_referencias'],
+    },
+}
+
+# Datos críticos que NUNCA deben faltar en la demanda (verificación final)
+CRITICOS_CLIENTE = [
+    {'campo': 'nombre', 'label': 'Nombre completo del cliente'},
+    {'campo': 'curp', 'label': 'CURP'},
+    {'campo': 'salario', 'label': 'Salario mensual'},
+    {'campo': 'fecha_ingreso', 'label': 'Fecha de ingreso'},
+    {'campo': 'fecha_salida', 'label': 'Fecha de salida / despido'},
+]
+
+
+def _verificar_datos_criticos(expediente):
+    """Retorna la lista de datos críticos faltantes del cliente (vacía si todo completo)."""
+    cliente = expediente.cliente
+    faltantes = []
+    for crit in CRITICOS_CLIENTE:
+        valor = getattr(cliente, crit['campo'])
+        completo = False
+        if crit['campo'] == 'curp':
+            completo = len(valor or '') >= 15
+        elif crit['campo'] == 'salario':
+            completo = valor is not None and valor > 0
+        else:
+            completo = bool(valor)
+        if not completo:
+            faltantes.append(crit)
+    return faltantes
+
+
+@login_required
+def demanda_asistente(request, pk):
+    """
+    Asistente paso a paso para llenar la demanda sin omitir datos.
+
+    Pasos:
+      1) Datos personales del cliente
+      2) Información laboral (salario, fechas → cálculos automáticos)
+      3) Empresa / patrón
+      4) Tipo de despido + revisión final (firma con nombre arriba y abajo)
+
+    Al terminar redirige al editor de demanda con el contenido generado.
+    """
+    if not _puede_generar_documentos(request):
+        messages.error(request, 'No tienes permiso para generar documentos legales.')
+        return redirect('dashboard_asesor')
+    expediente = get_object_or_404(get_expedientes_queryset(request.user), pk=pk)
+    cliente = expediente.cliente
+
+    PASOS_VALIDOS = list(WIZARD_PASOS.keys()) + ['4']
+    SIGUIENTE_PASO = {'1': '2', '2': '3', '3': '4'}
+    paso = request.POST.get('paso_actual') or request.GET.get('paso') or '1'
+    paso = paso if paso in PASOS_VALIDOS else '1'
+
+    errores = {}
+
+    if request.method == 'POST':
+        accion = request.POST.get('accion', 'siguiente')
+
+        if paso in WIZARD_PASOS:
+            # Validar y guardar solo los campos de este paso (reutilizando ClienteForm)
+            form = ClienteForm(request.POST, instance=cliente)
+            # Campos opcionales del modelo (vacío en el wizard = conservar el valor actual)
+            opcionales = {'rfc', 'telefono', 'whatsapp', 'email', 'fecha_nacimiento', 'genero',
+                          'puesto', 'periodo_pago', 'horas_semanales', 'jornada',
+                          'empresa_razon_social', 'empresa_actividad', 'tipo_persona_citado',
+                          'empresa_telefono', 'empresa_calle', 'empresa_numero',
+                          'empresa_colonia', 'empresa_cp', 'empresa_referencias', 'como_supo'}
+            for campo in WIZARD_PASOS[paso]['campos']:
+                raw = request.POST.get(campo, '')
+                # Si es opcional y viene vacío, no validar (conserva su valor)
+                if campo in opcionales and raw == '':
+                    continue
+                try:
+                    form.fields[campo].clean(raw)
+                except Exception as e:
+                    errores[campo] = list(e.messages) if hasattr(e, 'messages') else [str(e)]
+
+            if not errores:
+                # Guardar solo los campos del paso (sin tocar el resto)
+                datos = {}
+                for campo in WIZARD_PASOS[paso]['campos']:
+                    raw = request.POST.get(campo, '')
+                    if campo in form.fields and raw != '':
+                        datos[campo] = form.fields[campo].clean(raw)
+                if datos:
+                    for campo, valor in datos.items():
+                        setattr(cliente, campo, valor)
+                    cliente.save(update_fields=list(datos))
+
+                # Avanzar al siguiente paso (¡con ?paso=X para no volver al paso 1!)
+                siguiente = SIGUIENTE_PASO.get(paso, '4')
+                return redirect(f"{reverse('demanda_asistente', kwargs={'pk': expediente.pk})}?paso={siguiente}")
+
+        if accion == 'finalizar':
+            # Paso 4: guardar tipo de despido y generar la demanda
+            tipo = request.POST.get('tipo_despido', '')
+            if tipo in dict(Expediente.TIPO_DESPIDO_CHOICES):
+                expediente.tipo_despido = tipo
+                expediente.save(update_fields=['tipo_despido'])
+
+            faltantes = _verificar_datos_criticos(expediente)
+            if faltantes:
+                for f in faltantes:
+                    messages.error(request, f'Falta: {f["label"]}. Completa el dato para generar la demanda.')
+                return redirect(f"{reverse('demanda_asistente', kwargs={'pk': expediente.pk})}?paso=4")
+
+            registrar_movimiento(
+                expediente=expediente,
+                usuario=request.user,
+                accion='actualizacion',
+                detalle='Demanda llenada con el asistente paso a paso'
+            )
+            messages.success(request, '✅ Demanda lista. Revisa el contenido en el editor antes de descargar.')
+            return redirect('demanda_editor', pk=expediente.pk)
+
+    # ─── Construir formulario para el paso actual ─────────────────────
+    form = ClienteForm(instance=cliente)
+
+    # Paso 4: cálculo y previsualización de la firma
+    calculo = None
+    if paso == '4':
+        calculo = calcular_desde_expediente(expediente)
+
+    # Datos críticos para mostrar en el paso 4
+    faltantes_criticos = _verificar_datos_criticos(expediente)
+
+    return render(request, 'expedientes/demanda_asistente.html', {
+        'expediente': expediente,
+        'cliente': cliente,
+        'form': form,
+        'paso': paso,
+        'pasos_info': WIZARD_PASOS,
+        'pasos_keys': list(WIZARD_PASOS.keys()) + ['4'],
+        'errores': errores,
+        'tipos_despido': Expediente.TIPO_DESPIDO_CHOICES,
+        'calculo': calculo,
+        'faltantes_criticos': faltantes_criticos,
+        'ESTADO_COLORS': ESTADO_COLORS,
+    })
+
+
+@login_required
+def demanda_guardar_machote(request, pk):
+    """
+    Guarda el contenido actual del editor como machote reutilizable.
+    Convierte los datos específicos del cliente en marcadores {{ variable }}.
+    """
+    if not _puede_generar_documentos(request):
+        messages.error(request, 'No tienes permiso para guardar machotes.')
+        return redirect('dashboard_asesor')
+    expediente = get_object_or_404(get_expedientes_queryset(request.user), pk=pk)
+
+    if request.method != 'POST':
+        return redirect('demanda_editor', pk=expediente.pk)
+
+    contenido_html = request.POST.get('contenido', '')
+    nombre = (request.POST.get('nombre', '') or '').strip()[:200]
+    if not contenido_html or not nombre:
+        messages.error(request, 'Nombre y contenido son obligatorios para guardar el machote.')
+        return redirect('demanda_editor', pk=expediente.pk)
+
+    # Evitar duplicados: si ya existe un machote con ese nombre, avisar
+    if Machote.objects.filter(nombre__iexact=nombre).exists():
+        messages.warning(
+            request,
+            f'⚠️ Ya existe un machote llamado "{nombre}". Usa otro nombre para no sobrescribirlo.'
+        )
+        return redirect('demanda_editor', pk=expediente.pk)
+
+    try:
+        from .management.commands.importar_machotes import reemplazar_datos_con_marcadores
+
+        cliente = expediente.cliente
+        html_con_marcadores = reemplazar_datos_con_marcadores(contenido_html)
+
+        # Reemplazar también el nombre del cliente y de la empresa (datos
+        # específicos del caso que la plantilla debe reutilizar)
+        sustituciones_extra = []
+        if cliente.nombre:
+            sustituciones_extra.append((cliente.nombre, '{{ nombre_cliente }}'))
+        if cliente.empresa_razon_social or cliente.empresa:
+            sustituciones_extra.append(
+                (cliente.empresa_razon_social or cliente.empresa, '{{ nombre_empresa }}')
+            )
+        if cliente.puesto:
+            sustituciones_extra.append((cliente.puesto, '{{ puesto_trabajador }}'))
+        if cliente.direccion_completa:
+            sustituciones_extra.append((cliente.direccion_completa, '{{ direccion_cliente }}'))
+
+        for texto, marcador in sustituciones_extra:
+            if not texto:
+                continue
+            patron = re.compile(r'\b' + re.escape(texto.strip()) + r'\b', re.IGNORECASE)
+            html_con_marcadores = patron.sub(marcador, html_con_marcadores)
+
+        machote = Machote.objects.create(
+            nombre=nombre,
+            descripcion=f'Guardado desde el editor de demanda del expediente {expediente.numero} ({expediente.cliente.nombre})',
+            categoria='demanda',
+            tipo_despido=expediente.tipo_despido or None,
+            jurisdiccion='federal',
+            contenido_html=html_con_marcadores,
+            icono='📝',
+            activo=True,
+        )
+
+        registrar_movimiento(
+            expediente=expediente,
+            usuario=request.user,
+            accion='actualizacion',
+            detalle=f'Machote guardado desde el editor: {machote.nombre}'
+        )
+        messages.success(
+            request,
+            f'✅ Machote "{machote.nombre}" guardado en la librería. '
+            'Los datos del cliente se reemplazaron por marcadores {{ }} reutilizables.'
+        )
+    except Exception as e:
+        logger.exception('Error guardando machote desde editor para expediente %s', expediente.numero)
+        messages.error(request, 'Error al guardar el machote. Intenta de nuevo.')
+
+    return redirect('demanda_editor', pk=expediente.pk)
 
 
 @login_required
@@ -1108,6 +1539,9 @@ def demanda_descargar(request, pk):
     """
     Recibe el HTML editado desde el editor Quill.js y genera
     el documento Word para descarga.
+
+    Verifica primero que el cliente tenga los datos críticos completos
+    (evita descargar demandas con nombre/salario/fechas vacíos).
     """
     if not _puede_generar_documentos(request):
         messages.error(request, 'No tienes permiso para descargar documentos legales.')
@@ -1116,6 +1550,18 @@ def demanda_descargar(request, pk):
 
     if request.method != 'POST':
         return redirect('demanda_editor', pk=expediente.pk)
+
+    # ─── Guard: datos críticos del cliente ────────────────────────────
+    faltantes = _verificar_datos_criticos(expediente)
+    if faltantes:
+        for f in faltantes:
+            messages.error(request, f'⚠️ No se puede descargar: falta {f["label"]}.')
+        messages.info(
+            request,
+            'Completa los datos del cliente (usando el asistente paso a paso o editando el cliente) '
+            'antes de descargar la demanda.'
+        )
+        return redirect('demanda_asistente', pk=expediente.pk)
 
     contenido_html = request.POST.get('contenido', '')
     if not contenido_html:
@@ -1847,32 +2293,119 @@ def reportes_admin(request):
 #  Automatización de Conciliación — ASÍNCRONA (threading)
 # ═══════════════════════════════════════════════════════════════════════════
 
+def _directorio_screenshots_tarea(task_id):
+    """
+    Directorio MEDIA donde la automatización guarda screenshots/PDF de una tarea.
+    Al estar bajo MEDIA_ROOT, las capturas son servibles por URL y la página
+    de progreso puede mostrarlas como espejo en vivo.
+    """
+    return Path(settings.MEDIA_ROOT) / 'conciliacion' / f'tarea_{task_id}'
+
+
+def _screenshots_servibles(task):
+    """
+    Devuelve las URLs de los screenshots de la tarea (para el espejo en vivo).
+
+    Las URLs apuntan a la vista autenticada `conciliacion_screenshot`, que
+    valida que el usuario tenga acceso al expediente antes de servir el archivo
+    (las capturas contienen PII de clientes y no deben ser públicas).
+    """
+    # Si ya terminó y hay URLs guardadas en screenshots_json, convertirlas
+    # (guardan /media/... directo) a la vista autenticada.
+    if task.screenshots_json:
+        try:
+            urls = json.loads(task.screenshots_json)
+            if urls:
+                return [
+                    reverse('conciliacion_screenshot', args=[task.pk, Path(u).name])
+                    for u in urls if u
+                ]
+        except (ValueError, TypeError):
+            pass
+
+    # En ejecución: escanear el directorio de la tarea (capturas parciales)
+    directorio = _directorio_screenshots_tarea(task.pk)
+    try:
+        if directorio.exists():
+            pngs = sorted(directorio.glob('*.png'), key=lambda p: p.stat().st_mtime)
+            return [
+                reverse('conciliacion_screenshot', args=[task.pk, p.name])
+                for p in pngs
+            ]
+    except Exception:
+        pass
+    return []
+
+
+@login_required
+def conciliacion_screenshot(request, task_pk, nombre_archivo):
+    """
+    Sirve un screenshot de una tarea de conciliación (espejo en vivo).
+
+    Requiere login y acceso al expediente de la tarea (misma regla que
+    conciliacion_estado). Sanitiza el nombre del archivo para evitar
+    path traversal.
+    """
+    task = get_object_or_404(TareaConciliacion.objects.select_related('expediente'), pk=task_pk)
+
+    # Misma validación de acceso que conciliacion_estado
+    expedientes_qs = get_expedientes_queryset(request.user)
+    if not expedientes_qs.filter(pk=task.expediente.pk).exists():
+        raise Http404
+
+    # Sanitizar: solo el nombre del archivo (sin rutas)
+    nombre = Path(nombre_archivo).name
+    ruta = _directorio_screenshots_tarea(task.pk) / nombre
+    if not ruta.is_file():
+        raise Http404
+
+    response = FileResponse(ruta.open('rb'), content_type='image/png')
+    response['Cache-Control'] = 'no-store'  # espejo en vivo: no cachear
+    return response
+
+
 def _ejecutar_conciliacion_en_hilo(task_id):
     """
     Ejecuta la automatización de conciliación en un hilo separado.
 
     Esto evita que el HTTP request se bloquee durante los 30-90 segundos
     que tarda Playwright en navegar y llenar el formulario del portal.
+
+    Los screenshots y el PDF se guardan bajo MEDIA_ROOT para que el asesor
+    pueda ver el navegador en vivo (espejo) y descargar el acuse.
     """
     from django.db import close_old_connections
+    import traceback
 
     close_old_connections()
     logger.info(f'[Hilo] Iniciando tarea de conciliación #{task_id}')
 
+    # Variable para asegurar que el estado se guarde siempre
+    task_obj = None
+
     try:
         # Marcar como ejecutando
         task = TareaConciliacion.objects.get(pk=task_id)
+        task_obj = task
         task.estado = 'ejecutando'
         task.save(update_fields=['estado'])
+        logger.info(f'[Hilo] Tarea #{task_id} marcada como ejecutando')
 
         close_old_connections()
 
+        # Directorio servible para screenshots y PDF (media/conciliacion/tarea_X)
+        download_dir = _directorio_screenshots_tarea(task_id)
+        download_dir.mkdir(parents=True, exist_ok=True)
+
         # Ejecutar la automatización (esto puede tomar 30-90 segundos)
+        logger.info(f'[Hilo] Llamando enviar_conciliacion para expediente {task.expediente_id}...')
         resultado = enviar_conciliacion(
             task.expediente,
             usuario=task.usuario,
             headless=True,  # Siempre headless en background
+            download_dir=str(download_dir),
         )
+        logger.info(f'[Hilo] enviar_conciliacion terminó: success={resultado.success}')
 
         close_old_connections()
 
@@ -1883,13 +2416,18 @@ def _ejecutar_conciliacion_en_hilo(task_id):
             task.estado = 'completado'
             task.folio = resultado.folio or ''
             task.pdf_path = resultado.pdf_path or ''
+            logger.info(f'[Hilo] Tarea #{task_id} exitosa. Folio: {resultado.folio}')
         else:
             task.estado = 'fallido'
             task.error = resultado.error or 'Error desconocido al enviar al portal'
+            logger.warning(f'[Hilo] Tarea #{task_id} falló: {task.error[:200]}')
 
         task.detalle = resultado.detalle or ''
         if resultado.screenshots:
-            task.screenshots_json = json.dumps(resultado.screenshots)
+            # Convertir rutas absolutas → URLs servibles /media/...
+            task.screenshots_json = json.dumps(
+                screenshots_a_urls(resultado.screenshots)
+            )
         else:
             task.screenshots_json = ''
         task.completed_at = timezone.now()
@@ -1899,15 +2437,21 @@ def _ejecutar_conciliacion_en_hilo(task_id):
 
     except Exception as e:
         close_old_connections()
+        tb = traceback.format_exc()
         logger.exception(f'[Hilo] Error en tarea de conciliación #{task_id}')
         try:
-            task = TareaConciliacion.objects.get(pk=task_id)
-            task.estado = 'fallido'
-            task.error = f'{type(e).__name__}: {str(e)}'
-            task.completed_at = timezone.now()
-            task.save(update_fields=['estado', 'error', 'completed_at'])
-        except:
-            pass
+            if task_obj is None:
+                task_obj = TareaConciliacion.objects.get(pk=task_id)
+            task_obj.estado = 'fallido'
+            task_obj.error = f'{type(e).__name__}: {str(e)[:500]}'
+            task_obj.detalle = f'Traceback:\n{tb[:2000]}'
+            task_obj.completed_at = timezone.now()
+            task_obj.save(update_fields=['estado', 'error', 'detalle', 'completed_at'])
+            logger.info(f'[Hilo] Tarea #{task_id} error guardado en BD')
+        except Exception as save_err:
+            logger.exception(f'[Hilo] Error CRÍTICO: no se pudo guardar el error de la tarea #{task_id}: {save_err}')
+            # Último recurso: log the traceback
+            logger.error(f'[Hilo] Error original:\n{tb}')
 
 
 @login_required
@@ -1921,8 +2465,10 @@ def enviar_conciliacion_automation(request, pk):
     expediente = get_object_or_404(get_expedientes_queryset(request.user), pk=pk)
 
     # Verificar que el expediente tenga datos mínimos
-    if not expediente.cliente.curp:
-        messages.error(request, 'El cliente debe tener CURP para enviar la solicitud de conciliación.')
+    try:
+        _validar_curp(expediente.cliente.curp)
+    except CurpInvalidoError as e:
+        messages.error(request, str(e))
         return redirect('expediente_detail', pk=expediente.pk)
 
     if not expediente.cliente.telefono:
@@ -1931,6 +2477,24 @@ def enviar_conciliacion_automation(request, pk):
 
     if request.method == 'POST':
         modo = request.POST.get('modo', 'automatico')
+
+        if modo == 'extension':
+            # ── Modo Extensión: NO se lanza el navegador headless ─────────
+            # Se crea la tarea en 'pendiente' para que la Extensión de Chrome
+            # del asesor la tome, llene el portal en su propio navegador y
+            # reporte el folio/acuse a la app.
+            task = TareaConciliacion.objects.create(
+                expediente=expediente,
+                usuario=request.user,
+                estado='pendiente',
+                modo='extension',
+            )
+            messages.info(
+                request,
+                '📲 Tarea creada. Abre la Extensión de Chrome para llenar la solicitud '
+                'en tu navegador y guardar el acuse.'
+            )
+            return redirect('extension_config')
 
         # Crear la tarea en la BD
         task = TareaConciliacion.objects.create(
@@ -1962,6 +2526,74 @@ def enviar_conciliacion_automation(request, pk):
 
 
 @login_required
+def extension_descargar_paquete(request):
+    """
+    Empaqueta la carpeta extension/ en un .zip y lo descarga.
+
+    El usuario descarga el paquete y lo carga en chrome://extensions
+    (Modo desarrollador → Cargar descomprimida → seleccionar el .zip extraído).
+    """
+    import io as _io
+    import zipfile as _zipfile
+
+    carpeta_extension = Path(settings.BASE_DIR) / 'extension'
+    if not carpeta_extension.exists():
+        return HttpResponse('La carpeta de la extensión no está disponible en este servidor.', status=404)
+
+    buffer = _io.BytesIO()
+    with _zipfile.ZipFile(buffer, 'w', _zipfile.ZIP_DEFLATED) as zf:
+        for archivo in sorted(carpeta_extension.rglob('*')):
+            if archivo.is_file():
+                # Ruta relativa dentro del zip (extension/...)
+                zf.write(archivo, archivo.relative_to(carpeta_extension.parent))
+    buffer.seek(0)
+
+    response = HttpResponse(buffer.getvalue(), content_type='application/zip')
+    response['Content-Disposition'] = 'attachment; filename="conciliacion_bc_extension.zip"'
+    return response
+
+
+@login_required
+def extension_config(request):
+    """
+    Página de configuración de la Extensión de Chrome.
+
+    Muestra al asesor su token personal (para conectarla con la app) e
+    instrucciones paso a paso para instalarla y usarla.
+    """
+    from accounts.models import UserProfile
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+
+    # Generar token si por alguna razón no tiene (migración de datos viejos)
+    if not profile.api_token:
+        profile.save()  # save() auto-genera si está vacío
+        profile.refresh_from_db()
+
+    # Tareas pendientes que esperan a la extensión
+    tareas_pendientes = TareaConciliacion.objects.filter(
+        expediente__in=get_expedientes_queryset(request.user),
+        estado='pendiente',
+    ).select_related('expediente', 'expediente__cliente').order_by('-created_at')[:10]
+
+    return render(request, 'expedientes/extension_config.html', {
+        'token': profile.api_token,
+        'tareas_pendientes': tareas_pendientes,
+        'ESTADO_COLORS': ESTADO_COLORS,
+    })
+
+
+@login_required
+@require_POST
+def extension_regenerar_token(request):
+    """Regenera el token API del usuario (invalida el anterior)."""
+    from accounts.models import UserProfile
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    nuevo = profile.regenerar_token()
+    messages.success(request, '🔑 Token regenerado. Actualízalo en las opciones de la extensión.')
+    return redirect('extension_config')
+
+
+@login_required
 def conciliacion_estado(request, task_pk):
     """
     API JSON: retorna el estado actual de una tarea de conciliación.
@@ -1974,6 +2606,9 @@ def conciliacion_estado(request, task_pk):
     if not expedientes_qs.filter(pk=task.expediente.pk).exists():
         return JsonResponse({'error': 'No autorizado'}, status=403)
 
+    # Screenshots para el espejo en vivo (URLs servibles /media/...)
+    screenshots = _screenshots_servibles(task)
+
     data = {
         'task_id': task.pk,
         'estado': task.estado,
@@ -1982,6 +2617,8 @@ def conciliacion_estado(request, task_pk):
         'folio': task.folio,
         'error': task.error,
         'detalle': task.detalle,
+        'screenshots': screenshots,
+        'screenshot_actual': screenshots[-1] if screenshots else '',
         'created_at': task.created_at.isoformat() if task.created_at else None,
         'completed_at': task.completed_at.isoformat() if task.completed_at else None,
     }
@@ -2003,9 +2640,15 @@ def conciliacion_procesando(request, task_pk):
         messages.error(request, 'No tienes acceso a este expediente.')
         return redirect('dashboard_redirect')
 
+    # Diagnóstico: detectar si Celery/Redis está disponible
+    celery_disponible = _celery_disponible()
+    modo_ejecucion = 'celery' if celery_disponible else 'hilo (fallback)'
+
     return render(request, 'expedientes/conciliacion_procesando.html', {
         'task': task,
         'expediente': task.expediente,
+        'celery_disponible': celery_disponible,
+        'modo_ejecucion': modo_ejecucion,
         'ESTADO_COLORS': ESTADO_COLORS,
     })
 
@@ -2023,8 +2666,10 @@ def reintentar_conciliacion(request, task_pk):
     expediente = get_object_or_404(expedientes_qs, pk=task_original.expediente.pk)
 
     # Verificar datos mínimos
-    if not expediente.cliente.curp:
-        messages.error(request, 'El cliente debe tener CURP para enviar la solicitud de conciliación.')
+    try:
+        _validar_curp(expediente.cliente.curp)
+    except CurpInvalidoError as e:
+        messages.error(request, str(e))
         return redirect('expediente_detail', pk=expediente.pk)
 
     if not expediente.cliente.telefono:
@@ -2066,9 +2711,12 @@ def reintentar_conciliacion(request, task_pk):
 @login_required
 def subir_conciliacion_pdf(request, pk):
     """
-    Permite al usuario subir manualmente un PDF de conciliación descargado
-    desde el portal del gobierno. Extrae el folio del PDF y actualiza el expediente.
+    Permite al usuario subir manualmente un PDF de conciliación (acuse) descargado
+    desde el portal del gobierno. Extrae los datos del acuse y muestra una vista
+    previa para que el asesor confirme qué campos popular en el expediente.
     """
+    from .acuse_parser import parsear_acuse_pdf
+
     expediente = get_object_or_404(get_expedientes_queryset(request.user), pk=pk)
 
     if request.method == 'POST' and request.FILES.get('pdf'):
@@ -2078,52 +2726,218 @@ def subir_conciliacion_pdf(request, pk):
             messages.error(request, 'Solo se aceptan archivos PDF.')
             return redirect('expediente_detail', pk=expediente.pk)
 
-        # Extraer folio del nombre del archivo o contenido
         contenido_bytes = pdf_file.read()
-        folio = _extraer_folio_pdf(pdf_file.name, contenido_bytes)
-        pdf_file.seek(0)  # Reset file pointer for saving
 
-        # Guardar como Documento
-        from .models import Documento as DocModel
-        from django.core.files.base import ContentFile
-        doc = DocModel(
+        # Límite de tamaño: un acuse oficial pesa ~50-200KB
+        MAX_ACUSE_SIZE = 2 * 1024 * 1024  # 2 MB
+        if len(contenido_bytes) > MAX_ACUSE_SIZE:
+            messages.error(request, 'El PDF es demasiado grande (máximo 2 MB).')
+            return redirect('expediente_detail', pk=expediente.pk)
+
+        # Parsear todos los datos del acuse (folio, solicitante, citado, fechas...)
+        datos = parsear_acuse_pdf(contenido_bytes)
+
+        # Guardar el PDF en sesión (pequeño, ~50KB) para la vista previa de confirmación
+        # El contenido se guarda en base64 (seguro para cualquier sesión JSON) y las
+        # fechas se serializan como ISO.
+        import base64
+        datos_sesion = {}
+        for k, v in datos.items():
+            if hasattr(v, 'isoformat'):
+                datos_sesion[k] = v.isoformat()
+            else:
+                datos_sesion[k] = v
+        request.session['acuse_pendiente'] = {
+            'nombre_archivo': pdf_file.name,
+            'contenido_b64': base64.b64encode(contenido_bytes).decode('ascii'),
+            'datos': datos_sesion,
+        }
+        request.session.modified = True
+
+        return redirect('acuse_vista_previa', pk=expediente.pk)
+
+    return redirect('expediente_detail', pk=expediente.pk)
+
+
+@login_required
+def acuse_vista_previa(request, pk):
+    """
+    Muestra los datos detectados en el acuse subido para que el asesor
+    confirme qué campos se aplican al expediente/cliente.
+    """
+    from datetime import date as _date
+    from .acuse_parser import mapear_campos_modelo
+
+    expediente = get_object_or_404(get_expedientes_queryset(request.user), pk=pk)
+    pendiente = request.session.get('acuse_pendiente')
+
+    if not pendiente:
+        messages.info(request, 'No hay un acuse pendiente de confirmación.')
+        return redirect('expediente_detail', pk=expediente.pk)
+
+    # Reconstruir fechas desde ISO
+    datos = dict(pendiente.get('datos', {}))
+    for campo in ('fecha_solicitud', 'fecha_conflicto'):
+        if datos.get(campo):
+            try:
+                datos[campo] = _date.fromisoformat(datos[campo])
+            except (ValueError, TypeError):
+                datos.pop(campo, None)
+
+    campos = mapear_campos_modelo(datos, expediente)
+
+    return render(request, 'expedientes/acuse_vista_previa.html', {
+        'expediente': expediente,
+        'datos': datos,
+        'campos': campos,
+        'nombre_archivo': pendiente.get('nombre_archivo', 'acuse.pdf'),
+        'ESTADO_COLORS': ESTADO_COLORS,
+    })
+
+
+@login_required
+@require_POST
+def confirmar_acuse_datos(request, pk):
+    """
+    Aplica al expediente/cliente los campos que el asesor seleccionó
+    de la vista previa del acuse, y guarda el PDF como Documento.
+    """
+    from datetime import date as _date
+    import base64
+    from django.core.files.base import ContentFile
+
+    expediente = get_object_or_404(get_expedientes_queryset(request.user), pk=pk)
+    pendiente = request.session.get('acuse_pendiente')
+
+    if not pendiente:
+        messages.error(request, 'La sesión del acuse expiró. Vuelve a subir el PDF.')
+        return redirect('expediente_detail', pk=expediente.pk)
+
+    # Modo "solo guardar PDF": subir el acuse sin aplicar datos (sin folio)
+    if request.POST.get('accion') == 'solo_guardar':
+        try:
+            contenido_bytes = base64.b64decode(pendiente['contenido_b64'])
+            doc = Documento(
+                expediente=expediente,
+                descripcion='Acuse de Conciliación - Folio: Pendiente',
+                tipo='citatorio',
+                subido_por=request.user,
+            )
+            doc.archivo.save(pendiente.get('nombre_archivo', 'acuse_conciliacion.pdf'),
+                             ContentFile(contenido_bytes), save=True)
+            registrar_movimiento(
+                expediente=expediente,
+                usuario=request.user,
+                accion='subida_documento',
+                detalle='Acuse de conciliación subido (sin datos extraídos)'
+            )
+            request.session.pop('acuse_pendiente', None)
+            messages.success(request, '✅ Acuse guardado como documento. No se detectaron datos para aplicar.')
+        except Exception as e:
+            logger.warning('No se pudo guardar el PDF del acuse: %s', e)
+            messages.error(request, 'No se pudo guardar el PDF del acuse.')
+        return redirect('expediente_detail', pk=expediente.pk)
+
+    seleccionados = request.POST.getlist('campos')
+    if not seleccionados:
+        # Si no se seleccionó nada, solo guardar el PDF sin popular datos
+        request.session.pop('acuse_pendiente', None)
+        messages.warning(request, 'No se aplicaron datos del acuse. El PDF no se guardó.')
+        return redirect('expediente_detail', pk=expediente.pk)
+
+    # Reconstruir datos y fechas
+    datos = dict(pendiente.get('datos', {}))
+    for campo in ('fecha_solicitud', 'fecha_conflicto'):
+        if datos.get(campo):
+            try:
+                datos[campo] = _date.fromisoformat(datos[campo])
+            except (ValueError, TypeError):
+                datos.pop(campo, None)
+
+    cliente = expediente.cliente
+    campos_aplicados = []
+
+    if 'folio' in seleccionados and datos.get('folio'):
+        expediente.folio = datos['folio']
+        expediente.fecha_tramite = datos.get('fecha_solicitud') or timezone.now().date()
+        campos_aplicados.append('folio')
+
+    if 'fecha_solicitud' in seleccionados and datos.get('fecha_solicitud'):
+        expediente.fecha_tramite = datos['fecha_solicitud']
+        campos_aplicados.append('fecha de solicitud')
+
+    if 'nombre' in seleccionados and datos.get('solicitante'):
+        cliente.nombre = datos['solicitante']
+        campos_aplicados.append('nombre del solicitante')
+
+    if 'citado' in seleccionados and datos.get('citado'):
+        cliente.empresa = datos['citado']
+        cliente.empresa_razon_social = datos['citado']
+        campos_aplicados.append('empresa citada')
+
+    if 'fecha_conflicto' in seleccionados and datos.get('fecha_conflicto'):
+        # La fecha del conflicto es la fecha de salida/despido del trabajador
+        cliente.fecha_salida = datos['fecha_conflicto']
+        campos_aplicados.append('fecha del conflicto')
+
+    if 'tipo_despido' in seleccionados and datos.get('tipo_despido'):
+        expediente.tipo_despido = datos['tipo_despido']
+        campos_aplicados.append('tipo de despido')
+
+    if 'unidad' in seleccionados and datos.get('unidad'):
+        solicitud, _ = SolicitudConciliacion.objects.get_or_create(expediente=expediente)
+        solicitud.unidad_sede = datos['unidad']
+        solicitud.save(update_fields=['unidad_sede'])
+        campos_aplicados.append('unidad de conciliación')
+
+    # Cambiar estado: nuevo → solicitud (el acuse ya se registró)
+    if expediente.estado == 'nuevo' and 'solicitud' in Expediente.TRANSICIONES.get('nuevo', []):
+        expediente.estado = 'solicitud'
+
+    expediente.save()
+    cliente.save()
+
+    # Guardar el PDF como Documento
+    folio = datos.get('folio', '')
+    try:
+        contenido_bytes = base64.b64decode(pendiente['contenido_b64'])
+        doc = Documento(
             expediente=expediente,
             descripcion=f'Acuse de Conciliación - Folio: {folio or "Pendiente"}',
             tipo='citatorio',
             subido_por=request.user,
         )
-        doc.archivo.save(pdf_file.name, ContentFile(contenido_bytes), save=True)
+        doc.archivo.save(pendiente.get('nombre_archivo', 'acuse_conciliacion.pdf'),
+                         ContentFile(contenido_bytes), save=True)
+    except Exception as e:
+        logger.warning('No se pudo guardar el PDF del acuse: %s', e)
 
-        # Actualizar expediente con el folio
-        if folio:
-            expediente.folio = folio
-            expediente.fecha_tramite = timezone.now().date()
-            expediente.save()
+    # Registrar la tarea de conciliación completada
+    TareaConciliacion.objects.create(
+        expediente=expediente,
+        usuario=request.user,
+        estado='completado',
+        folio=folio or '',
+        detalle=(f'Acuse subido manualmente. Folio: {folio or "No detectado"}. '
+                 f'Campos aplicados: {", ".join(campos_aplicados)}.'),
+        modo='automatico',
+        completed_at=timezone.now(),
+    )
 
-        # Crear TareaConciliacion como completada
-        TareaConciliacion.objects.create(
-            expediente=expediente,
-            usuario=request.user,
-            estado='completado',
-            folio=folio or '',
-            detalle=f'PDF subido manualmente. Folio: {folio or "No detectado"}.',
-            modo='automatico',
-            completed_at=timezone.now(),
-        )
+    registrar_movimiento(
+        expediente=expediente,
+        usuario=request.user,
+        accion='actualizacion',
+        detalle=(f'Acuse de conciliación subido. Folio: {folio or "No detectado"}. '
+                 f'Campos aplicados: {", ".join(campos_aplicados)}.')
+    )
 
-        registrar_movimiento(
-            expediente=expediente,
-            usuario=request.user,
-            accion='actualizacion',
-            detalle=f'PDF de conciliación subido manualmente. Folio: {folio or "No detectado"}'
-        )
+    request.session.pop('acuse_pendiente', None)
 
-        if folio:
-            messages.success(request, f'✅ PDF de conciliación registrado. Folio: {folio}')
-        else:
-            messages.warning(request, 'PDF guardado pero no se pudo detectar el folio. Puedes capturarlo manualmente en Editar Expediente.')
-
-        return redirect('expediente_detail', pk=expediente.pk)
+    if folio:
+        messages.success(request, f'✅ Acuse registrado. Folio: {folio}')
+    else:
+        messages.success(request, '✅ Acuse guardado y datos aplicados al expediente.')
 
     return redirect('expediente_detail', pk=expediente.pk)
 
@@ -2164,3 +2978,380 @@ def descargar_conciliacion_pdf(request, pk):
         logger.exception('Error generando PDF de conciliación para expediente %s', expediente.numero)
         messages.error(request, f'Error al generar el PDF: {e}')
         return redirect('expediente_detail', pk=expediente.pk)
+
+
+# ─── Importación CLT.xlsx desde el navegador ───────────────────────────────
+
+from .management.commands.importar_clt import (
+    leer_filas as clt_leer_filas,
+    importar_filas as clt_importar_filas,
+    crear_asesores as clt_crear_asesores,
+    _nombre_usuario as clt_nombre_usuario,
+)
+
+
+@login_required
+def importar_clt_web(request):
+    """
+    Sube CLT.xlsx desde el navegador, muestra vista previa de las citas
+    detectadas y permite confirmar la importación (crea Cliente + Expediente
+    con fecha de audiencia). Solo admin/superadmin.
+    """
+    if not hasattr(request.user, 'profile') or request.user.profile.rol not in ['admin', 'superadmin']:
+        messages.error(request, 'No tienes permisos para importar citas CLT.')
+        return redirect('dashboard_admin')
+
+    # ── Paso 2: Confirmar importación ─────────────────────────────────
+    if request.method == 'POST' and request.POST.get('confirmar'):
+        import os
+        ruta = request.session.get('clt_import_path')
+        if not ruta or not os.path.exists(ruta):
+            messages.error(request, 'El archivo ya no está disponible. Vuelve a subirlo.')
+            return redirect('importar_clt_web')
+
+        try:
+            filas = clt_leer_filas(ruta, '')
+        except Exception as e:
+            logger.exception('Error re-leyendo CLT.xlsx al confirmar')
+            messages.error(request, f'No se pudo re-leer el archivo: {e}')
+            return redirect('importar_clt_web')
+
+        # Crear asesores que falten (opción marcada)
+        creados, existentes = [], []
+        if request.POST.get('crear_asesores') == 'on':
+            nombres = {f['asesor'] for f in filas} | {f['asesor2'] for f in filas}
+            nombres = {n for n in nombres if n and n not in ('N/A',)}
+            creados, existentes = clt_crear_asesores(nombres)
+
+        stats = clt_importar_filas(filas)
+
+        # Limpiar archivo temporal
+        try:
+            os.remove(ruta)
+        except OSError:
+            pass
+        request.session.pop('clt_import_path', None)
+
+        return render(request, 'expedientes/clt_importar.html', {
+            'resultado': stats,
+            'asesores_creados': creados,
+            'asesores_existentes': existentes,
+            'total_citas': len(filas),
+            'nombre_archivo': request.session.pop('clt_import_nombre', ''),
+            'ESTADO_COLORS': ESTADO_COLORS,
+        })
+
+    # ── Paso 1: Subir archivo y previsualizar ─────────────────────────
+    if request.method == 'POST' and request.FILES.get('archivo'):
+        archivo = request.FILES['archivo']
+        if not archivo.name.lower().endswith('.xlsx'):
+            messages.error(request, 'El archivo debe tener extensión .xlsx')
+            return redirect('importar_clt_web')
+
+        import os
+        import time
+        import uuid
+        from django.conf import settings
+
+        dir_tmp = os.path.join(settings.MEDIA_ROOT, 'clt_imports')
+        os.makedirs(dir_tmp, exist_ok=True)
+
+        # Limpiar archivos temporales abandonados (> 1 día) para no acumular basura
+        try:
+            ahora = time.time()
+            for viejo in os.listdir(dir_tmp):
+                ruta_viejo = os.path.join(dir_tmp, viejo)
+                if os.path.isfile(ruta_viejo) and ahora - os.path.getmtime(ruta_viejo) > 86400:
+                    os.remove(ruta_viejo)
+        except OSError:
+            pass
+
+        ruta = os.path.join(dir_tmp, f'clt_{uuid.uuid4().hex}.xlsx')
+        with open(ruta, 'wb') as destino:
+            for chunk in archivo.chunks():
+                destino.write(chunk)
+
+        try:
+            filas = clt_leer_filas(ruta, '')
+        except Exception as e:
+            logger.exception('Error leyendo CLT.xlsx subido: %s', archivo.name)
+            try:
+                os.remove(ruta)
+            except OSError:
+                pass
+            messages.error(request, f'No se pudo leer el archivo: {e}')
+            return redirect('importar_clt_web')
+
+        if not filas:
+            try:
+                os.remove(ruta)
+            except OSError:
+                pass
+            messages.error(request, 'No se encontraron citas en el archivo. Verifica que tenga filas con datos.')
+            return redirect('importar_clt_web')
+
+        request.session['clt_import_path'] = ruta
+        request.session['clt_import_nombre'] = archivo.name
+
+        # Resumen por hoja para la vista previa
+        from collections import Counter
+        hojas = Counter(f['hoja'] for f in filas)
+
+        return render(request, 'expedientes/clt_importar.html', {
+            'filas': filas,
+            'total_citas': len(filas),
+            'hojas': dict(hojas),
+            'nombre_archivo': archivo.name,
+            'vista_previa': True,
+            'ESTADO_COLORS': ESTADO_COLORS,
+        })
+
+    # ── GET: formulario inicial ──────────────────────────────────────
+    return render(request, 'expedientes/clt_importar.html', {
+        'ESTADO_COLORS': ESTADO_COLORS,
+    })
+
+
+# ─── Generador de CURP (independiente) ─────────────────────────────────────
+
+@login_required
+def generador_curp(request):
+    """
+    Herramienta independiente tipo boxfactura.com/calculadora/curp.
+    Genera la CURP en vivo conforme el usuario escribe sus datos, muestra
+    el desglose por sección (letras, fecha, sexo, entidad, consonantes,
+    homoclave) y también valida una CURP existente.
+
+    Todo el cálculo ocurre en el navegador (JS puro); esta vista solo
+    sirve la plantilla.
+    """
+    return render(request, 'expedientes/curp_generador.html', {
+        'ESTADO_COLORS': ESTADO_COLORS,
+    })
+
+
+# ─── Catálogo de Machotes (a la mano) ───────────────────────────────────
+
+@login_required
+def machotes_catalogo(request):
+    """
+    Catálogo general de machotes (plantillas) disponible para la abogada,
+    administrativos y superadmin. Muestra todos los machotes activos
+    agrupados por categoría con vista previa de su contenido.
+
+    Soporta búsqueda por texto (?q=) en nombre/descripción/archivo/contenido
+    y filtro por categoría (?categoria=clave). Ambos pueden combinarse.
+    """
+    if not _puede_generar_documentos(request):
+        messages.error(request, 'No tienes permiso para acceder al catálogo de machotes.')
+        return redirect('dashboard_redirect')
+
+    from collections import Counter, defaultdict
+    from django.db.models import Q
+
+    q = (request.GET.get('q') or '').strip()
+    categoria_filtro = request.GET.get('categoria') or ''
+
+    base = _get_machotes_queryset()
+    machotes = base
+
+    if categoria_filtro:
+        machotes = machotes.filter(categoria=categoria_filtro)
+    if q:
+        machotes = machotes.filter(
+            Q(nombre__icontains=q)
+            | Q(descripcion__icontains=q)
+            | Q(archivo_origen__icontains=q)
+            | Q(contenido_html__icontains=q)
+        )
+
+    machotes_agrupados = defaultdict(list)
+    for m in machotes:
+        machotes_agrupados[m.get_categoria_display()].append(m)
+
+    # Conteo de machotes por categoría (para el selector de filtro)
+    conteo_categorias = Counter(base.values_list('categoria', flat=True))
+
+    return render(request, 'expedientes/machotes_catalogo.html', {
+        'machotes_agrupados': dict(machotes_agrupados),
+        'total_machotes': sum(len(v) for v in machotes_agrupados.values()),
+        'total_sin_filtros': base.count(),
+        'q': q,
+        'categoria_filtro': categoria_filtro,
+        'categorias_disponibles': Machote.CATEGORIA_CHOICES,
+        'categorias_dict': dict(Machote.CATEGORIA_CHOICES),
+        'conteo_categorias': dict(conteo_categorias),
+        'ESTADO_COLORS': ESTADO_COLORS,
+    })
+
+
+@login_required
+def machote_editar(request, machote_id):
+    """
+    Edita un machote de la librería: metadatos (nombre, categoría, tipo de
+    despido...) y su contenido HTML con marcadores {{ }} reutilizables.
+    (Editor de plantilla, sin datos de expediente).
+    """
+    if not _puede_generar_documentos(request):
+        messages.error(request, 'No tienes permiso para editar machotes.')
+        return redirect('machotes_catalogo')
+    machote = get_object_or_404(Machote, pk=machote_id, activo=True)
+
+    if request.method == 'POST':
+        form = MachoteForm(request.POST, instance=machote)
+        contenido = request.POST.get('contenido', '')
+        if form.is_valid() and contenido.strip():
+            machote = form.save(commit=False)
+            machote.contenido_html = contenido
+            machote.save()
+            messages.success(request, f'✅ Machote "{machote.nombre}" actualizado.')
+            return redirect('machotes_catalogo')
+        else:
+            messages.error(
+                request,
+                'Corrige los errores del formulario o verifica que el contenido no esté vacío.'
+            )
+    else:
+        form = MachoteForm(instance=machote)
+
+    return render(request, 'expedientes/machote_editar.html', {
+        'machote': machote,
+        'form': form,
+        'contenido_html': machote.contenido_html,
+        'ESTADO_COLORS': ESTADO_COLORS,
+    })
+
+
+@login_required
+@require_POST
+def machote_eliminar(request, machote_id):
+    """Elimina un machote de la librería (solo usuarios con permiso de documentos)."""
+    if not _puede_generar_documentos(request):
+        messages.error(request, 'No tienes permiso para eliminar machotes.')
+        return redirect('machotes_catalogo')
+    machote = get_object_or_404(Machote, pk=machote_id, activo=True)
+    nombre = machote.nombre
+    machote.delete()
+    messages.success(request, f'🗑️ Machote "{nombre}" eliminado de la librería.')
+    return redirect('machotes_catalogo')
+
+
+@login_required
+@require_POST
+def machote_renombrar(request, machote_id):
+    """
+    Renombra un machote de la librería (solo el nombre).
+
+    Acción ligera para que la abogada y demás usuarios con permiso de
+    documentos puedan organizar sus plantillas sin entrar al editor
+    completo de contenido.
+    """
+    if not _puede_generar_documentos(request):
+        messages.error(request, 'No tienes permiso para renombrar machotes.')
+        return redirect('machotes_catalogo')
+    machote = get_object_or_404(Machote, pk=machote_id, activo=True)
+    nuevo_nombre = (request.POST.get('nombre') or '').strip()
+    if not nuevo_nombre:
+        messages.error(request, 'El nombre del machote no puede estar vacío.')
+    elif len(nuevo_nombre) > 200:
+        messages.error(request, 'El nombre no puede exceder 200 caracteres.')
+    else:
+        nombre_anterior = machote.nombre
+        machote.nombre = nuevo_nombre
+        machote.save(update_fields=['nombre', 'updated_at'])
+        messages.success(request, f'✏️ Machote renombrado de "{nombre_anterior}" a "{nuevo_nombre}".')
+
+    # Volver a la página desde donde se renombró (ej. dashboard de la abogada)
+    # si el destino es relativo/seguro; si no, al catálogo por defecto.
+    # (Vista POST-only: el destino se envía siempre en el body del form.)
+    destino = (request.POST.get('next') or '').strip()
+    from django.utils.http import url_has_allowed_host_and_scheme
+    if destino and url_has_allowed_host_and_scheme(destino, allowed_hosts=None, require_https=request.is_secure()):
+        return redirect(destino)
+    return redirect('machotes_catalogo')
+
+
+@login_required
+def machote_importar_web(request):
+    """
+    Sube un archivo .docx (nueva demanda u otro documento) desde el navegador
+    y lo añade a los machotes como plantilla reutilizable.
+    Reutiliza la misma lógica del comando importar_machotes: convierte el
+    docx a HTML y reemplaza datos específicos por marcadores {{ variable }}.
+    """
+    if not _puede_generar_documentos(request):
+        messages.error(request, 'No tienes permiso para importar machotes.')
+        return redirect('dashboard_redirect')
+
+    if request.method == 'POST' and request.FILES.get('archivo'):
+        archivo = request.FILES['archivo']
+        if not archivo.name.lower().endswith('.docx'):
+            messages.error(request, 'El archivo debe tener extensión .docx')
+            return redirect('machote_importar_web')
+
+        import os
+        import tempfile
+
+        nombre_archivo = archivo.name
+        # Guardar a archivo temporal (el helper docx_a_html recibe una ruta)
+        try:
+            from .management.commands.importar_machotes import (
+                clasificar_archivo,
+                extraer_nombre_plantilla,
+                docx_a_html,
+                reemplazar_datos_con_marcadores,
+            )
+
+            contenido_bytes = archivo.read()
+            with tempfile.NamedTemporaryFile(suffix='.docx', delete=False) as tmp:
+                tmp.write(contenido_bytes)
+                ruta_tmp = tmp.name
+            try:
+                html = docx_a_html(ruta_tmp)
+            finally:
+                try:
+                    os.remove(ruta_tmp)
+                except OSError:
+                    pass
+
+            html = reemplazar_datos_con_marcadores(html)
+            clasificacion = clasificar_archivo(nombre_archivo)
+
+            # Verificar si ya existe un machote con el mismo archivo de origen
+            if Machote.objects.filter(archivo_origen=nombre_archivo).exists():
+                messages.warning(request, f'Ya existe un machote importado de "{nombre_archivo}".')
+                return redirect('machotes_catalogo')
+
+            iconos = {
+                'demanda': '⚡',
+                'carta_finiquito': '📄',
+                'convenio': '🤝',
+                'solicitud': '📋',
+                'citatorio': '📬',
+                'otro': '📎',
+            }
+
+            machote = Machote.objects.create(
+                nombre=extraer_nombre_plantilla(nombre_archivo),
+                descripcion=f'Importado desde el navegador: {nombre_archivo}',
+                categoria=clasificacion['categoria'],
+                tipo_despido=clasificacion['tipo_despido'],
+                jurisdiccion=clasificacion['jurisdiccion'],
+                contenido_html=html,
+                icono=iconos.get(clasificacion['categoria'], '📄'),
+                activo=True,
+                orden=0,
+                archivo_origen=nombre_archivo,
+            )
+
+            messages.success(request, f'✅ Machote "{machote.nombre}" importado correctamente.')
+            return redirect('machotes_catalogo')
+
+        except Exception as e:
+            logger.exception('Error importando machote desde navegador')
+            messages.error(request, f'No se pudo importar el documento: {e}')
+            return redirect('machote_importar_web')
+
+    return render(request, 'expedientes/machotes_importar.html', {
+        'ESTADO_COLORS': ESTADO_COLORS,
+    })

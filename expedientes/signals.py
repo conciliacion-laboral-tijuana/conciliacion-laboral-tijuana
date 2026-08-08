@@ -6,7 +6,8 @@ from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
 
-from .models import Expediente, Documento, Movimiento, Nota, WhatsAppMessage, TareaConciliacion
+from .models import (Cliente, Expediente, Documento, Movimiento, Nota,
+                     WhatsAppMessage, TareaConciliacion)
 
 logger = logging.getLogger(__name__)
 
@@ -105,6 +106,42 @@ def registrar_movimiento(expediente, usuario, accion, detalle=''):
         accion=accion,
         detalle=detalle,
     )
+
+
+@receiver(post_save, sender=Cliente)
+def recalcular_calculos_al_cambiar_cliente(sender, instance, created,
+                                           update_fields=None, **kwargs):
+    """
+    Recalcula automáticamente los Cálculos Laborales de un cliente cuando
+    cambian sus fechas de ingreso/salida o su salario.
+
+    Evita que el cálculo guardado quede desactualizado (stale) cuando se
+    editan los datos del cliente: el total y montos vuelven a calcularse
+    con la misma selección de conceptos y datos manuales del asesor.
+    """
+    if created:
+        return  # Aún no hay expedientes asociados
+    # Si el guardado solo tocó otros campos (p. ej. teléfono), no recalcular
+    if update_fields and not (update_fields & {'fecha_ingreso', 'fecha_salida', 'salario'}):
+        return
+
+    from .laboral_calculator import recalcular_calculo, _aplicar_conceptos_excluidos
+
+    for expediente in instance.expediente_set.select_related('cliente'):
+        calculo = getattr(expediente, 'calculo_laboral', None)
+        if calculo is None:
+            continue
+        try:
+            # Mantener alineados los conceptos excluidos con la demanda
+            # (p. ej. renuncia voluntaria) y recalcular con datos actuales
+            _aplicar_conceptos_excluidos(calculo, expediente)
+            recalcular_calculo(calculo)
+            calculo.save()
+        except Exception:
+            logger.exception(
+                'Error recalculando cálculo de %s tras cambios del cliente',
+                expediente.numero
+            )
 
 
 # ─── Tracker de cambios de estado para TareaConciliación ───────────────────

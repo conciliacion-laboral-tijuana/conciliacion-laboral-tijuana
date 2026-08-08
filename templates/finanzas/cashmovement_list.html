@@ -94,8 +94,8 @@
             <span>📋 Registros</span>
             <span class="text-[10px] text-gray-400">{% if page_obj %}{{ page_obj.start_index }}–{{ page_obj.end_index }} de {{ page_obj.paginator.count }}{% endif %}</span>
         </div>
-        <div class="overflow-x-auto">
-            <table class="w-full">
+        <div class="excel-scroll">
+            <table class="w-full excel-table">
                 <thead>
                     <tr>
                         <th>Fecha</th>

@@ -1,0 +1,121 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Extensión de Chrome - Conciliación{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto space-y-5">
+
+    <!-- Encabezado -->
+    <div class="card">
+        <div class="card-header" style="background: #2a3340; color: white; border-bottom: none;">
+            <h1 class="text-sm font-bold">📲 Extensión de Chrome — Conciliación</h1>
+        </div>
+        <div class="card-body space-y-4">
+            <div class="bg-green-50 border border-green-200 rounded-lg p-4 text-sm text-green-800">
+                <strong>✨ ¿Qué hace?</strong> La extensión abre el portal del gobierno
+                <strong>en TU navegador</strong>, llena el formulario con los datos del expediente
+                y <em>tú</em> das el clic final en "Enviar solicitud". Así evitas que la
+                automatización del servidor se quede detenida al final, y el acuse se
+                descarga directamente en tu computadora.
+            </div>
+
+            <!-- Token -->
+            <div class="bg-gray-50 rounded-lg p-4">
+                <h3 class="text-sm font-semibold text-gray-700 mb-2">🔑 Tu token personal</h3>
+                <p class="text-xs text-gray-500 mb-2">La extensión usa este token para conectarse con la app. Es único e intransferible.</p>
+                <div class="flex items-center space-x-2">
+                    <code id="token-field" class="flex-1 bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono break-all select-all">{{ token }}</code>
+                    <button onclick="copiarToken()" class="btn" style="background:#2563eb; color:white; white-space:nowrap;">📋 Copiar</button>
+                </div>
+                <form method="post" action="{% url 'extension_regenerar_token' %}" class="mt-2" onsubmit="return confirm('¿Regenerar el token? La extensión dejará de funcionar hasta que lo actualices en sus opciones.');">
+                    {% csrf_token %}
+                    <button type="submit" class="text-xs text-red-600 hover:underline">↻ Regenerar token (invalida el anterior)</button>
+                </form>
+            </div>
+
+            <!-- Tareas pendientes -->
+            <div class="bg-white border border-gray-200 rounded-lg p-4">
+                <h3 class="text-sm font-semibold text-gray-700 mb-2">📋 Tareas esperando a la extensión</h3>
+                {% if tareas_pendientes %}
+                <ul class="space-y-2">
+                    {% for t in tareas_pendientes %}
+                    <li class="flex items-center justify-between bg-blue-50 rounded-lg px-3 py-2 text-sm">
+                        <span>
+                            <strong>{{ t.expediente.numero }}</strong> — {{ t.expediente.cliente.nombre }}
+                            <span class="text-gray-500 text-xs">(creada {{ t.created_at|date:'d/m H:i' }})</span>
+                        </span>
+                        <span class="text-xs bg-blue-600 text-white rounded-full px-2 py-0.5">Pendiente</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-sm text-gray-500">
+                    No hay tareas pendientes. Cuando inicies un envío eligiendo
+                    <strong>"📲 Desde mi navegador (Extensión)"</strong>, aparecerá aquí.
+                </p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Instrucciones -->
+    <div class="card">
+        <div class="card-header" style="background: #2a3340; color: white; border-bottom: none;">
+            <h2 class="text-sm font-bold">📖 Instalación (una sola vez por computadora)</h2>
+        </div>
+        <div class="card-body">
+            <ol class="list-decimal ml-5 space-y-3 text-sm">
+                <li>
+                    Abre Chrome y ve a <code class="bg-gray-100 rounded px-1.5 py-0.5">chrome://extensions</code>
+                </li>
+                <li>
+                    Activa el <strong>Modo de desarrollador</strong> (switch arriba a la derecha)
+                </li>
+                <li>
+                    Haz clic en <strong>"Cargar descomprimida"</strong> y selecciona la carpeta
+                    <code class="bg-gray-100 rounded px-1.5 py-0.5">extension/</code> de este proyecto
+                </li>
+                <li>
+                    Haz clic en el ícono de la extensión → <strong>Opciones</strong>
+                </li>
+                <li>
+                    Pega la <strong>URL de la app</strong> (ej. <code class="bg-gray-100 rounded px-1.5 py-0.5">https://tu-app.railway.app</code>)
+                    y el <strong>token</strong> de arriba → Guardar
+                </li>
+            </ol>
+        </div>
+    </div>
+
+    <!-- Cómo usarla -->
+    <div class="card">
+        <div class="card-header" style="background: #2a3340; color: white; border-bottom: none;">
+            <h2 class="text-sm font-bold">🚀 Cómo usarla</h2>
+        </div>
+        <div class="card-body">
+            <ol class="list-decimal ml-5 space-y-3 text-sm">
+                <li>En la app, abre el expediente → <strong>Enviar a Conciliación</strong> → elige
+                    <strong>"📲 Desde mi navegador (Extensión)"</strong></li>
+                <li>Haz clic en el ícono de la extensión → verás la tarea pendiente → <strong>Llenar</strong></li>
+                <li>Se abrirá el portal del gobierno con el formulario ya llenado</li>
+                <li>Revisa los datos, resuelve el CAPTCHA si aparece y da clic en
+                    <strong>"Enviar solicitud"</strong></li>
+                <li>En la página del acuse, la extensión detectará el folio, descargará el
+                    PDF y lo guardará automáticamente en el expediente 🎉</li>
+            </ol>
+        </div>
+    </div>
+
+</div>
+
+<script>
+function copiarToken() {
+    const el = document.getElementById('token-field');
+    navigator.clipboard.writeText(el.textContent.trim()).then(() => {
+        const btn = event.target;
+        const original = btn.textContent;
+        btn.textContent = '✅ Copiado';
+        setTimeout(() => btn.textContent = original, 1500);
+    });
+}
+</script>
+{% endblock %}

@@ -689,10 +689,10 @@ class PartnerLoanListView(LoginRequiredMixin, AdminOrSuperOnlyMixin, ListView):
         # Totales
         qs = self.get_queryset()
         context['total_pendiente'] = qs.filter(estado='pendiente').aggregate(
-            t=models.Sum('monto')
+            t=Sum('monto')
         )['t'] or 0
         context['total_pagado'] = qs.filter(estado='pagado').aggregate(
-            t=models.Sum('monto')
+            t=Sum('monto')
         )['t'] or 0
         return context
 
@@ -1044,10 +1044,10 @@ class ProfitDistributionListView(LoginRequiredMixin, AdminOrSuperOnlyMixin, List
 
         qs = self.get_queryset()
         totales = qs.aggregate(
-            total_monto_convenio=models.Sum('monto_convenio'),
-            total_utilidad=models.Sum('utilidad_neta'),
-            total_honorarios=models.Sum('honorarios'),
-            total_comisiones=models.Sum('comisiones'),
+            total_monto_convenio=Sum('monto_convenio'),
+            total_utilidad=Sum('utilidad_neta'),
+            total_honorarios=Sum('honorarios'),
+            total_comisiones=Sum('comisiones'),
         )
         context['total_monto_convenio'] = totales['total_monto_convenio'] or 0
         context['total_utilidad'] = totales['total_utilidad'] or 0

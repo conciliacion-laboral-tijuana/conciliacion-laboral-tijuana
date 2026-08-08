@@ -21,7 +21,7 @@ dependencies = [
     "whitenoise>=6.0",
     "celery>=5.4.0",
     "redis>=5.0.0",
-
+    "pymupdf>=1.28.0",
 ]
 
 [project.scripts]

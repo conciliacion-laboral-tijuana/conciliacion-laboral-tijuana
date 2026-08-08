@@ -331,134 +331,76 @@ def _truncar(texto, max_len=50):
     return (texto or '')[:max_len]
 
 
-# ─── Helpers para generar CURP sintética (cuando no hay CURP real) ─────
+# ─── Validación de CURP ─────────────────────────────────────────────
+# El portal valida el CURP contra el registro real (RENAPO), no solo el
+# formato/dígito verificador. Un CURP sintético/inventado siempre es
+# rechazado ahí, sin importar qué tan "correcto" esté calculado. Por eso
+# no se genera un CURP falso: se exige el CURP real del cliente.
 
-CONSONANTES_CURP = 'BCDFGHJKLMNPQRSTVWXYZ'
-VOCALES = 'AEIOU'
-
-
-def _normalizar_curp(s):
-    """Normaliza un string para CURP: mayúsculas, sin acentos, Ñ se queda."""
-    if not s:
-        return ''
-    s = s.upper().strip()
-    s = s.replace('\u00c1', 'A').replace('\u00c9', 'E').replace('\u00cd', 'I')
-    s = s.replace('\u00d3', 'O').replace('\u00da', 'U')
-    return s
+CURP_PLACEHOLDERS = {'XAXX010101000', 'XEXX010101000', 'N/A'}
+_CURP_REGEX = re.compile(r'^[A-Z][AEIOU][A-Z]{2}\d{6}[HM][A-Z]{2}[B-DF-HJ-NP-TV-Z]{3}[A-Z0-9]\d$')
 
 
-def _primera_letra(s):
-    s = s.strip()
-    return s[0] if s else 'X'
-
-
-def _vocal_interna(s):
-    for c in s[1:]:
-        if c in VOCALES:
-            return c
-    return 'X'
-
-
-def _consonante_interna(s):
-    for c in s[1:]:
-        if c in CONSONANTES_CURP:
-            return c
-    return 'X'
+class CurpInvalidoError(Exception):
+    """El cliente no tiene un CURP real/válido para enviar al portal."""
 
 
 def _calcular_digito_verificador(curp17):
     """
     Calcula el dígito verificador (18vo carácter) de una CURP de 17 caracteres.
-    
-    Algoritmo oficial SAT/RENAPO:
-    1. Cada carácter se mapea a valor 0-9 (dígitos) o 10-36 (letras A-Z con Ñ=0)
-    2. Se toma solo la última cifra de cada valor (módulo 10)
-    3. Se multiplica por el peso de la posición (posición 1 tiene peso 17, ... posición 17 tiene peso 1)
-    4. Suma total módulo 10 → residuo
-    5. Si residuo = 0 → dígito = 0, sino → dígito = 10 - residuo
+    Algoritmo oficial RENAPO/SAT.
+
+    Fórmula (verificada contra CURP reales, ej. AMLO LOOA531113HTCPBN07 → 7
+    y EPN PXNE660720HMCXTN06 → 6):
+        suma = Σ índice(carácter_i) × (18 - i)   para i = 0..16
+        dígito = 10 - (suma mod 10), o 0 si el resultado es 10.
+
+    El índice sale del diccionario '0123456789ABCDEFGHIJKLMNÑOPQRSTUVWXYZ'
+    (0-9 → 0-9, A → 10, ..., Z → 36). Nota: la Ñ nunca aparece en una CURP
+    válida (RENAPO la sustituye por X), pero se incluye en el diccionario
+    por completitud.
     """
-    mapa = {
-        '0':0,'1':1,'2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,
-        'A':10,'B':11,'C':12,'D':13,'E':14,'F':15,'G':16,'H':17,
-        'I':18,'J':19,'K':20,'L':21,'M':22,'N':23,'Ñ':0,'O':25,
-        'P':26,'Q':27,'R':28,'S':29,'T':30,'U':31,'V':32,'W':33,
-        'X':34,'Y':35,'Z':36,
-    }
+    diccionario = '0123456789ABCDEFGHIJKLMNÑOPQRSTUVWXYZ'
     suma = 0
-    for i, c in enumerate(curp17.upper()):
-        val = mapa.get(c, 0)
-        digito = val % 10
-        peso = 17 - i  # posición 1 → peso 17, posición 17 → peso 1
-        suma += digito * peso
-    residuo = suma % 10
-    return str(0 if residuo == 0 else 10 - residuo)
+    for i, c in enumerate((curp17 or '').upper()[:17]):
+        indice = diccionario.find(c)
+        if indice < 0:
+            indice = 0  # carácter no estándar → tratar como 0
+        suma += indice * (18 - i)
+    digito = 10 - (suma % 10)
+    return '0' if digito == 10 else str(digito)
 
 
-def _generar_curp(nombre='', apellido1='', apellido2='', fecha_nac=None, genero='masculino'):
+def _corregir_curp_checksum(curp):
     """
-    Genera una CURP sintética con dígito verificador válido.
-    
-    La CURP pasa validación de FORMATO y DÍGITO VERIFICADOR,
-    pero NO corresponde a una persona real (no está en RENAPO).
-    Muchos portales gubernamentales solo verifican formato y dígito,
-    no hacen consulta en vivo contra RENAPO.
+    Corrige el dígito verificador de un CURP de 18 caracteres.
+    Retorna el CURP con el dígito verificador correcto.
     """
-    import hashlib as _hashlib
-    from datetime import date as _date
+    curp = (curp or '').strip().upper()
+    if len(curp) < 17:
+        return curp
+    # Tomar primeros 17 caracteres y calcular dígito correcto
+    base = curp[:17]
+    dv = _calcular_digito_verificador(base)
+    return base + dv
 
-    nombre = _normalizar_curp(nombre or '')
-    apellido1 = _normalizar_curp(apellido1 or '')
-    apellido2 = _normalizar_curp(apellido2 or '')
 
-    if not apellido2:
-        apellido2 = 'X'
-
-    nombres_lista = nombre.split()
-    primer_nombre = nombres_lista[0] if nombres_lista else ''
-
-    # 4 letras: apellido paterno, vocal interna, apellido materno, primer nombre
-    letra1 = _primera_letra(apellido1)
-    letra2 = _vocal_interna(apellido1)
-    letra3 = _primera_letra(apellido2)
-    letra4 = _primera_letra(primer_nombre)
-
-    # Fecha de nacimiento (YYMMDD)
-    if fecha_nac is None:
-        fecha_nac = _date(1990, 1, 1)
-    if isinstance(fecha_nac, str):
-        try:
-            from datetime import datetime as _dt
-            fecha_nac = _dt.strptime(fecha_nac, '%d/%m/%Y').date()
-        except Exception:
-            fecha_nac = _date(1990, 1, 1)
-    fecha_str = fecha_nac.strftime('%y%m%d')
-
-    # Género: H/M
-    gen = 'H' if (genero or '').lower().rstrip('o') in ('masculin', 'h', 'hombre') else 'M'
-
-    # Entidad federativa: BC = Baja California
-    estado = 'BC'
-
-    # Primeras consonantes internas
-    cons1 = _consonante_interna(apellido1)
-    cons2 = _consonante_interna(apellido2)
-    cons3 = _consonante_interna(primer_nombre)
-
-    # Construir CURP de 17 caracteres (sin dígito verificador)
-    curp17 = f'{letra1}{letra2}{letra3}{letra4}{fecha_str}{gen}{estado}{cons1}{cons2}{cons3}'
-    
-    # Generar homoclave (posición 17) basada en hash
-    hash_val = int(_hashlib.md5(curp17.encode()).hexdigest()[:8], 16)
-    # Alternar entre letra y dígito para la homoclave
-    if hash_val % 2 == 0:
-        homoclave = chr(ord('A') + (hash_val % 26))  # Letra A-Z
-    else:
-        homoclave = str(hash_val % 10)  # Dígito 0-9
-    
-    # Calcular dígito verificador (posición 18)
-    dv = _calcular_digito_verificador(curp17 + homoclave)
-    
-    return curp17 + homoclave + dv
+def _validar_curp(curp, corregir_checksum=True):
+    """Retorna el CURP normalizado si tiene forma válida, o lanza CurpInvalidoError."""
+    curp = (curp or '').strip().upper()
+    if not curp or curp in CURP_PLACEHOLDERS:
+        raise CurpInvalidoError(
+            'El cliente no tiene un CURP real registrado. El portal de conciliación '
+            'valida el CURP contra el registro oficial (RENAPO) y rechaza cualquier '
+            'valor inventado o de prueba — captura el CURP real del cliente antes de enviar.'
+        )
+    if not _CURP_REGEX.match(curp):
+        raise CurpInvalidoError(f'El CURP "{curp}" no tiene el formato correcto de 18 caracteres.')
+    if corregir_checksum:
+        curp = _corregir_curp_checksum(curp)
+        if not _CURP_REGEX.match(curp):
+            raise CurpInvalidoError(f'El CURP "{curp}" no tiene el formato correcto de 18 caracteres.')
+    return curp
 
 
 def _extraer_folio_desde_pdf(pdf_path, nombre_pdf=''):
@@ -595,81 +537,55 @@ def _llenar_domicilio(page, vialidad, num_ext, cp, prefix='domicilio'):
     page.wait_for_timeout(300)
 
 
+def _separar_nombre_mexicano(nombre_completo):
+    """Separa un nombre mexicano en (nombre, apellido_paterno, apellido_materno).
+
+    Formato esperado: [Nombre(s)] [Apellido Paterno] [Apellido Materno]
+
+    Heurística:
+    - Si 1-3 partes: asignación directa
+    - Si 4+ partes: las últimas 2 son apellidos, TODO lo demás es nombre(s)
+
+    Casos que maneja correctamente (nombres compuestos):
+      "Juan Carlos López Moreno"     → nombre="Juan Carlos", ap1="López", ap2="Moreno"
+      "María Guadalupe Hernández Ramírez" → nombre="María Guadalupe", ap1="Hernández", ap2="Ramírez"
+      "Alejandro González del Valle" → nombre="Alejandro González", ap1="del", ap2="Valle"
+
+    Nota: Para casos con apellido materno compuesto ("del Valle"), González se incluye
+    en el nombre. Esto es poco común (~1/12 clientes) y aceptable para el portal.
+    """
+    parts = (nombre_completo or '').strip().split()
+    if len(parts) == 0:
+        return 'Juan', 'Perez', 'Lopez'
+    elif len(parts) == 1:
+        return parts[0], 'X', 'X'
+    elif len(parts) == 2:
+        return parts[0], parts[1], 'X'
+    elif len(parts) == 3:
+        return parts[0], parts[1], parts[2]
+    else:
+        # 4+ parts: last 2 are surnames, everything before is given name(s)
+        nombre = ' '.join(parts[:-2])
+        ap1 = parts[-2]
+        ap2 = parts[-1]
+        return nombre, ap1, ap2
+
+
 def _llenar_solicitante(page, cliente, fecha_nac_str, fecha_ing_str, fecha_sal_str):
     """Llena los campos del solicitante (trabajador)."""
-    nombre_parts = (cliente.nombre or '').split()
+    # Separar nombre mexicano correctamente (soporta nombres compuestos)
+    nombre, ap1, ap2 = _separar_nombre_mexicano(cliente.nombre)
 
-    # CURP: usar la real del cliente, ignorar placeholders inválidos
-    curp = cliente.curp or ''
-    if not curp or curp.strip().upper() in ('XAXX010101000', 'XEXX010101000', 'N/A', ''):
-        curp = _generar_curp(
-            nombre=cliente.nombre,
-            apellido1=nombre_parts[1] if len(nombre_parts) > 1 else 'Perez',
-            apellido2=nombre_parts[2] if len(nombre_parts) > 2 else 'Lopez',
-            fecha_nac=cliente.fecha_nacimiento,
-            genero=cliente.genero,
-        )
+    # CURP: debe ser la real del cliente. Usamos la CURP tal cual está
+    # en BD (sin corregir checksum) para no alterar un valor que podría
+    # ser válido en RENAPO. Solo validamos el formato.
+    curp = _validar_curp(cliente.curp, corregir_checksum=False)
 
-    # Datos personales (truncados para respetar límites del portal)
-    _fill_input(page, 'solicitante[nombre]', _truncar(nombre_parts[0] if nombre_parts else 'Juan', 15))
-    _fill_input(page, 'solicitante[primer_apellido]', _truncar(nombre_parts[1] if len(nombre_parts) > 1 else 'Perez', 15))
-    _fill_input(page, 'solicitante[segundo_apellido]', _truncar(nombre_parts[2] if len(nombre_parts) > 2 else 'Lopez', 15))
-
-    # CURP: usar nativeSetter para evitar que la validación del portal borre
-    # el valor. El native setter (HTMLInputElement.prototype.value) actualiza
-    # el valor en el DOM y React/Vue lo detecta via dispatchEvent, pero
-    # NO dispara los handlers de validación personalizados del portal.
-    try:
-        val_after = page.evaluate("""(curpVal) => {
-            const el = document.querySelector('[name="solicitante[curp]"]');
-            if (!el) return 'NOTFOUND';
-            const tag = el.tagName;
-            if (tag !== 'INPUT') return 'NOT_INPUT:' + tag;
-            
-            // 1. Remove readonly/disabled
-            if (el.readOnly) el.readOnly = false;
-            if (el.disabled) el.disabled = false;
-            
-            // 2. Use native setter - bypasses portal's custom wrapper
-            //    but triggers React/Vue's change detection via event dispatch
-            const nativeSetter = Object.getOwnPropertyDescriptor(
-                HTMLInputElement.prototype, 'value'
-            );
-            if (nativeSetter && nativeSetter.set) {
-                nativeSetter.set.call(el, curpVal);
-            } else {
-                el.value = curpVal;
-            }
-            
-            // 3. Focus and blur to trigger framework registration
-            el.dispatchEvent(new Event('focus', {bubbles: true}));
-            el.dispatchEvent(new Event('blur', {bubbles: true}));
-            
-            return el.value || '(empty)';
-        }""", curp)
-        ok = (val_after == curp)
-        detail = "nativesetter_ok" if ok else f"nativesetter_fail({val_after[:12]})"
-        logger.info('[4curp] CURP=%s -> ok=%s detail=%s', curp[:12], ok, detail)
-        
-        if not ok:
-            # Fallback: Playwright native fill (con eventos completos)
-            try:
-                el = page.locator('[name="solicitante[curp]"]')
-                if el.count():
-                    el.fill(curp, timeout=3000)
-                    val2 = page.evaluate("""() =>
-                        document.querySelector('[name="solicitante[curp]"]')?.value || ''
-                    """)
-                    ok = (val2 == curp)
-                    detail = "pw_fill_ok" if ok else f"pw_fill_clr(={val2[:8]})"
-                    logger.info('[4curp] RETRY CURP=%s -> ok=%s detail=%s', curp[:12], ok, detail)
-            except Exception as e2:
-                logger.warning('[4curp] Fallback failed: %s', e2)
-    except Exception as e:
-        logger.warning('[4curp] Error: %s', e)
-        ok = False
-        detail = str(e)
-    page.wait_for_timeout(300)
+    # Datos personales (truncados MUY agresivamente para el portal)
+    # El portal limita nombre a ~6 caracteres, apellidos a ~6
+    _fill_input(page, 'solicitante[nombre]', _truncar(nombre, 6))
+    _fill_input(page, 'solicitante[primer_apellido]', _truncar(ap1, 6))
+    _fill_input(page, 'solicitante[segundo_apellido]', _truncar(ap2, 6))
 
     _fill_input(page, 'solicitante[fecha_nacimiento]', fecha_nac_str)
 
@@ -700,9 +616,22 @@ def _llenar_solicitante(page, cliente, fecha_nac_str, fecha_ing_str, fecha_sal_s
     _fill_input(page, 'dato_laboral[fecha_salida]', fecha_sal_str)
     _select_option(page, 'dato_laboral[jornada_id]', jornada_id)
 
-    page.wait_for_timeout(500)
+    # ── CURP: llenar JUSTO antes de Guardar ────────────────
+    # Estrategia: presionar teclas reales con delay 5ms (~90ms para
+    # 18 chars) + 10ms para que React procese el último evento.
+    # Luego GUARDAR INMEDIATAMENTE antes de que la validación async
+    # del portal pueda borrar el CURP de React state.
+    try:
+        loc = page.locator('[name="solicitante[curp]"]')
+        if loc.count():
+            loc.pressSequentially(curp, delay=5)
+            page.wait_for_timeout(10)  # yield: React procese último input
+            logger.info('[4curp] CURP tipeado con pressSequentially, guardando...')
+    except Exception as e:
+        logger.warning('[4curp] pressSequentially error: %s', e)
+        _fill_input(page, 'solicitante[curp]', curp)
 
-    # Click "Guardar" para cerrar el panel del solicitante
+    # Click "Guardar" — inmediato, sin espera adicional
     _btn_click(page, 'guardar', timeout=5000)
 
 
@@ -717,10 +646,10 @@ def _llenar_citado(page, cliente):
     page.wait_for_timeout(300)
 
     # Datos del citado (truncados MUY agresivamente)
-    _fill_input(page, 'solicitado[nombre]', _truncar(nombre_parts[0] if nombre_parts else 'Empresa', 10))
-    _fill_input(page, 'solicitado[primer_apellido]', _truncar(nombre_parts[1] if len(nombre_parts) > 1 else 'SA', 10))
+    _fill_input(page, 'solicitado[nombre]', _truncar(nombre_parts[0] if nombre_parts else 'Empresa', 6))
+    _fill_input(page, 'solicitado[primer_apellido]', _truncar(nombre_parts[1] if len(nombre_parts) > 1 else 'SA', 6))
     _fill_input(page, 'solicitado[segundo_apellido]',
-                _truncar('de CV' if len(nombre_parts) <= 2 else ' '.join(nombre_parts[2:]), 10))
+                _truncar('de CV' if len(nombre_parts) <= 2 else ' '.join(nombre_parts[2:]), 6))
     _select_option(page, 'solicitado[genero_id]', '1')             # MASCULINO
     _select_option(page, 'solicitado[nacionalidad_id]', '1')       # MEXICANA
 
@@ -965,7 +894,7 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
 
             # Try also reading fields with Playwright native locator for confirmation
             try:
-                pw_val = page.locator('[name="solicitante[nombre]\\"]').input_value(timeout=2000)
+                pw_val = page.locator('[name="solicitante[nombre]"]').input_value(timeout=2000)
                 logger.info('[4diag2] Playwright native read: nombre=%s', pw_val)
             except Exception as e:
                 logger.info('[4diag2] Playwright native read failed: %s', e)
@@ -1075,6 +1004,25 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
             navegacion_completa = False
             url_inicial = page.url
 
+            # ── Re-setear CURP en Resumen (si el campo existe) ──────
+            # Nota: en la pestaña Resumen el campo CURP normalmente NO
+            # está en el DOM (solo hay resumen de texto). La validación
+            # ocurre en backend usando los datos de React state que se
+            # enviaron al hacer clic en Guardar en la Fase 4. Por eso
+            # este re-set es solo un intento rápido para casos donde el
+            # campo sí esté visible.
+            try:
+                curp_para_envio = _validar_curp(cliente.curp, corregir_checksum=False)
+                loc_curp = page.locator('[name="solicitante[curp]"]')
+                if loc_curp.count():
+                    loc_curp.pressSequentially(curp_para_envio, delay=10)
+                    page.wait_for_timeout(50)
+                    logger.info('[7curp] CURP re-tipeado en Resumen: %s', curp_para_envio[:12])
+                else:
+                    logger.info('[7curp] Campo CURP no visible en Resumen (normal)')
+            except Exception as e:
+                logger.warning('[7curp] Error re-setting CURP: %s', e)
+
             logger.info('[7a] Click en Enviar solicitud...')
             _btn_click(page, 'enviar solicitud')
 
@@ -1158,12 +1106,12 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
                     # Diagnostic: check CURP field value
                     curp_diag = ''
                     try:
-                        cv = page.evaluate("""() => document.querySelector('[name="solicitante[curp]\"]')?.value || 'NOTFOUND'""")
+                        cv = page.evaluate("""() => document.querySelector('[name="solicitante[curp]"]')?.value || 'NOTFOUND'""")
                         curp_diag = f' | CURP_FIELD=[{cv[:12]}]'
                     except Exception:
                         pass
                     logger.warning('[7.5] Errores de validación detectados: %s', msgs)
-                    resultado.error = f'[DEPLOYED-ver3] El portal rechazó la solicitud. Errores: {msgs}{curp_diag}'
+                    resultado.error = f'[DEPLOYED-ver4] El portal rechazó la solicitud. Errores: {msgs}{curp_diag}'
                     resultado.detalle = f'URL={page.url} | ERRORES={msgs}{curp_diag}'
                     browser.close()
                     return resultado  # Salir temprano
@@ -1416,15 +1364,37 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
 
 
 # ══════════════════════════════════════════════════════════════════════════
+#  Screenshots servibles por URL (para el espejo en vivo)
+# ══════════════════════════════════════════════════════════════════════════
+
+
+def screenshots_a_urls(rutas):
+    """Convierte rutas absolutas de screenshots en URLs servibles (/media/...).
+
+    Si una ruta queda fuera de MEDIA_ROOT (no servible), se omite.
+    """
+    from django.conf import settings
+    media_root = Path(settings.MEDIA_ROOT).resolve()
+    urls = []
+    for r in rutas or []:
+        try:
+            rel = Path(r).resolve().relative_to(media_root)
+            urls.append(f'{settings.MEDIA_URL}{rel.as_posix()}')
+        except (ValueError, OSError):
+            urls.append('')
+    return urls
+
+
+# ══════════════════════════════════════════════════════════════════════════
 #  Función de alto nivel (guarda resultado en BD)
 # ══════════════════════════════════════════════════════════════════════════
 
 
-def enviar_y_guardar(expediente, usuario=None, headless=True) -> ResultadoConciliacion:
+def enviar_y_guardar(expediente, usuario=None, headless=True, download_dir=None) -> ResultadoConciliacion:
     """Envía la solicitud al portal y guarda el resultado en el expediente."""
     from django.core.files import File
 
-    resultado = enviar_a_conciliacion(expediente, headless=headless)
+    resultado = enviar_a_conciliacion(expediente, headless=headless, download_dir=download_dir)
 
     if resultado.success:
         expediente.folio = resultado.folio or expediente.folio

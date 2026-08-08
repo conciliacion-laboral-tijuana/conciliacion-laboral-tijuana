@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Conciliación BC — Opciones</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif; background: #f1f5f9;
+      color: #1f2937; padding: 40px 20px; display: flex; justify-content: center;
+    }
+    .card {
+      background: #fff; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,.08);
+      padding: 28px; max-width: 520px; width: 100%;
+    }
+    h1 { font-size: 20px; margin-bottom: 6px; }
+    p.desc { color: #6b7280; font-size: 13px; margin-bottom: 20px; }
+    label { display: block; font-weight: 600; font-size: 13px; margin: 14px 0 4px; }
+    input {
+      width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px;
+      font-size: 13px; font-family: inherit;
+    }
+    input:focus { outline: 2px solid #2563eb; border-color: transparent; }
+    .ayuda { font-size: 11px; color: #6b7280; margin-top: 4px; }
+    .btn {
+      margin-top: 20px; padding: 11px 18px; border: none; border-radius: 8px;
+      background: #2563eb; color: #fff; font-weight: 600; font-size: 14px; cursor: pointer;
+    }
+    .btn:hover { background: #1d4ed8; }
+    #status { margin-top: 12px; font-size: 13px; font-weight: 600; min-height: 20px; }
+    .ok { color: #16a34a; }
+    .err { color: #dc2626; }
+    .pasos { margin-top: 24px; border-top: 1px solid #e5e7eb; padding-top: 16px; font-size: 12px; color: #374151; line-height: 1.7; }
+    code { background: #f1f5f9; padding: 1px 5px; border-radius: 4px; font-size: 11px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>🤖 Conciliación BC — Opciones</h1>
+    <p class="desc">Conecta la extensión con tu app para obtener los datos de los expedientes.</p>
+
+    <label for="apiUrl">URL de la app</label>
+    <input type="url" id="apiUrl" placeholder="https://tu-app.railway.app" autocomplete="off">
+    <div class="ayuda">La URL de tu app de despacho (sin / al final).</div>
+
+    <label for="token">Token personal</label>
+    <input type="password" id="token" placeholder="pega aquí tu token" autocomplete="off">
+    <div class="ayuda">En la app: abre la página <strong>Extensión de Chrome</strong> para ver tu token.</div>
+
+    <button class="btn" id="guardar">💾 Guardar configuración</button>
+    <div id="status"></div>
+
+    <div class="pasos">
+      <strong>📖 ¿Cómo obtener tu token?</strong><br>
+      1. Entra a tu app y ve a la página <em>"Extensión de Chrome"</em> (desde el expediente → Enviar a Conciliación → opción Extensión).<br>
+      2. Copia el token que aparece ahí.<br>
+      3. Pégalo arriba y guarda.
+    </div>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>
