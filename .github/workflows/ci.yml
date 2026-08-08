@@ -43,7 +43,11 @@ jobs:
           DEBUG: "False"
 
       - name: Verify demandas cálculos (script CLI)
-        run: uv run python verify_demandas_calculos.py
+        # El script usa la BD de desarrollo por defecto (sqlite); se ejecutan
+        # las migraciones primero para que las tablas existan.
+        run: |
+          uv run python manage.py migrate --noinput
+          uv run python verify_demandas_calculos.py
         env:
           SECRET_KEY: ci-secret-key
           ALLOWED_HOSTS: "*"
