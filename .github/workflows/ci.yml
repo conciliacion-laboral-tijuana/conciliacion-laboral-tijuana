@@ -41,3 +41,11 @@ jobs:
           ALLOWED_HOSTS: "*"
           CSRF_TRUSTED_ORIGINS: http://localhost
           DEBUG: "False"
+
+      - name: Verify demandas cálculos (script CLI)
+        run: uv run python verify_demandas_calculos.py
+        env:
+          SECRET_KEY: ci-secret-key
+          ALLOWED_HOSTS: "*"
+          CSRF_TRUSTED_ORIGINS: http://localhost
+          DEBUG: "False"
