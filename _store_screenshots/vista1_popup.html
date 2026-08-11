@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    width: 1280px; height: 800px; overflow: hidden;
+    font-family: system-ui, -apple-system, sans-serif;
+    background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 60%, #2563eb 100%);
+    display: flex; align-items: center; justify-content: center;
+  }
+  /* ── Ventana de Chrome simulada ── */
+  .chrome {
+    width: 900px; border-radius: 14px; overflow: hidden;
+    box-shadow: 0 25px 70px rgba(0,0,0,.55);
+    background: #fff;
+  }
+  .tabbar {
+    background: #dbe2ea; padding: 8px 12px 0 12px; display: flex; gap: 6px;
+    align-items: flex-end;
+  }
+  .tab {
+    background: #fff; border-radius: 9px 9px 0 0; padding: 7px 16px;
+    font-size: 12px; color: #374151; font-weight: 500; max-width: 240px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    border: 1px solid #c3ccd8; border-bottom: none;
+  }
+  .tab.active { box-shadow: 0 -2px 6px rgba(37,99,235,.15); }
+  .toolbar {
+    background: #fff; border-bottom: 1px solid #e5e7eb;
+    display: flex; align-items: center; gap: 10px; padding: 8px 14px;
+  }
+  .addr {
+    flex: 1; background: #f1f3f5; border: 1px solid #e0e4e8; border-radius: 20px;
+    padding: 6px 14px; font-size: 12px; color: #4b5563;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .lock { font-size: 12px; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; }
+  .browser-content { position: relative; height: 560px; background: #f8fafc; }
+  /* ── Página de fondo (app del despacho) ── */
+  .app-page {
+    position: absolute; inset: 0; padding: 30px 40px; overflow: hidden;
+  }
+  .app-title { font-size: 22px; font-weight: 700; color: #1e293b; margin-bottom: 4px; }
+  .app-sub { font-size: 13px; color: #64748b; margin-bottom: 22px; }
+  .app-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .app-card {
+    background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 18px;
+  }
+  .app-card .num { font-size: 26px; font-weight: 800; color: #2563eb; }
+  .app-card .lbl { font-size: 12px; color: #64748b; margin-top: 2px; }
+  .app-table { margin-top: 20px; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; }
+  .app-table .row { display: flex; padding: 10px 16px; font-size: 12px; border-bottom: 1px solid #f1f5f9; }
+  .app-table .row:nth-child(odd) { background: #f8fafc; }
+  .app-table .row b { color: #334155; }
+  /* ── Popup de la extensión (CSS real de popup.html) ── */
+  .popup {
+    position: absolute; top: 20px; right: 24px; width: 360px;
+    background: #f8fafc; border-radius: 12px; overflow: hidden;
+    box-shadow: 0 18px 50px rgba(15,23,42,.35); border: 1px solid #e2e8f0;
+    font-size: 13px; color: #1f2937;
+  }
+  .popup header {
+    background: #2563eb; color: #fff; padding: 13px 15px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .popup header h1 { font-size: 14px; font-weight: 700; }
+  .popup header a { color: #dbeafe; font-size: 12px; text-decoration: none; }
+  .popup .content { padding: 13px 15px; }
+  .card {
+    background: #fff; border: 1px solid #e5e7eb; border-radius: 10px;
+    padding: 11px 12px; margin-bottom: 10px;
+  }
+  .card .titulo { font-weight: 600; font-size: 13px; margin-bottom: 3px; }
+  .card .sub { color: #6b7280; font-size: 11px; }
+  .card .folio { color: #2563eb; font-weight: 700; font-size: 12px; margin-top: 4px; }
+  .btn {
+    display: block; width: 100%; padding: 9px; border: none; border-radius: 8px;
+    font-weight: 600; font-size: 12px; cursor: pointer; margin-top: 8px;
+  }
+  .btn-primario { background: #16a34a; color: #fff; }
+  .popup footer { padding: 9px 15px; border-top: 1px solid #e5e7eb; font-size: 11px; color: #9ca3af; text-align: center; }
+  .etiqueta {
+    position: absolute; bottom: 22px; left: 0; right: 0; text-align: center;
+    color: rgba(255,255,255,.85); font-size: 13px; font-weight: 600; letter-spacing: .02em;
+    text-shadow: 0 1px 3px rgba(0,0,0,.3);
+  }
+</style>
+</head>
+<body>
+  <div style="position:relative;">
+    <div class="chrome">
+      <div class="tabbar">
+        <div class="tab">Sistema de Gestión de Expedientes</div>
+        <div class="tab active">🔒 app.conciliacionbc.gob.mx</div>
+      </div>
+      <div class="toolbar">
+        <div class="addr"><span class="lock">🔒</span> app.conciliacionbc.gob.mx/solicitudes/create</div>
+      </div>
+      <div class="browser-content">
+        <div class="app-page">
+          <div class="app-title">Dashboard — Asesor Laboral</div>
+          <div class="app-sub">Bienvenido · 8 expedientes activos · 2 audiencias esta semana</div>
+          <div class="app-grid">
+            <div class="app-card"><div class="num">8</div><div class="lbl">Casos activos</div></div>
+            <div class="app-card"><div class="num">3</div><div class="lbl">Convenios</div></div>
+            <div class="app-card"><div class="num">2</div><div class="lbl">Audiencias próximas</div></div>
+          </div>
+          <div class="app-table">
+            <div class="row"><b>2026-0051</b>&nbsp;· Alma Ruiz Contreras · &nbsp;📁 Conciliación pendiente</div>
+            <div class="row"><b>2026-0052</b>&nbsp;· Bruno Salas Nava · &nbsp;📁 Conciliación pendiente</div>
+            <div class="row"><b>2026-0053</b>&nbsp;· Cecilia Ortega Vidal · &nbsp;📁 Conciliación pendiente</div>
+          </div>
+        </div>
+        <!-- POPUP REAL con tareas -->
+        <div class="popup">
+          <header>
+            <h1>🤖 Conciliación BC</h1>
+            <a href="#">⚙️ Opciones</a>
+          </header>
+          <div class="content">
+            <div class="card">
+              <div class="titulo">📁 2026-0051 — Alma Ruiz Contreras</div>
+              <div class="sub">Maquiladora Frontera Norte SA</div>
+              <div class="folio">CURP: RUC990112MBCRLL02</div>
+              <button class="btn btn-primario">🚀 Llenar en el portal</button>
+            </div>
+            <div class="card">
+              <div class="titulo">📁 2026-0052 — Bruno Salas Nava</div>
+              <div class="sub">Logística Express BC SAPI</div>
+              <div class="folio">CURP: SANY880523MBCLVR08</div>
+              <button class="btn btn-primario">🚀 Llenar en el portal</button>
+            </div>
+            <div class="card">
+              <div class="titulo">📁 2026-0053 — Cecilia Ortega Vidal</div>
+              <div class="sub">Clínica San Ángel SA</div>
+              <div class="folio">CURP: OVCM950214MBCRDL01</div>
+              <button class="btn btn-primario">🚀 Llenar en el portal</button>
+            </div>
+          </div>
+          <footer>El llenado ocurre en TU navegador. Tú das el clic final.</footer>
+        </div>
+      </div>
+    </div>
+    <div class="etiqueta">Llena la solicitud de conciliación desde el navegador del asesor · Portal oficial de Baja California</div>
+  </div>
+</body>
+</html>

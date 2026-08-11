@@ -3,7 +3,7 @@
   "name": "Conciliación BC — Asistente",
   "version": "1.0.0",
   "description": "Llena automáticamente el formulario de conciliación del portal de Baja California con los datos de tu expediente, y guarda el folio y el acuse en la app.",
-  "permissions": ["storage", "tabs", "activeTab"],
+  "permissions": ["storage", "activeTab"],
   "host_permissions": [
     "https://app.conciliacionbc.gob.mx/*",
     "https://*.railway.app/*",
@@ -11,8 +11,7 @@
     "http://127.0.0.1:*/*"
   ],
   "optional_host_permissions": [
-    "https://*/*",
-    "http://*/*"
+    "https://*/*"
   ],
   "background": {
     "service_worker": "background.js"

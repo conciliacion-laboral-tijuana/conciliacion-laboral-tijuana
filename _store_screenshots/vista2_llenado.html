@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    width: 1280px; height: 800px; overflow: hidden;
+    font-family: system-ui, -apple-system, sans-serif;
+    background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 60%, #2563eb 100%);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .chrome {
+    width: 960px; border-radius: 14px; overflow: hidden;
+    box-shadow: 0 25px 70px rgba(0,0,0,.55); background: #fff;
+  }
+  .tabbar {
+    background: #dbe2ea; padding: 8px 12px 0 12px; display: flex; gap: 6px; align-items: flex-end;
+  }
+  .tab {
+    background: #fff; border-radius: 9px 9px 0 0; padding: 7px 16px; font-size: 12px;
+    color: #374151; font-weight: 500; border: 1px solid #c3ccd8; border-bottom: none;
+  }
+  .tab.active { box-shadow: 0 -2px 6px rgba(37,99,235,.15); }
+  .toolbar {
+    background: #fff; border-bottom: 1px solid #e5e7eb;
+    display: flex; align-items: center; gap: 10px; padding: 8px 14px;
+  }
+  .addr {
+    flex: 1; background: #f1f3f5; border: 1px solid #e0e4e8; border-radius: 20px;
+    padding: 6px 14px; font-size: 12px; color: #4b5563; display: flex; align-items: center; gap: 8px;
+  }
+  .browser-content { position: relative; height: 570px; background: #f1f5f9; }
+
+  /* ── Formulario del portal (simulado) ── */
+  .portal {
+    position: absolute; inset: 0; padding: 24px 34px; overflow: hidden;
+  }
+  .portal-header {
+    display: flex; align-items: center; gap: 12px; margin-bottom: 18px;
+  }
+  .portal-logo {
+    width: 44px; height: 44px; border-radius: 10px; background: #1d4ed8;
+    color: #fff; display: flex; align-items: center; justify-content: center; font-size: 22px;
+  }
+  .portal-title { font-size: 17px; font-weight: 700; color: #1e293b; }
+  .portal-sub { font-size: 12px; color: #64748b; }
+  .pasos {
+    display: flex; gap: 4px; margin-bottom: 18px; background: #e2e8f0;
+    border-radius: 10px; padding: 4px;
+  }
+  .paso {
+    flex: 1; text-align: center; padding: 8px 4px; border-radius: 8px;
+    font-size: 11px; font-weight: 600; color: #64748b; background: transparent;
+  }
+  .paso.hecho { background: #dcfce7; color: #166534; }
+  .paso.actual { background: #2563eb; color: #fff; box-shadow: 0 2px 6px rgba(37,99,235,.3); }
+  .form-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 18px 20px; }
+  .form-card h3 { font-size: 14px; font-weight: 700; color: #1e293b; margin-bottom: 12px; }
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; }
+  .campo label { display: block; font-size: 11px; font-weight: 600; color: #475569; margin-bottom: 4px; }
+  .input, .select {
+    width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 8px;
+    font-size: 12px; background: #fff; color: #1e293b; outline: none;
+  }
+  .input:focus, .select:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
+  .input.lleno { border-color: #16a34a; background: #f0fdf4; }
+  .select.lleno { border-color: #16a34a; background: #f0fdf4; }
+  .resaltado { animation: pulse 2s infinite; }
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 3px rgba(37,99,235,.15); }
+    50% { box-shadow: 0 0 0 5px rgba(37,99,235,.28); }
+  }
+
+  /* ── Panel del asistente (mismo CSS de content.js) ── */
+  .panel {
+    position: absolute; top: 14px; right: 16px; width: 300px; z-index: 999;
+    background: #fff; border: 2px solid #2563eb; border-radius: 12px;
+    box-shadow: 0 8px 30px rgba(0,0,0,.25); font-family: system-ui, sans-serif;
+    font-size: 13px; color: #1f2937; overflow: hidden;
+  }
+  .panel-head {
+    background: #2563eb; color: #fff; padding: 10px 14px; font-weight: 600;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .panel-estado { padding: 12px 14px; line-height: 1.5; }
+  .panel-pasos { padding: 0 14px 12px; border-top: 1px solid #e5e7eb; }
+  .panel-pasos div { margin: 3px 0; }
+  .panel-pasos .actual { font-weight: 600; }
+  .etiqueta {
+    position: absolute; bottom: 22px; left: 0; right: 0; text-align: center;
+    color: rgba(255,255,255,.85); font-size: 13px; font-weight: 600;
+    text-shadow: 0 1px 3px rgba(0,0,0,.3);
+  }
+</style>
+</head>
+<body>
+  <div style="position:relative;">
+    <div class="chrome">
+      <div class="tabbar">
+        <div class="tab">Sistema de Gestión de Expedientes</div>
+        <div class="tab active">🔒 app.conciliacionbc.gob.mx</div>
+      </div>
+      <div class="toolbar">
+        <div class="addr"><span>🔒</span> app.conciliacionbc.gob.mx/solicitudes/create</div>
+      </div>
+      <div class="browser-content">
+        <div class="portal">
+          <div class="portal-header">
+            <div class="portal-logo">⚖️</div>
+            <div>
+              <div class="portal-title">Solicitud de Conciliación Laboral</div>
+              <div class="portal-sub">Centro de Conciliación Laboral · Baja California</div>
+            </div>
+          </div>
+          <div class="pasos">
+            <div class="paso hecho">✅ Aviso</div>
+            <div class="paso hecho">✅ Industria</div>
+            <div class="paso hecho">✅ Fecha y objeto</div>
+            <div class="paso actual">⏳ Solicitante</div>
+            <div class="paso">⬜ Citado</div>
+            <div class="paso">⬜ Descripción</div>
+            <div class="paso">⬜ Enviar</div>
+          </div>
+          <div class="form-card">
+            <h3>👤 Datos del solicitante (trabajador)</h3>
+            <div class="form-grid">
+              <div class="campo"><label>Nombre</label><input class="input lleno" value="Alma"></div>
+              <div class="campo"><label>Primer apellido</label><input class="input lleno" value="Ruiz"></div>
+              <div class="campo"><label>Segundo apellido</label><input class="input lleno" value="Contreras"></div>
+              <div class="campo"><label>CURP</label><input class="input resaltado" value="RUC990112MBCRLL02"></div>
+              <div class="campo"><label>Fecha de nacimiento</label><input class="input lleno" value="12/01/1999"></div>
+              <div class="campo"><label>Género</label><select class="select lleno"><option>Femenino</option></select></div>
+              <div class="campo"><label>Puesto</label><input class="input lleno" value="Operadora de producción"></div>
+              <div class="campo"><label>Salario mensual</label><input class="input lleno" value="$18,500.00"></div>
+              <div class="campo"><label>Fecha de ingreso</label><input class="input lleno" value="01/03/2019"></div>
+              <div class="campo"><label>Fecha de salida</label><input class="input lleno" value="08/07/2026"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Panel del asistente llenando -->
+        <div class="panel">
+          <div class="panel-head">
+            <span>🤖 Conciliación BC — Asistente</span>
+            <span style="cursor:pointer;">✕</span>
+          </div>
+          <div class="panel-estado" style="color:#2563eb; font-weight:500;">
+            Llenando datos del solicitante…
+          </div>
+          <div class="panel-pasos">
+            <div>✅ Aviso de privacidad</div>
+            <div>✅ Industria</div>
+            <div>✅ Fecha y objeto</div>
+            <div class="actual">⏳ Solicitante</div>
+            <div>⬜ Citado</div>
+            <div>⬜ Descripción</div>
+            <div>⬜ Resumen y envío</div>
+            <div>⬜ Acuse</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="etiqueta">La extensión llena el formulario oficial fase por fase, con el asesor supervisando en vivo</div>
+  </div>
+</body>
+</html>
