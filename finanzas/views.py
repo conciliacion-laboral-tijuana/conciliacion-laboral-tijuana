@@ -82,6 +82,37 @@ def _calcular_flujo_mensual(oficina_id=None):
     }
 
 
+def _totales_oficina(oficina, filtrar_fecha):
+    """
+    Ingresos, gastos, utilidad y comisiones pagadas de una oficina, dentro del
+    rango de fechas aplicado por `filtrar_fecha` (callable qs → qs filtrado).
+
+    Compartido por el dashboard financiero y su exportación a Excel para que
+    ambos muestren SIEMPRE los mismos totales (evita drift y regresiones).
+    Cada agregado va entre paréntesis con su propio `or 0`: sin paréntesis,
+    `A or 0 + B` se evalúa como `A or (0 + B)` → TypeError si A y B son None,
+    y subestima los totales si A es distinto de cero.
+    """
+    ing_of = (
+        (filtrar_fecha(oficina.settlementpayment_set.all()).aggregate(total=Sum('monto'))['total'] or 0)
+        + (filtrar_fecha(oficina.cashmovement_set.filter(tipo='ingreso')).aggregate(total=Sum('monto'))['total'] or 0)
+    )
+    gas_of = (
+        (filtrar_fecha(oficina.expense_set.all()).aggregate(total=Sum('monto'))['total'] or 0)
+        + (filtrar_fecha(oficina.cashmovement_set.filter(tipo='egreso')).aggregate(total=Sum('monto'))['total'] or 0)
+        + (filtrar_fecha(oficina.payroll_set.all(), campo_fecha='fecha_pago').aggregate(total=Sum('total_pagado'))['total'] or 0)
+    )
+    com_pagadas = filtrar_fecha(
+        Commission.objects.filter(oficina=oficina, estado='pagada')
+    ).aggregate(total=Sum('monto_comision'))['total'] or 0
+    return {
+        'ingresos': ing_of,
+        'gastos': gas_of,
+        'utilidad': ing_of - gas_of,
+        'comisiones_pagadas': com_pagadas,
+    }
+
+
 class AdminOrSuperOnlyMixin(UserPassesTestMixin):
     """Restringe acceso a administrativos y superadmin."""
     def test_func(self):
@@ -164,35 +195,10 @@ class DashboardFinancieroView(LoginRequiredMixin, AdminOrSuperOnlyMixin, Templat
 
         # ─── 4. Resumen por oficina ────────────────────────────────────
         oficinas = Office.objects.filter(activa=True)
-        resumen_oficinas = []
-        for of in oficinas:
-            # OJO: cada agregado debe ir entre paréntesis con su propio `or 0`.
-            # Sin paréntesis, `A or 0 + B` se evalúa como `A or (0 + B)` → si A es
-            # None (sin pagos) y B es None (sin caja) lanza TypeError, y si A es
-            # distinto de cero ignora B (subestima los totales).
-            ing_of = (
-                (filtrar_por_fecha(of.settlementpayment_set.all()).aggregate(total=Sum('monto'))['total'] or 0)
-                + (filtrar_por_fecha(of.cashmovement_set.filter(tipo='ingreso')).aggregate(total=Sum('monto'))['total'] or 0)
-            )
-            gas_of = (
-                (filtrar_por_fecha(of.expense_set.all()).aggregate(total=Sum('monto'))['total'] or 0)
-                + (filtrar_por_fecha(of.cashmovement_set.filter(tipo='egreso')).aggregate(total=Sum('monto'))['total'] or 0)
-                + (filtrar_por_fecha(of.payroll_set.all(), campo_fecha='fecha_pago').aggregate(total=Sum('total_pagado'))['total'] or 0)
-            )
-            uti_of = ing_of - gas_of
-
-            # Comisiones pagadas en la oficina
-            com_pagadas = filtrar_por_fecha(
-                Commission.objects.filter(oficina=of, estado='pagada')
-            ).aggregate(total=Sum('monto_comision'))['total'] or 0
-
-            resumen_oficinas.append({
-                'oficina': of,
-                'ingresos': ing_of,
-                'gastos': gas_of,
-                'utilidad': uti_of,
-                'comisiones_pagadas': com_pagadas,
-            })
+        resumen_oficinas = [
+            {'oficina': of, **_totales_oficina(of, filtrar_por_fecha)}
+            for of in oficinas
+        ]
 
         context['resumen_oficinas'] = resumen_oficinas
 
@@ -813,11 +819,11 @@ def exportar_dashboard_financiero_excel(request):
         def filtrar_oficina(qs):
             return qs.filter(oficina_id=oficina_id) if oficina_id else qs
 
-        def filtrar_fecha(qs, campo='fecha'):
+        def filtrar_fecha(qs, campo_fecha='fecha'):
             if fd:
-                qs = qs.filter(**{f'{campo}__gte': fd.date()})
+                qs = qs.filter(**{f'{campo_fecha}__gte': fd.date()})
             if fh:
-                qs = qs.filter(**{f'{campo}__lte': fh.date()})
+                qs = qs.filter(**{f'{campo_fecha}__lte': fh.date()})
             return qs
 
         i_pagos = filtrar_oficina(filtrar_fecha(SettlementPayment.objects.all())).aggregate(t=Sum('monto'))['t'] or 0
@@ -826,7 +832,7 @@ def exportar_dashboard_financiero_excel(request):
 
         g_exp = filtrar_oficina(filtrar_fecha(Expense.objects.all())).aggregate(t=Sum('monto'))['t'] or 0
         g_caja = filtrar_oficina(filtrar_fecha(CashMovement.objects.filter(tipo='egreso'))).aggregate(t=Sum('monto'))['t'] or 0
-        g_nom = filtrar_oficina(filtrar_fecha(Payroll.objects.all(), campo='fecha_pago')).aggregate(t=Sum('total_pagado'))['t'] or 0
+        g_nom = filtrar_oficina(filtrar_fecha(Payroll.objects.all(), campo_fecha='fecha_pago')).aggregate(t=Sum('total_pagado'))['t'] or 0
         total_gas = g_exp + g_caja + g_nom
         utilidad = total_ing - total_gas
 
@@ -876,19 +882,12 @@ def exportar_dashboard_financiero_excel(request):
 
         oficinas = Office.objects.filter(activa=True)
         for of in oficinas:
-            # Mismo arreglo de precedencia que en el dashboard: cada agregado
-            # con su propio `or 0` entre paréntesis (evita TypeError y subestimación).
-            ing_of = (
-                (filtrar_fecha(of.settlementpayment_set.all()).aggregate(t=Sum('monto'))['t'] or 0)
-                + (filtrar_fecha(of.cashmovement_set.filter(tipo='ingreso')).aggregate(t=Sum('monto'))['t'] or 0)
-            )
-            gas_of = (
-                (filtrar_fecha(of.expense_set.all()).aggregate(t=Sum('monto'))['t'] or 0)
-                + (filtrar_fecha(of.cashmovement_set.filter(tipo='egreso')).aggregate(t=Sum('monto'))['t'] or 0)
-                + (filtrar_fecha(of.payroll_set.all(), campo='fecha_pago').aggregate(t=Sum('total_pagado'))['t'] or 0)
-            )
-            com_of = filtrar_fecha(Commission.objects.filter(oficina=of, estado='pagada')).aggregate(t=Sum('monto_comision'))['t'] or 0
-            uti_of = ing_of - gas_of
+            # Mismos totales que el dashboard (helper compartido → sin drift)
+            datos_of = _totales_oficina(of, filtrar_fecha)
+            ing_of = datos_of['ingresos']
+            gas_of = datos_of['gastos']
+            com_of = datos_of['comisiones_pagadas']
+            uti_of = datos_of['utilidad']
             margen = float(uti_of / ing_of * 100) if ing_of > 0 else 0
 
             ws1.cell(row=row, column=1, value=of.nombre).border = thin_border
@@ -957,7 +956,7 @@ def exportar_dashboard_financiero_excel(request):
 
         for i, asesor in enumerate(asesores, 2):
             com = filtrar_fecha(Commission.objects.filter(asesor=asesor, estado='pagada')).aggregate(t=Sum('monto_comision'))['t'] or 0
-            monto_rec = filtrar_fecha(Expediente.objects.filter(asesor=asesor), campo='created_at').aggregate(t=Sum('monto_convenio'))['t'] or 0
+            monto_rec = filtrar_fecha(Expediente.objects.filter(asesor=asesor), campo_fecha='created_at').aggregate(t=Sum('monto_convenio'))['t'] or 0
 
             ws4.cell(row=i, column=1, value=asesor.get_full_name() or asesor.username).border = thin_border
             ws4.cell(row=i, column=2, value=asesor.total_casos).border = thin_border

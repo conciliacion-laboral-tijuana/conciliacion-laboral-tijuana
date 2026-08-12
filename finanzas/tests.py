@@ -345,6 +345,73 @@ class ProfitDistributionTests(BaseFinanzasTestCase):
             self.assertEqual(resumen.utilidad_pendiente, pp.monto)
 
 
+class TotalesOficinaHelperTests(BaseFinanzasTestCase):
+    """Prueba el helper compartido _totales_oficina (dashboard + export Excel)."""
+
+    @staticmethod
+    def _sin_filtro(qs, campo_fecha='fecha'):
+        """Filtro no-op para probar el helper sin rango de fechas."""
+        return qs
+
+    def test_suma_ingresos_gastos_y_utilidad(self):
+        from finanzas.views import _totales_oficina
+
+        fecha = date.today()
+        SettlementPayment.objects.create(
+            fecha=fecha, cliente=self.cliente, expediente=self.expediente,
+            monto=Decimal('5000.00'), forma_pago='efectivo',
+            oficina=self.oficina, registrado_por=self.admin,
+        )
+        CashMovement.objects.create(
+            oficina=self.oficina, fecha=fecha, tipo='ingreso',
+            categoria='anticipo', monto=Decimal('1000.00'),
+            registrado_por=self.admin,
+        )
+        Expense.objects.create(
+            fecha=fecha, categoria='renta', monto=Decimal('2000.00'),
+            oficina=self.oficina, registrado_por=self.admin,
+        )
+        CashMovement.objects.create(
+            oficina=self.oficina, fecha=fecha, tipo='egreso',
+            categoria='papeleria', monto=Decimal('500.00'),
+            registrado_por=self.admin,
+        )
+        emp = Employee.objects.create(
+            nombre='Emp Nómina', salario=Decimal('3000.00'), oficina=self.oficina,
+        )
+        Payroll.objects.create(
+            empleado=emp, fecha_pago=fecha, salario_pagado=Decimal('3000.00'),
+            descuentos=Decimal('0.00'), oficina=self.oficina,
+            registrado_por=self.admin,
+        )
+
+        datos = _totales_oficina(self.oficina, self._sin_filtro)
+        self.assertEqual(datos['ingresos'], Decimal('6000.00'))
+        self.assertEqual(datos['gastos'], Decimal('5500.00'))
+        self.assertEqual(datos['utilidad'], Decimal('500.00'))
+        self.assertEqual(datos['comisiones_pagadas'], Decimal('0'))
+
+    def test_comisiones_pagadas_se_suman(self):
+        from finanzas.views import _totales_oficina
+
+        Commission.objects.create(
+            expediente=self.expediente, asesor=self.asesor, fecha=date.today(),
+            monto_convenio=Decimal('10000.00'), porcentaje=Decimal('5.00'),
+            estado='pagada', oficina=self.oficina, registrado_por=self.admin,
+        )
+        datos = _totales_oficina(self.oficina, self._sin_filtro)
+        self.assertEqual(datos['comisiones_pagadas'], Decimal('500.00'))
+
+    def test_oficina_sin_datos_no_crashea(self):
+        """Regresión: sin pagos ni caja el helper devuelve ceros (no TypeError)."""
+        from finanzas.views import _totales_oficina
+
+        datos = _totales_oficina(self.oficina, self._sin_filtro)
+        self.assertEqual(datos['ingresos'], 0)
+        self.assertEqual(datos['gastos'], 0)
+        self.assertEqual(datos['utilidad'], 0)
+
+
 # ══════════════════════════════════════════════════════════════════════
 #  FORMULARIOS
 # ══════════════════════════════════════════════════════════════════════
