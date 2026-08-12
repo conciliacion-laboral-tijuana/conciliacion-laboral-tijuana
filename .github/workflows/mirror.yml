@@ -1,0 +1,34 @@
+name: Mirror a conciliacion-laboral-tijuana
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    # Solo corre en el repo fuente. Sin este guard, el repo espejo (que también
+    # recibe este archivo) ejecutaría el workflow de nuevo → loop infinito.
+    # Además, se omite si aún no se ha configurado el deploy key (secreto).
+    if: github.repository == 'deskiziarecords/despacho-laboral' && secrets.CLIENT_DEPLOY_KEY != ''
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup SSH deploy key
+        env:
+          CLIENT_DEPLOY_KEY: ${{ secrets.CLIENT_DEPLOY_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$CLIENT_DEPLOY_KEY" > ~/.ssh/client_deploy_key
+          chmod 600 ~/.ssh/client_deploy_key
+          ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Push to client repo (conciliacion-laboral-tijuana)
+        run: |
+          git remote add client git@github.com:conciliacion-laboral-tijuana/conciliacion-laboral-tijuana.git
+          GIT_SSH_COMMAND="ssh -i ~/.ssh/client_deploy_key -o IdentitiesOnly=yes" \
+            git push --force client main

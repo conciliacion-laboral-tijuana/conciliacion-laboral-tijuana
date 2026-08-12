@@ -22,3 +22,11 @@ STORAGES = {
 
 # Correo a consola (nunca enviar emails reales en tests)
 EMAIL_BACKEND = 'django.core.mail.backends.locmem.EmailBackend'
+
+# ─── Seguridad HTTPS desactivada en tests ─────────────────────────
+# En producción DEBUG=False activa SECURE_SSL_REDIRECT y cookies seguras
+# (config.settings usa "not DEBUG"). En tests eso rompería las respuestas
+# (301 en lugar de 302) y las cookies no se guardarían.
+SECURE_SSL_REDIRECT = False
+SESSION_COOKIE_SECURE = False
+CSRF_COOKIE_SECURE = False

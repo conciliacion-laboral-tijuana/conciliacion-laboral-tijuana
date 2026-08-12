@@ -24,7 +24,9 @@ environ.Env.read_env(BASE_DIR / '.env')
 
 SECRET_KEY = env('SECRET_KEY')
 
-DEBUG = True
+# DEBUG ahora se controla por entorno (env var DEBUG, default False).
+# En Railway se debe dejar sin definir o en False para producción.
+DEBUG = env('DEBUG')
 
 ALLOWED_HOSTS = env('ALLOWED_HOSTS')
 
