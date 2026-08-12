@@ -42,6 +42,16 @@ if _RAILWAY_DOMAIN:
     if _railway_origin not in CSRF_TRUSTED_ORIGINS:
         CSRF_TRUSTED_ORIGINS.append(_railway_origin)
 
+# ─── Red de seguridad en Railway ────────────────────
+# En producción dentro de Railway, si el usuario no configuró ALLOWED_HOSTS
+# de forma explícita, aceptar cualquier host de la plataforma. Evita el
+# error 400 "Bad Request" cuando RAILWAY_PUBLIC_DOMAIN no se inyecta.
+if os.environ.get('RAILWAY_ENVIRONMENT') and not DEBUG and not os.environ.get('ALLOWED_HOSTS'):
+    if '*' not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append('*')
+    if 'https://*.up.railway.app' not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append('https://*.up.railway.app')
+
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
