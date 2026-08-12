@@ -341,34 +341,179 @@ solicitud ya llenado, para presentarlo manualmente en el centro si así se requi
 ## 10. Documentos legales (machotes y demanda)
 
 > 🔒 **Permiso:** solo usuarios con el permiso **"Puede generar documentos legales"**
-> (configurado por el administrador) ven estos botones.
+> (configurado por el administrador) ven los botones de Documentos/Demanda. Si no los
+> ves, pídelo al administrador.
 
-### 10.1 Generar un documento desde una plantilla (machote)
+Los **machotes** son plantillas reutilizables (demanda laboral, carta finiquito, convenio,
+solicitud, citatorio…) que se llenan automáticamente con los datos del expediente
+mediante **marcadores** como `{{ nombre_cliente }}`, `{{ empresa }}`, `{{ salario }}`,
+`{{ curp }}`, etc.
 
-1. Abre el expediente y presiona **Documentos** (catálogo de machotes).
-2. Elige la plantilla adecuada (Demanda Laboral, Carta Finiquito, Convenio, Solicitud,
-   Citatorio, Otro). Las favoritas aparecen primero.
-3. En **Preparar documento** verás **qué datos faltan** (ej. CURP, salario, dirección de
-   la empresa) con su porcentaje de completitud. Haz clic en el enlace de cada campo
-   faltante para **editarlo directamente**.
-4. Cuando esté completo, **Generar** el documento → se abre el **editor** con el texto
-   ya llenado (los `{{ marcadores }}` se reemplazaron con los datos del caso).
-5. Revisa, ajusta lo necesario y **Descargar PDF**.
-6. Opcional: **Guardar como machote** para que el equipo reutilice tu versión.
+---
 
-### 10.2 Asistente de Demanda (paso a paso)
+### 10.1 El generador de documentos (desde el expediente)
 
-1. En el expediente, presiona **Asistente de Demanda**.
-2. Responde cada sección guiada (actor, demandado, hechos, prestaciones, cálculos).
-3. Al final, **genera la demanda** lista para descargar.
+1. Abre el expediente y presiona **Documentos**.
+2. Arriba verás una **barra de completitud** con el estado de los datos del expediente
+   (ej. `12/15 completos`) y un enlace para **editar el expediente** si faltan datos.
+3. Las plantillas están **agrupadas por categoría** (Demanda Laboral, Carta Finiquito,
+   Convenio, Solicitud, Citatorio, Otro). Cada tarjeta muestra:
+   - **Ícono y nombre** de la plantilla, tipo de despido y jurisdicción.
+   - Los **marcadores disponibles** que se rellenarán (hasta 5 visibles).
+4. Cada plantilla tiene 2 botones:
+   - **Preparar y generar** → revisas que no falten datos y generas (sección 10.2).
+   - **Editar** → abre el editor directamente con los datos ya insertados (sección 10.3).
 
-### 10.3 Generar la demanda directamente
+---
 
-- En el expediente, presiona **Demanda** → se genera el documento de **Demanda Laboral**
-  en Word (`.docx`) con todos los datos y cálculos integrados → **Descargar**.
+### 10.2 Preparar el documento (revisar datos antes de generar)
 
-> 💡 El administrador gestiona las plantillas desde **Machotes → Catálogo/Importar**.
-> Los archivos Word existentes se pueden importar como plantillas.
+1. Presiona **Preparar y generar** en la plantilla elegida.
+2. **Barra de completitud:** porcentaje de datos completos (verde ≥80%, ámbar ≥50%,
+   rojo <50%) con mensaje orientativo.
+3. **Checklist por secciones** (👤 Cliente, 💼 Empleo, 🏢 Empresa, 📋 Expediente): cada
+   campo muestra ✓ (completo) o ! (faltante) con su valor actual y un botón **Editar**
+   que abre el formulario correspondiente para corregirlo al momento.
+4. **Resumen de cálculos** (columna derecha): aguinaldo, vacaciones, prima vacacional,
+   prima de antigüedad (con aviso de tope), indemnización y **TOTAL**, calculados con
+   los datos del expediente. Enlace a **Ver cálculo completo →**.
+5. **Marcadores disponibles:** chips con los `{{ marcadores }}` que se inyectarán.
+6. **Vista previa de valores inyectados:** los valores que se insertarán; los que
+   aparecen en **rojo** (ej. `[CURP]`, `[MONTO]`) indican datos faltantes.
+7. Presiona **✅ Generar documento** (si faltan datos, el botón cambia a
+   **⚠️ Generar de todas formas**) → se abre el editor con el texto ya llenado.
+
+---
+
+### 10.3 Editor del documento
+
+1. El documento se abre en un **editor de texto enriquecido** (Quill) con los datos del
+   caso **ya insertados** — puedes editar cualquier parte libremente.
+2. Botones:
+   - **👁️ Vista previa** — ve el documento limpio (modal) antes de descargar.
+   - **📄 Descargar Word** — genera el `.docx` listo para imprimir/firmar (también con
+     `Ctrl+Shift+D`).
+3. **Auto-guardado:** cada 30 segundos se guarda un **borrador local** en tu navegador;
+   si cierras sin querer, al volver se restaura. Ojo: si cambias de equipo, el borrador
+   no viaja contigo.
+4. Al final de la página verás **otras plantillas similares** para cambiar rápido.
+5. ⚠️ Descarga siempre el documento; los cambios no editados se pierden al cerrar.
+
+---
+
+### 10.4 Catálogo de machotes (gestionar plantillas)
+
+Entra a **Machotes → Catálogo** (menú o desde el botón **Documentos** del expediente):
+
+1. **Buscar y filtrar:** busca por nombre/descripción/archivo y filtra por **categoría**
+   (muestra el conteo por categoría). Botón **Limpiar filtros**.
+2. Cada plantilla (agrupada por categoría) muestra su ícono, nombre, descripción,
+   archivo de origen, y etiquetas de **★ Favorito**, tipo de despido y jurisdicción.
+3. Acciones por plantilla:
+   - **👁️ Vista previa** — despliega el contenido HTML de la plantilla en pantalla.
+   - **✏️ Editar** — abre el editor de plantilla (sección 10.5).
+   - **Renombrar** — cambia el nombre sin abrir el editor (modal).
+   - **🗑️ Eliminar** — borra la plantilla (pide confirmación, no se puede deshacer).
+4. Botón **📤 Subir nueva demanda (Word)** en la parte superior → sección 10.6.
+
+> 💡 Los **machotes favoritos** aparecen primero en el editor de demanda. Marca la
+> estrella desde el editor o el admin.
+
+---
+
+### 10.5 Editar una plantilla (machote)
+
+1. Desde el catálogo, presiona **Editar** en la plantilla.
+2. **Datos de la plantilla:** nombre, descripción, **categoría**, **tipo de despido**,
+   **jurisdicción** (Federal / Estatal BC / Ambas) e **ícono** (emoji).
+3. **Contenido:** editor de texto enriquecido; escribe los **marcadores**
+   `{{ variable }}` donde quieras que se inserten datos del expediente.
+4. **💾 Guardar cambios** (`Ctrl+Shift+S`). Los cambios aplican a todos los expedientes
+   futuros.
+5. En la parte inferior hay un bloque **🗑️ Eliminar plantilla** (con confirmación).
+
+---
+
+### 10.6 Subir una demanda Word como plantilla (importar .docx)
+
+1. Desde el **Catálogo de Machotes**, presiona **📤 Subir nueva demanda (Word)**.
+2. Selecciona un archivo **`.docx`** (demanda, finiquito, convenio, solicitud o
+   citatorio ya redactados).
+3. El sistema lo **convierte en plantilla reutilizable**: los datos específicos
+   (fechas, salarios, CURP, RFC, teléfonos) se reemplazan automáticamente por
+   **marcadores** (`{{ fecha }}`, `{{ salario }}`, `{{ curp }}`…).
+4. **Clasificación automática por el nombre del archivo:** si el nombre contiene
+   `demanda` → Demanda Laboral; `finiquito` → Carta Finiquito; `convenio` → Convenio;
+   `solicitud` → Solicitud; `citatorio` → Citatorio; cualquier otro → Otro.
+5. Si el archivo ya se importó antes, se muestra un aviso y **no se duplica**.
+6. La plantilla queda disponible en el catálogo y en el generador de documentos.
+
+---
+
+### 10.7 Asistente de Demanda (paso a paso)
+
+Guía de **4 pasos** para no omitir ningún dato. En el expediente, presiona
+**Asistente de Demanda**:
+
+- **Paso 1 — Datos del actor (trabajador):** nombre (aparecerá arriba y en la firma),
+  CURP, RFC, teléfono, WhatsApp, email, fecha de nacimiento, género, cómo supo del
+  despacho y oficina. (Los obligatorios están marcados con `*`.)
+- **Paso 2 — Datos de empleo:** puesto, **salario** (necesario para los cálculos),
+  periodo de pago, horas semanales, jornada, **fecha de ingreso** y **fecha de salida**.
+- **Paso 3 — Datos de la empresa/patrón:** usa el **buscador de empresas** del catálogo
+  para autocompletar, o captura nombre, razón social, actividad, tipo de persona
+  (física/moral), teléfono, domicilio y referencias.
+- **Paso 4 — Revisión final:**
+  - **🔒 Datos críticos** — lista de lo que falta (si algo aparece en rojo "FALTA",
+    regresa a completarlo).
+  - **⚖️ Tipo de despido** — selecciónalo; **los cálculos se ajustan automáticamente**.
+  - **🧮 Cálculo automático** — tabla con aguinaldo, vacaciones, prima vacacional,
+    prima de antigüedad, indemnización y **TOTAL**.
+  - **✍️ Verificación de la firma** — confirma que el nombre del actor aparezca arriba
+    y abajo (evita que quede el nombre de una demanda anterior).
+
+Al terminar, presiona **✨ Generar demanda y editar** → se abre el editor con todo
+insertado. Puedes volver atrás en cualquier paso con **Anterior**.
+
+---
+
+### 10.8 Editor de Demanda
+
+1. **Selector de plantillas por tipo de despido** (Injustificado, Justificado,
+   Voluntario, Rescisión, Otro) — la recomendada para cada tipo trae la etiqueta
+   **RECOMENDADO**. Cambia con un clic (o `Ctrl+Shift+1..5`).
+2. **Machotes de casos reales** (si existen): plantillas importadas de `.docx` de casos
+   anteriores, con **estrella para marcarlas como favoritas**. Al cargarlas, los
+   marcadores se reemplazan con los datos del expediente actual.
+3. ⚠️ Si al cliente le **faltan datos críticos**, verás una alerta roja y la descarga
+   queda **bloqueada** hasta completarlos (enlace directo al asistente).
+4. Botones: **👁️ Vista previa**, **📑 Guardar como machote** (sección 10.9) y
+   **📄 Descargar Word** (`Ctrl+Shift+D`).
+5. **Auto-guardado** del borrador local cada 30 segundos (se restaura al volver).
+6. Al cambiar de plantilla o machote, si ya editaste contenido te pedirá confirmación
+   (para que no pierdas tu trabajo).
+
+---
+
+### 10.9 Guardar como machote (reutilizar tu versión)
+
+1. En el editor de demanda (o de documento), presiona **📑 Guardar como machote**.
+2. Escribe un **nombre** descriptivo (ej. "Demanda por despido injustificado con
+   vacaciones vencidas").
+3. El sistema **convierte los datos del cliente en marcadores** automáticamente, para
+   que la plantilla sirva en otros casos.
+4. **Guardar machote** → queda en el catálogo disponible para todo el equipo.
+
+---
+
+### 10.10 Generar la demanda directamente
+
+- En el expediente, presiona **Demanda** → se abre el editor con la demanda ya generada
+  (plantilla según el tipo de despido, datos y cálculos integrados).
+
+> 💡 El administrador también puede crear plantillas desde el **admin de Django**
+> (Machotes → Añadir) o con el comando `importar_machotes` (convierte un lote de
+> archivos .docx).
 
 ---
 
