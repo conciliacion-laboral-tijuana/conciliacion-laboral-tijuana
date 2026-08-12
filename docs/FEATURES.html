@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>System &amp; Features Document (English)</title>
+<style>
+@page { size: A4; margin: 17mm 15mm; }
+* { box-sizing: border-box; }
+body { font-family: 'Segoe UI', 'Calibri', Arial, sans-serif; font-size: 10.5pt;
+       color: #1f2937; line-height: 1.5; margin: 0; }
+h1 { font-size: 19pt; color: #111827; border-bottom: 3px solid #1a6b3c;
+     padding-bottom: 5px; margin: 4px 0 14px; }
+h2 { font-size: 14pt; color: #1a6b3c; margin: 20px 0 8px; page-break-after: avoid; }
+h3 { font-size: 11.5pt; color: #374151; margin: 14px 0 6px; page-break-after: avoid; }
+p { margin: 6px 0; }
+ul, ol { margin: 6px 0 6px 4px; padding-left: 22px; }
+li { margin: 2px 0; }
+table { border-collapse: collapse; width: 100%; margin: 8px 0; font-size: 9pt;
+        page-break-inside: avoid; }
+th { background: #1f2937; color: #ffffff; text-align: left; padding: 5px 8px;
+     border: 1px solid #374151; }
+td { border: 1px solid #d1d5db; padding: 4px 8px; vertical-align: top; }
+tr:nth-child(even) td { background: #f9fafb; }
+code { font-family: Consolas, 'Courier New', monospace; font-size: 8.8pt;
+       background: #eef2ff; padding: 0 3px; border-radius: 3px; }
+pre { background: #f3f4f6; border: 1px solid #e5e7eb; padding: 8px 10px;
+      border-radius: 4px; white-space: pre-wrap; margin: 8px 0;
+      page-break-inside: avoid; }
+pre code { background: none; padding: 0; font-size: 8.5pt; }
+blockquote { border-left: 4px solid #f59e0b; background: #fffbeb; margin: 8px 0;
+             padding: 6px 12px; color: #78350f; }
+hr { border: none; border-top: 1px solid #e5e7eb; margin: 16px 0; }
+a { color: #2563eb; text-decoration: none; }
+strong { color: #111827; }
+.cabecera-doc { font-size: 9pt; color: #6b7280; border-bottom: 1px solid #e5e7eb;
+                padding-bottom: 6px; margin-bottom: 16px; }
+.pie-doc { margin-top: 24px; padding-top: 8px; border-top: 1px solid #e5e7eb;
+           font-size: 8.5pt; color: #9ca3af; text-align: center; }
+</style>
+</head>
+<body>
+<div class="cabecera-doc">Conciliación Laboral Tijuana &mdash; System &amp; Features Document (English)</div>
+<h1>⚖️ Despacho Laboral — Complete System &amp; Features Document</h1>
+<blockquote><strong>System:</strong> Web application for managing labor law cases at a law firm in Tijuana, Mexico <strong>Product name:</strong> Conciliación Laboral Tijuana — Despacho Laboral <strong>Stack:</strong> Django 5.x · Tailwind CSS · HTMX · PostgreSQL/SQLite · Celery + Redis · Selenium <strong>Last updated:</strong> August 2026</blockquote>
+<hr>
+<h2>1. What the System Does</h2>
+<p><code>Despacho Laboral</code> is a <strong>case-management (CRM + legal workflow) platform</strong> for a labor law practice. It manages the complete life cycle of a labor claim — from the first client contact, through the mandatory pre-trial conciliation stage with the *Centro de Conciliación Laboral (CCL)* of Baja California, up to settlement (convenio) or filing a formal lawsuit (demanda laboral).</p>
+<p>Beyond case tracking, the platform automates the most repetitive and error-prone parts of the practice:</p>
+<ul><li><strong>Legal benefit calculations</strong> (aguinaldo, vacation premium, seniority premium, constitutional severance, etc.) computed automatically from Mexican labor law (LFT).</li><li><strong>Legal document generation</strong> from reusable HTML templates (machotes) with automatic data injection.</li><li><strong>Automated submission of conciliation requests</strong> to the official BC government portal (<code>app.conciliacionbc.gob.mx</code>) — both server-side and via a companion Chrome extension.</li><li><strong>WhatsApp notifications</strong> to clients (manual, automatic per state change, and reminders).</li><li><strong>A full finance module</strong> (payments, expenses, payroll, commissions, cash registers, partner loans, profit distribution) organized per office and per work week.</li></ul>
+<hr>
+<h2>2. Users, Roles &amp; Permissions</h2>
+<h3>2.1 Roles (5)</h3>
+<table><thead><tr><th>Role</th><th>Key</th><th>Scope</th></tr></thead><tbody><tr><td><strong>Superadmin</strong></td><td><code>superadmin</code></td><td>Full access: Django admin, all dashboards, permission matrix, user management</td></tr><tr><td><strong>Administrativo</strong></td><td><code>admin</code></td><td>Sees all cases, productivity reports, totals, Excel exports, Django admin access</td></tr><tr><td><strong>Asesor</strong></td><td><code>asesor</code></td><td>Only sees and edits <strong>his own</strong> cases; personal dashboard with stats</td></tr><tr><td><strong>Abogada</strong></td><td><code>abogada</code></td><td>Dedicated dashboard for the firm's attorney (case overview &amp; document focus)</td></tr><tr><td><strong>Finanzas</strong></td><td><code>finanzas</code></td><td>Financial dashboard and finance module access (counts as admin for permissions)</td></tr></tbody></table>
+<h3>2.2 Profile capabilities (`UserProfile`)</h3>
+<p>Each user profile additionally has:</p>
+<ul><li><strong>`puede_generar_documentos`</strong> — flag granting access to the legal document generators (demanda, machotes, legal documents). Off by default.</li><li><strong>`api_token`</strong> — personal API token used by the Chrome extension to authenticate against the app's extension API. Auto-generated on profile creation and can be regenerated (invalidating the old one) from the *Extensión de Chrome* config page.</li></ul>
+<h3>2.3 Permission audit (`PermisoAuditLog`)</h3>
+<p>Every time a superadmin/admin changes a user's role, document permissions, or other privileges, an <strong>audit entry</strong> is recorded: who was modified, who modified them, the action (<code>cambio_rol</code>, <code>cambio_docs</code>, <code>mixto</code>), and the detail (e.g. <code>Rol: asesor → admin</code>).</p>
+<h3>2.4 Superadmin module</h3>
+<ul><li><strong>Superadmin dashboard</strong> — overview panel for platform administration.</li><li><strong>Permission matrix</strong> (<code>matriz_permisos</code>) — grid to manage every user's role and document-generation permission, with <strong>Excel export</strong>.</li><li><strong>Load demo data</strong> — one-click seeding of demo users/cases for testing.</li></ul>
+<h3>2.5 Auth &amp; security</h3>
+<ul><li>Login / logout, full <strong>password reset</strong> flow via email (SMTP configurable; console backend by default in dev).</li><li>Redirect to the correct dashboard automatically per role after login.</li><li>Production hardening: HTTPS redirect, secure cookies, Railway domain auto-detection, env-driven <code>DEBUG</code>/<code>SECRET_KEY</code>/<code>ALLOWED_HOSTS</code>.</li></ul>
+<hr>
+<h2>3. Case Management (Módulo Expedientes)</h2>
+<h3>3.1 Clients (`Cliente`)</h3>
+<p>Rich client record built specifically for labor conciliation:</p>
+<ul><li><strong>Identity:</strong> name, <strong>CURP</strong> (unique), RFC, phone, WhatsApp, email, birth date, gender.</li><li><strong>Home address:</strong> street, number, ZIP, colonia — assembled into <code>direccion_completa</code>.</li><li><strong>Employer data:</strong> company name, economic activity, phone, legal name, full address and references.</li><li><strong>Employer person type</strong> (física / moral) — used by the conciliation portal form.</li><li><strong>Employment data:</strong> position, <strong>monthly salary</strong>, pay period (daily/weekly/biweekly/ monthly), weekly hours, work shift (diurna/nocturna/mixta), hire date, termination date.</li><li><strong>Marketing/source:</strong> how the client heard about the firm (Facebook, Google, recommendation, WhatsApp, TikTok, TV/radio, flyer…).</li><li><strong>Office assignment</strong> (Plaza Patria, Otay, CLT).</li><li><strong>Free consultation tracking:</strong> whether the free weekly consultation was offered, scheduled, and on which date.</li><li>Indexed for fast lookups by CURP, name, and consultation date.</li></ul>
+<h3>3.2 Case files (`Expediente`)</h3>
+<ul><li><strong>Automatic numbering</strong> <code>AAAA-####</code> (year + sequential), unique and non-editable.</li><li>Assigned to one <strong>asesor</strong> (legal advisor).</li><li><strong>Amounts:</strong> claimed amount (<code>monto_reclamado</code>) and settlement amount (<code>monto_convenio</code>).</li><li><strong>Hearing scheduling</strong> with date/time and recorded result.</li><li><strong>Conciliation data:</strong> dismissal type (justified/unjustified/voluntary/rescission/other), claimed benefits, <strong>folio</strong> and processing date.</li><li><strong>Follow-up:</strong> next action date, internal notes, priority (baja/media/alta).</li><li><strong>Per-case WhatsApp automation toggle</strong> (<code>notificar_whatsapp_auto</code>).</li></ul>
+<h3>State machine with validated transitions</h3>
+<pre><code>nuevo → solicitud → citatorio → audiencia → no_notificado ─┐
+                                        ├→ reprogramacion ─┤
+                                        ├→ convenio ───────┤
+                                        ├→ sin_conciliacion─┼→ demanda → audiencia/convenio/cerrado
+                                        └→ cerrado (from any state)</code></pre>
+<p>The model <strong>rejects illegal transitions</strong> (e.g. jumping from <code>nuevo</code> to <code>audiencia</code>) with a clear message listing the allowed transitions. States have associated colors for UI badges.</p>
+<h3>3.3 Documents (`Documento`)</h3>
+<ul><li>Upload PDFs/images per case with type classification (INE, contract, evidence, screenshot, citatorio, PDF, other) and description; uploader and date recorded.</li><li>Organized by year/month folders on disk.</li></ul>
+<h3>3.4 Notes &amp; Activity history</h3>
+<ul><li><strong>Notas</strong> — free-form notes per case with author and timestamp.</li><li><strong>Movimientos</strong> — automatic audit trail of every action: creation, state change, update, document upload, note added, hearing result (who, when, what changed).</li></ul>
+<h3>3.5 Notifications (bell)</h3>
+<p>In-app notifications for the user: transfers, avisos, system messages, reminders. Each notification can carry a link; mark single or <strong>all as read</strong>.</p>
+<h3>3.6 Transfer requests between advisors</h3>
+<p>When an asesor can't attend a hearing (schedule conflict, etc.):</p>
+<ul><li>He requests a <strong>transfer</strong> of the case, optionally suggesting a destination asesor, with a mandatory reason.</li><li>Administration reviews the request, optionally <strong>reassigns</strong> to another advisor, and approves or rejects with a comment.</li><li>Statuses: pending → approved / rejected / cancelled. Notifications keep everyone informed.</li></ul>
+<h3>3.7 Avisos (mandatory admin notices)</h3>
+<ul><li>Admin creates notices/pending items with title, content, priority, and <strong>optional expiry date</strong> (auto-hides after expiry).</li><li>Shown on every advisor/admin dashboard; users can mark them as <strong>read/understood</strong> (tracked per user via M2M).</li></ul>
+<h3>3.8 Global search &amp; filtering</h3>
+<ul><li><strong>Global search</strong> across cases, clients, folios, companies.</li><li>Advanced filters on the case list; asesores only see their own cases.</li></ul>
+<h3>3.9 Calendar</h3>
+<ul><li><strong>Hearing calendar</strong> (<code>calendario</code>) aggregating all scheduled hearings.</li></ul>
+<h3>3.10 Reports &amp; exports</h3>
+<ul><li><strong>Excel export</strong> of cases.</li><li><strong>Admin reports</strong> page (<code>reportes_admin</code>) — productivity, totals per advisor.</li><li><strong>PDF per case</strong> (<code>pdf_expediente</code>) generated with WeasyPrint.</li></ul>
+<hr>
+<h2>4. Dashboards (per role)</h2>
+<table><thead><tr><th>Dashboard</th><th>What it shows</th></tr></thead><tbody><tr><td><strong>Asesor</strong></td><td>Personal KPIs, his cases by state, upcoming actions/hearings, pending tasks, avisos</td></tr><tr><td><strong>Abogada</strong></td><td>Attorney-oriented overview of the practice's cases and documents</td></tr><tr><td><strong>Admin</strong></td><td>All cases, productivity reports, total amounts, avisos, export actions</td></tr><tr><td><strong>Finanzas</strong></td><td>Financial KPIs (see Finance module)</td></tr><tr><td><strong>Superadmin</strong></td><td>Platform administration panel + permission matrix</td></tr></tbody></table>
+<hr>
+<h2>5. Legal Calculation Engine (Cálculo Laboral)</h2>
+<h3>5.1 Configurable legal rules (`LegalConfig`)</h3>
+<p>All legal parameters are stored in the database and editable from the Django admin — <strong>no code changes needed when the law changes</strong>:</p>
+<ul><li><strong>UMA</strong> daily value, general minimum wage, <strong>northern border zone (ZLF) minimum wage</strong>.</li><li><strong>Aguinaldo</strong> days (min. legal 15).</li><li><strong>Vacation premium %</strong> (min. 25%).</li><li><strong>Seniority premium:</strong> days per year (12) + salary cap type (2× UMA / 2× SM / 2× ZLF SM) and multiplier.</li><li><strong>Constitutional severance days</strong> (3 months = 90).</li><li>Only one config can be *active* at a time; saving one deactivates the others.</li></ul>
+<h3>5.2 Vacation table (LFT 2023 reform)</h3>
+<p>The system implements the current Mexican vacation table (year 1 → 12 days, +2 per year up to 20, then +2 every 5 years), extrapolating beyond the table when needed.</p>
+<h3>5.3 Concepts calculated</h3>
+<table><thead><tr><th>Concept</th><th>Article</th><th>Type</th></tr></thead><tbody><tr><td>Aguinaldo proporcional</td><td>Art. 87 LFT</td><td>automatic</td></tr><tr><td>Vacaciones proporcionales</td><td>Art. 76 LFT</td><td>automatic</td></tr><tr><td>Prima vacacional</td><td>Art. 80 LFT</td><td>automatic</td></tr><tr><td>Prima de antigüedad (with cap flag)</td><td>Art. 162 LFT</td><td>automatic</td></tr><tr><td>Indemnización constitucional (90 days)</td><td>Art. 50 LFT</td><td>automatic</td></tr><tr><td>Indemnización 20 días por año</td><td>Art. 50-II LFT</td><td>automatic</td></tr><tr><td>Vacaciones vencidas (manual days)</td><td>Art. 76 LFT</td><td>semi-auto</td></tr><tr><td>Horas extras (manual hours)</td><td>Art. 66-68 LFT</td><td>semi-auto</td></tr><tr><td>Salarios devengados (manual amount)</td><td>Art. 48 LFT</td><td>manual</td></tr><tr><td>Días festivos (manual days)</td><td>Art. 75 LFT</td><td>semi-auto</td></tr></tbody></table>
+<h3>5.4 Per-case calculation (`CalculoLaboral`)</h3>
+<ul><li>One calculation per expediente, storing a <strong>snapshot of inputs</strong> for history.</li><li><strong>Checkboxes</strong> let the advisor choose which concepts to include (defaults sensible).</li><li><strong>Manual override</strong> for vacation days actually owed (when some years were already paid or enjoyed) — shown with an *override applied* flag.</li><li>Shows daily wage, days worked, years of service, per-concept breakdown with legal references, applied-cap warnings, and <strong>total</strong>.</li><li><strong>Auto-recalculation</strong> when client/case data or legal rules change (<code>recalcular</code>).</li><li><strong>Quick simulation</strong> (<code>simulacion-rapida</code>) — instant estimate for a prospect without creating a case: enter salary + dates and get the full breakdown.</li></ul>
+<hr>
+<h2>6. Legal Document Generation</h2>
+<h3>6.1 Machotes (reusable HTML templates)</h3>
+<ul><li>Templates categorized as: <strong>Demanda Laboral, Carta Finiquito, Convenio, Solicitud, Citatorio, Otro</strong>; with jurisdiction (Federal / Estatal BC / Both), optional dismissal type, icon, active flag, and ordering.</li><li><strong>Favorite</strong> templates float to the top of the editor.</li><li>Template body is HTML using <strong>markers</strong> like <code>{{ nombre }}</code>, <code>{{ empresa }}</code>, etc.</li></ul>
+<h3>6.2 Marker injection engine (`marcadores.py`)</h3>
+<ul><li>~40 markers with <strong>real case data</strong>: client, employer, case, dates (in Spanish, e.g. "1 de enero de 2024"), salary formatting, <strong>and computed benefits</strong> (aguinaldo, vacations, indemnity…) pulled automatically from the calculation engine.</li><li>Missing data renders as visible placeholders (<code>[CURP]</code>, <code>[MONTO]</code>, …) instead of blank or crashing — so the user knows exactly what to fill in.</li><li><strong>Completeness checker</strong>: lists which fields are complete/incomplete per section (Cliente, Empleo, Empresa, Expediente) with <strong>direct edit links</strong> and a completeness percentage.</li></ul>
+<h3>6.3 Document workflow</h3>
+<ol start="1"><li>Choose a machote from the catalog (or from the case).</li><li><strong>Prepare</strong> — see which data is missing, click through to fix it.</li><li><strong>Edit/preview</strong> the rendered document in the browser.</li><li><strong>Generate/download</strong> as PDF.</li><li>Optionally <strong>save the edited document as a new machote</strong> (team template library grows organically).</li></ol>
+<h3>6.4 Import machotes from Word</h3>
+<ul><li><code>.docx</code> files (e.g. a folder of existing demandas) are converted to HTML templates via the <code>importar_machotes</code> command or web import, preserving markers where possible.</li><li>Template library is managed from the Django admin or the machotes UI.</li></ul>
+<h3>6.5 Demanda Laboral generator (`demanda_generator.py`)</h3>
+<ul><li>Generates a <strong>professional Mexican labor lawsuit document</strong> (Word <code>.docx</code>) with all case data, integrated calculations, print/filing-ready formatting.</li><li>A <strong>step-by-step wizard</strong> (<code>demanda_asistente</code>) guides through sections of the demanda; a <strong>direct generator</strong> produces the document in one click.</li><li>Downloads as <code>.docx</code> for editing/signing.</li></ul>
+<hr>
+<h2>7. Conciliation Automation (Portal de Baja California)</h2>
+<p>The system integrates with the official portal <code>app.conciliacionbc.gob.mx</code> in <strong>two modes</strong>.</p>
+<h3>7.1 Server-side automation (`conciliacion_automation.py` + Celery)</h3>
+<ul><li>Fills the real multi-step portal flow: privacy notice → industry → conflict date &amp; object → worker (solicitante) → employer (citado) → description → submit.</li><li>Runs <strong>headless</strong> (server) or <strong>visible/debug</strong> mode.</li><li>Executed asynchronously via <strong>Celery worker</strong> (or threading fallback without Redis) so HTTP requests never time out.</li><li>Live progress page (<code>conciliacion_procesando</code>) showing <strong>screenshots of the browser</strong> and elapsed time; retry support.</li><li>On success: captures the <strong>folio</strong>, saves the <strong>acuse PDF</strong> into the case, marks TareaConciliacion as completed with full logs.</li><li>Management command <code>enviar_solicitud_conciliacion</code> for batch/CLI sending.</li></ul>
+<h3>7.2 Acuse parser (`acuse_parser.py`)</h3>
+<p>When an official acuse PDF is available (auto-downloaded or manually uploaded), the system <strong>extracts its text with PyMuPDF</strong> and auto-populates the case:</p>
+<ul><li>Folio (e.g. <code>TIJ/26427/2026</code>), request date, applicant name, cited company, conflict date, object, conciliation unit.</li><li><strong>Maps the conciliation object → dismissal type</strong> (e.g. "Despido" → injustificado).</li><li><strong>Preview screen</strong> shows detected values vs. current values (new/differing flagged) and lets the advisor <strong>confirm</strong> before saving.</li></ul>
+<h3>7.3 Chrome extension — "Conciliación BC Asistente"</h3>
+<p>For when automated navigation is detected or a CAPTCHA must be solved by a human, the companion <strong>Chrome extension (Manifest V3)</strong> fills the portal form <strong>in the advisor's own browser</strong>:</p>
+<ul><li>The advisor clicks *Enviar a Conciliación → Desde mi navegador (Extensión de Chrome)*.</li><li>The extension shows pending tasks (case number, client, company, CURP) in its popup.</li><li><strong>🚀 Llenar en el portal</strong> opens the portal with the form <strong>already filled</strong> (privacy, industry, dates, worker, employer, description) via a content script — so the portal sees a human-driven session.</li><li>The advisor reviews, solves CAPTCHAs live, and clicks *Enviar solicitud* himself.</li><li><strong>🔍 Ya envié, detectar acuse</strong> — the extension detects the folio, downloads the acuse PDF, takes a screenshot, and <strong>reports everything back to the app's API</strong> (authenticated with the user's personal token), attaching the PDF to the case.</li><li>Config screen (options) stores the app URL + token and verifies connectivity.</li><li>The extension package can be <strong>downloaded as a .zip</strong> from the app (<code>/extension/descargar/</code>), ready to load unpacked into Chrome.</li></ul>
+<h3>7.4 Manual fallbacks</h3>
+<ul><li>Upload the acuse PDF manually (<code>subir-conciliacion</code>), then preview/confirm the parsed data.</li><li>Download a <strong>pre-filled conciliation request PDF</strong> to file manually at the center.</li><li>Upload the acuse via the normal document flow.</li></ul>
+<hr>
+<h2>8. WhatsApp Integration</h2>
+<p>Two delivery methods:</p>
+<ol start="1"><li><strong>Deep links (wa.me)</strong> — free; opens WhatsApp with a pre-filled message.</li><li><strong>Twilio WhatsApp API</strong> — server-sent messages (needs Twilio credentials); falls back to deep link automatically when not configured.</li></ol>
+<h3>Features</h3>
+<ul><li><strong>Templates</strong> for: hearing reminder, citatorio, convenio follow-up, general follow-up, document request, custom messages — with variables (<code>{cliente}</code>, <code>{fecha}</code>, <code>{asesor}</code>…).</li><li><strong>Automatic messages on state changes</strong>: every case state has a configured message (new case, solicitud created, citatorio, hearing, not notified, rescheduled, convenio, no agreement, demanda, closed). Per-case toggle to enable/disable.</li><li><strong>Message history</strong> per case with status (pending/sent/failed), channel, and logs.</li><li>Mexican phone normalization (adds country code 52, strips common formatting).</li><li>Management command <code>enviar_whatsapp_automatico</code> to flush pending messages (with <code>--dry-run</code> and <code>--send-twilio</code> options).</li></ul>
+<hr>
+<h2>9. Imports &amp; Utilities</h2>
+<h3>9.1 CLT import (citas from Excel)</h3>
+<p><code>CLT.xlsx</code> (pre-scheduled conciliation appointments from the CCL) is imported as <strong>expedientes with scheduled hearings</strong>:</p>
+<ul><li>Per-sheet import (e.g. monthly tabs), auto-creates <strong>advisor users</strong> found in the file if needed, and cleanup options for test data.</li><li>CURP is optional at import time and captured later (so numbers flow in fast).</li></ul>
+<h3>9.2 Company catalog (`Empresa`)</h3>
+<ul><li>Import from <code>Empresas y Domicilios.xlsx</code> — <strong>idempotent</strong>, names normalized (uppercase, no accents, compacted spaces) so re-importing a growing file never duplicates.</li><li>Person type auto-detected; detailed address kept for <strong>autocomplete in the client form</strong> (<code>empresas/buscar/</code> AJAX endpoint).</li></ul>
+<h3>9.3 CURP generator</h3>
+<p>Standalone tool to <strong>generate a valid CURP</strong> from personal data (name, birth date, gender, state) — saves manual lookups when onboarding clients.</p>
+<h3>9.4 User settings (Ajustes)</h3>
+<p>Per-user settings page: profile info, phone, WhatsApp automation preference, API token management, extension configuration.</p>
+<hr>
+<h2>10. Finance Module (Módulo Finanzas)</h2>
+<p>Organized by <strong>office</strong> (sucursal) and by <strong>work week</strong> for operational reporting.</p>
+<h3>10.1 Offices</h3>
+<p>Catalog of firm offices with address, phone, manager, active flag. Each office has its own income/expense/cash-register operations.</p>
+<h3>10.2 Work weeks</h3>
+<p>The finance system revolves around <strong>weeks</strong> (Mon–Sun): the current week is created automatically; every movement can be attributed to a week. Weeks can be opened/closed. Totals per week: <strong>income</strong> (cash + settlement payments), <strong>expenses</strong> (cash + expenses + payroll) and <strong>balance</strong> are computed on the fly.</p>
+<h3>10.3 Settlement payments (`SettlementPayment`)</h3>
+<p>Payments received from settlement agreements (convenios): date, client, case, amount, payment method (cash/transfer/check/credit/debit/deposit/other), office, notes, auditor.</p>
+<h3>10.4 Expenses (`Expense`)</h3>
+<p>Operational expenses per office with category (rent, utilities, internet, stationery, advertising, salaries, gas, maintenance, taxes, equipment, furniture, insurance, professional fees, other), provider, tax folio/invoice, and auditor.</p>
+<h3>10.5 Agreements &amp; honorarios (`Agreement` / `Honorario`)</h3>
+<ul><li><strong>Convenios</strong> with the client: amount, state (pending signature → signed → paid / partially paid / cancelled), responsible person, office, and automatic <strong>total fees</strong>.</li><li><strong>Honorarios:</strong> one or more fee entries per convenio with a <strong>% tariff</strong> (25/30/35/40/50%); amount auto-computed (<code>convenio × % ÷ 100</code>), expected/payment dates, paid/pending sums aggregated on the convenio.</li></ul>
+<h3>10.6 Commissions (`Commission`)</h3>
+<p>Advisor commissions on closed convenios: % configurable, <strong>amount auto-computed</strong>, state (pending/paid/cancelled), payment date, office, auditor.</p>
+<h3>10.7 Employees &amp; payroll (`Employee` / `Payroll`)</h3>
+<ul><li>Employee catalog with position (administrative, legal advisor, supervisor, accountant, receptionist, assistant, director…), pay period, salary, office, active flag.</li><li><strong>Payroll payments</strong> per period: period type (weekly/biweekly/monthly/extraordinary/ aguinaldo/vacation premium/bonus), period range, salary paid, deductions (ISR/IMSS), <strong>total auto-computed</strong> (<code>salario − descuentos</code>), office, auditor.</li></ul>
+<h3>10.8 Cash register (`CashMovement`)</h3>
+<p>Daily cash movements per office and date: <strong>income</strong> (convenio payment, client payment, advance, refund, other) or <strong>expense</strong> (stationery, gas, rent, utilities, internet, phone, travel, commissions, fees, other). Category coherence with type is <strong>validated</strong> (e.g. an income can't have an expense category). Reference field links to case/invoice.</p>
+<h3>10.9 Partners, loans &amp; profit distribution</h3>
+<ul><li><strong>Partners (`Partner`):</strong> participation % per partner for profit sharing.</li><li><strong>Partner loans (`PartnerLoan`):</strong> formal record of loans between partners (origin → destination, amount, concept, status, pending balance), replacing informal IOUs.</li><li><strong>Profit distribution (`ProfitDistribution` + `PartnerProfit`):</strong></li><li>Auto-computes <strong>net profit</strong> = convenio amount − fees − commissions − withholdings − related expenses.</li><li>Distributes it among partners per their participation % (<strong>individual share auto-calculated</strong>), with states (draft → distributed → confirmed/cancelled).</li><li>Per-partner <strong>accumulated summaries</strong> (generated / paid / pending) auto-updated when distributions are confirmed.</li></ul>
+<h3>10.10 Financial dashboard</h3>
+<ul><li>KPIs per office and overall; <strong>monthly cash flow</strong> chart fed by the <code>api_flujo_mensual</code> JSON endpoint; <strong>Excel export</strong> of the dashboard totals.</li><li><strong>Convenio reports</strong> (<code>reporte_convenios</code>) with Excel export.</li></ul>
+<hr>
+<h2>11. Management Commands (CLI)</h2>
+<table><thead><tr><th>Command</th><th>Purpose</th></tr></thead><tbody><tr><td><code>crear_usuarios_prueba</code></td><td>Create test users (1 superadmin, 4 admins, 15 asesores)</td></tr><tr><td><code>seed_datos</code> / <code>seed_clientes_prueba</code></td><td>Seed demo cases (10 labor scenarios / full clients with calculations)</td></tr><tr><td><code>enviar_recordatorios</code></td><td>Send upcoming-action/hearing reminders (<code>--days</code>, <code>--dry-run</code>)</td></tr><tr><td><code>enviar_solicitud_conciliacion</code></td><td>Submit conciliation requests to the BC portal from CLI (<code>--headless</code>)</td></tr><tr><td><code>enviar_whatsapp_automatico</code></td><td>Flush pending automatic WhatsApp messages (<code>--dry-run</code>, <code>--send-twilio</code>)</td></tr><tr><td><code>importar_clt</code></td><td>Import CLT.xlsx citas as expedientes with hearings</td></tr><tr><td><code>importar_empresas</code></td><td>Import the companies/addresses catalog (idempotent)</td></tr><tr><td><code>importar_machotes</code></td><td>Convert <code>.docx</code> templates into machotes (<code>--reload</code>, <code>--file</code>)</td></tr><tr><td><code>migrate_sqlite_to_pg</code></td><td>One-shot data migration from SQLite to PostgreSQL</td></tr></tbody></table>
+<hr>
+<h2>12. Integrations Summary</h2>
+<table><thead><tr><th>Service</th><th>Use</th><th>Config</th></tr></thead><tbody><tr><td><strong>Selenium</strong></td><td>Portal automation (headless/debug)</td><td>included</td></tr><tr><td><strong>Celery + Redis</strong></td><td>Background tasks (conciliation automation); threading fallback</td><td><code>REDIS_URL</code></td></tr><tr><td><strong>Twilio</strong></td><td>WhatsApp API sending (optional)</td><td><code>TWILIO_*</code> env vars</td></tr><tr><td><strong>SMTP</strong></td><td>Password-reset emails (console backend in dev)</td><td><code>EMAIL_*</code> env vars</td></tr><tr><td><strong>WeasyPrint</strong></td><td>PDF generation (expediente PDFs, documents)</td><td>included</td></tr><tr><td><strong>python-docx</strong></td><td>Word (.docx) demanda generation</td><td>included</td></tr><tr><td><strong>PyMuPDF (fitz)</strong></td><td>Acuse PDF text extraction</td><td>included</td></tr><tr><td><strong>openpyxl</strong></td><td>Excel imports (CLT, companies) and exports</td><td>included</td></tr><tr><td><strong>Chrome extension API</strong></td><td>Token-authenticated REST endpoints for the extension</td><td>personal <code>api_token</code></td></tr><tr><td><strong>Railway</strong></td><td>Deployment; auto-detects domain, PostgreSQL and Redis env vars</td><td>env-driven</td></tr></tbody></table>
+<hr>
+<h2>13. Architecture &amp; Tech Notes</h2>
+<ul><li><strong>Backend:</strong> Django 5.x, <code>es-mx</code> locale, <code>America/Mexico_City</code> timezone.</li><li><strong>Database:</strong> SQLite (dev) / PostgreSQL (prod) via <code>DATABASE_URL</code>; Railway env auto-detection (<code>PGHOST</code>…).</li><li><strong>Frontend:</strong> Tailwind CSS (CDN) + <strong>HTMX</strong> for dynamic interactions (no heavy JS framework); responsive design.</li><li><strong>Static files:</strong> Whitenoise (<code>CompressedManifestStaticFilesStorage</code>) for zero-Nginx production serving.</li><li><strong>Background work:</strong> Celery when Redis is present, <strong>threading fallback</strong> otherwise (graceful degradation for local dev).</li><li><strong>Auditability:</strong> every key entity (payments, expenses, payroll, cash, loans, distributions, commissions) records <code>registrado_por</code>/<code>creado_por</code>.</li><li><strong>Deployment:</strong> Dockerfile, Railway config, entrypoint (auto-starts Celery worker when Redis exists), Nginx + Gunicorn recipe for VPS (droplet), and client-facing deploy guide.</li></ul>
+<hr>
+<h2>14. Testing</h2>
+<p>The suite includes <strong>48 tests</strong> (expedientes, finanzas, automation) covering state transition validation, financial calculations, and the verification script <code>verify_demandas_calculos.py</code> (used by CI). Run with:</p>
+<pre><code>uv run python manage.py test</code></pre>
+<hr>
+<h2>15. Quick Start (dev)</h2>
+<pre><code>uv sync                          # install dependencies
+uv run python manage.py migrate  # DB migrations
+uv run python manage.py crear_usuarios_prueba
+uv run python manage.py runserver</code></pre>
+<p>Test logins: <code>superadmin/Admin123!</code> · <code>admin1/Admin1!</code> · <code>asesor1/Asesor1!</code></p><div class="pie-doc">Generado desde el proyecto Despacho Laboral &middot; Documento oficial del sistema</div>
+</body>
+</html>

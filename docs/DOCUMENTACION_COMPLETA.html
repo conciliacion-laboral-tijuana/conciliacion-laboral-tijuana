@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Documentación Completa del Sistema</title>
+<style>
+@page { size: A4; margin: 17mm 15mm; }
+* { box-sizing: border-box; }
+body { font-family: 'Segoe UI', 'Calibri', Arial, sans-serif; font-size: 10.5pt;
+       color: #1f2937; line-height: 1.5; margin: 0; }
+h1 { font-size: 19pt; color: #111827; border-bottom: 3px solid #1a6b3c;
+     padding-bottom: 5px; margin: 4px 0 14px; }
+h2 { font-size: 14pt; color: #1a6b3c; margin: 20px 0 8px; page-break-after: avoid; }
+h3 { font-size: 11.5pt; color: #374151; margin: 14px 0 6px; page-break-after: avoid; }
+p { margin: 6px 0; }
+ul, ol { margin: 6px 0 6px 4px; padding-left: 22px; }
+li { margin: 2px 0; }
+table { border-collapse: collapse; width: 100%; margin: 8px 0; font-size: 9pt;
+        page-break-inside: avoid; }
+th { background: #1f2937; color: #ffffff; text-align: left; padding: 5px 8px;
+     border: 1px solid #374151; }
+td { border: 1px solid #d1d5db; padding: 4px 8px; vertical-align: top; }
+tr:nth-child(even) td { background: #f9fafb; }
+code { font-family: Consolas, 'Courier New', monospace; font-size: 8.8pt;
+       background: #eef2ff; padding: 0 3px; border-radius: 3px; }
+pre { background: #f3f4f6; border: 1px solid #e5e7eb; padding: 8px 10px;
+      border-radius: 4px; white-space: pre-wrap; margin: 8px 0;
+      page-break-inside: avoid; }
+pre code { background: none; padding: 0; font-size: 8.5pt; }
+blockquote { border-left: 4px solid #f59e0b; background: #fffbeb; margin: 8px 0;
+             padding: 6px 12px; color: #78350f; }
+hr { border: none; border-top: 1px solid #e5e7eb; margin: 16px 0; }
+a { color: #2563eb; text-decoration: none; }
+strong { color: #111827; }
+.cabecera-doc { font-size: 9pt; color: #6b7280; border-bottom: 1px solid #e5e7eb;
+                padding-bottom: 6px; margin-bottom: 16px; }
+.pie-doc { margin-top: 24px; padding-top: 8px; border-top: 1px solid #e5e7eb;
+           font-size: 8.5pt; color: #9ca3af; text-align: center; }
+
+section.documento { page-break-before: always; }
+.portada { page-break-after: always; height: 250mm; display: flex;
+           align-items: center; justify-content: center; }
+.portada-inner { text-align: center; width: 100%; }
+.portada-logo { font-size: 56pt; line-height: 1.2; }
+.portada-titulo { font-size: 34pt; color: #111827; margin: 10px 0 4px; border: none; }
+.portada-sub { font-size: 16pt; color: #1a6b3c; font-weight: 600; margin-bottom: 16px; }
+.portada-leyenda { font-size: 11pt; color: #4b5563; margin-bottom: 24px; line-height: 1.6; }
+.portada-version { display: inline-block; border: 1px solid #d1d5db; border-radius: 999px;
+                   padding: 5px 16px; font-size: 9.5pt; color: #374151; margin-bottom: 28px;
+                   background: #f9fafb; }
+.portada-indice { max-width: 430px; margin: 0 auto; text-align: left;
+                  border: 1px solid #e5e7eb; border-radius: 10px; padding: 16px 24px;
+                  background: #fafbfc; }
+.portada-indice-titulo { font-weight: 700; color: #111827; margin-bottom: 8px; font-size: 11pt; }
+.portada-indice ol { margin: 0; padding-left: 22px; font-size: 10.5pt; }
+.portada-indice li { margin: 5px 0; }
+@page { @bottom-center { content: "Conciliación Laboral Tijuana · Página " counter(page);
+         font-size: 8pt; color: #9ca3af; } }
+@page :first { @bottom-center { content: none; } }
+</style>
+</head>
+<body>
+<section class="portada">
+<div class="portada-inner">
+<div class="portada-logo">⚖️</div>
+<h1 class="portada-titulo">Despacho Laboral</h1>
+<div class="portada-sub">Conciliación Laboral Tijuana</div>
+<div class="portada-leyenda">Documentación completa del sistema:<br>funcionalidad, manual de usuario, administración y finanzas</div>
+<div class="portada-version">Versión 1.0 &middot; 12 de agosto de 2026</div>
+<div class="portada-indice">
+<div class="portada-indice-titulo">Contenido</div>
+<ol>
+<li>Documentación Funcional del Sistema</li>
+<li>Manual de Usuario (asesores y administrativos)</li>
+<li>Manual de Administración (permisos, configuración legal y finanzas)</li>
+<li>System &amp; Features Document (English)</li>
+</ol>
+</div>
+</div>
+</section>
+<section class="documento">
+<div class="cabecera-doc">Conciliación Laboral Tijuana &mdash; Documentación Funcional del Sistema</div>
+<h1>⚖️ Despacho Laboral — Documentación Funcional del Sistema</h1>
+<blockquote><strong>Sistema:</strong> Aplicación web para la gestión de expedientes laborales de un despacho de abogados en Tijuana, México <strong>Nombre del producto:</strong> Conciliación Laboral Tijuana — Despacho Laboral <strong>Tecnología:</strong> Django 5.x · Tailwind CSS · HTMX · PostgreSQL/SQLite · Celery + Redis · Selenium <strong>Última actualización:</strong> Agosto de 2026</blockquote>
+<hr>
+<h2>1. Qué hace el sistema</h2>
+<p><code>Despacho Laboral</code> es una <strong>plataforma de gestión de casos (CRM + flujo de trabajo legal)</strong> para un despacho de abogados laboralistas. Administra el ciclo de vida completo de una reclamación laboral — desde el primer contacto con el cliente, pasando por la etapa de conciliación prejudicial obligatoria ante el *Centro de Conciliación Laboral (CCL)* de Baja California, hasta el acuerdo (convenio) o la presentación de una <strong>demanda laboral</strong> formal.</p>
+<p>Más allá del seguimiento de casos, la plataforma automatiza las partes más repetitivas y propensas a error de la práctica:</p>
+<ul><li><strong>Cálculo de prestaciones laborales</strong> (aguinaldo, prima vacacional, prima de antigüedad, indemnización constitucional, etc.) calculados automáticamente conforme a la Ley Federal del Trabajo (LFT).</li><li><strong>Generación de documentos legales</strong> a partir de plantillas HTML reutilizables (machotes) con inyección automática de datos.</li><li><strong>Envío automatizado de solicitudes de conciliación</strong> al portal oficial del gobierno de BC (<code>app.conciliacionbc.gob.mx</code>) — tanto del lado del servidor como mediante una extensión de Chrome complementaria.</li><li><strong>Notificaciones por WhatsApp</strong> a los clientes (manuales, automáticas por cambio de estado y recordatorios).</li><li><strong>Un módulo financiero completo</strong> (pagos, gastos, nómina, comisiones, caja diaria, préstamos entre socios, distribución de utilidades) organizado por oficina y por semana de trabajo.</li></ul>
+<hr>
+<h2>2. Usuarios, roles y permisos</h2>
+<h3>2.1 Roles (5)</h3>
+<table><thead><tr><th>Rol</th><th>Clave</th><th>Alcance</th></tr></thead><tbody><tr><td><strong>Superadmin</strong></td><td><code>superadmin</code></td><td>Acceso total: admin de Django, todos los dashboards, matriz de permisos, gestión de usuarios</td></tr><tr><td><strong>Administrativo</strong></td><td><code>admin</code></td><td>Ve todos los casos, reportes de productividad, montos totales, exportaciones a Excel, acceso al admin de Django</td></tr><tr><td><strong>Asesor</strong></td><td><code>asesor</code></td><td>Solo ve y edita <strong>sus propios</strong> casos; dashboard personal con estadísticas</td></tr><tr><td><strong>Abogada</strong></td><td><code>abogada</code></td><td>Dashboard dedicado para la abogada del despacho (visión general de casos y documentos)</td></tr><tr><td><strong>Finanzas</strong></td><td><code>finanzas</code></td><td>Dashboard financiero y acceso al módulo de finanzas (cuenta como admin para permisos)</td></tr></tbody></table>
+<h3>2.2 Capacidades del perfil (`UserProfile`)</h3>
+<p>Cada perfil de usuario cuenta además con:</p>
+<ul><li><strong>`puede_generar_documentos`</strong> — bandera que otorga acceso a los generadores de documentos legales (demanda, machotes, documentos legales). Desactivada por defecto.</li><li><strong>`api_token`</strong> — token personal de API que usa la extensión de Chrome para autenticarse contra la API de la aplicación. Se genera automáticamente al crear el perfil y se puede regenerar (invalidando el anterior) desde la página *Extensión de Chrome*.</li></ul>
+<h3>2.3 Auditoría de permisos (`PermisoAuditLog`)</h3>
+<p>Cada vez que un superadmin/admin modifica el rol de un usuario, sus permisos de documentos u otros privilegios, se registra una <strong>entrada de auditoría</strong>: a quién se modificó, quién lo modificó, la acción (<code>cambio_rol</code>, <code>cambio_docs</code>, <code>mixto</code>) y el detalle (ej: <code>Rol: asesor → admin</code>).</p>
+<h3>2.4 Módulo de superadmin</h3>
+<ul><li><strong>Dashboard de superadmin</strong> — panel de administración de la plataforma.</li><li><strong>Matriz de permisos</strong> (<code>matriz_permisos</code>) — cuadrícula para gestionar el rol y el permiso de generación de documentos de cada usuario, con <strong>exportación a Excel</strong>.</li><li><strong>Cargar datos demo</strong> — siembra de datos de prueba con un clic (usuarios/casos).</li></ul>
+<h3>2.5 Autenticación y seguridad</h3>
+<ul><li>Inicio/cierre de sesión y flujo completo de <strong>restablecimiento de contraseña</strong> por correo (SMTP configurable; backend de consola por defecto en desarrollo).</li><li>Redirección automática al dashboard correspondiente según el rol tras iniciar sesión.</li><li>Endurecimiento en producción: redirección HTTPS, cookies seguras, detección automática del dominio de Railway, <code>DEBUG</code>/<code>SECRET_KEY</code>/<code>ALLOWED_HOSTS</code> controlados por entorno.</li></ul>
+<hr>
+<h2>3. Gestión de casos (Módulo Expedientes)</h2>
+<h3>3.1 Clientes (`Cliente`)</h3>
+<p>Ficha de cliente enriquecida diseñada específicamente para la conciliación laboral:</p>
+<ul><li><strong>Identidad:</strong> nombre, <strong>CURP</strong> (único), RFC, teléfono, WhatsApp, correo, fecha de nacimiento, género.</li><li><strong>Domicilio particular:</strong> calle, número, código postal, colonia — se ensambla en <code>direccion_completa</code>.</li><li><strong>Datos del patrón:</strong> empresa, actividad económica, teléfono, razón social, domicilio completo y referencias.</li><li><strong>Tipo de persona del patrón</strong> (física / moral) — se usa en el formulario del portal de conciliación.</li><li><strong>Datos laborales:</strong> puesto, <strong>salario mensual</strong>, periodo de pago (diario/semanal/ quincenal/mensual), horas semanales, jornada (diurna/nocturna/mixta), fecha de ingreso, fecha de salida.</li><li><strong>Fuente de captación:</strong> cómo se enteró el cliente del despacho (Facebook, Google, recomendación, WhatsApp, TikTok, TV/radio, volante…).</li><li><strong>Asignación de oficina</strong> (Plaza Patria, Otay, CLT).</li><li><strong>Seguimiento de asesoría gratuita:</strong> si se ofreció la asesoría gratuita semanal, si se agendó y en qué fecha.</li><li>Indexado para búsquedas rápidas por CURP, nombre y fecha de asesoría.</li></ul>
+<h3>3.2 Expedientes (`Expediente`)</h3>
+<ul><li><strong>Numeración automática</strong> <code>AAAA-####</code> (año + secuencial), única y no editable.</li><li>Asignado a un <strong>asesor</strong> (asesor jurídico).</li><li><strong>Montos:</strong> monto reclamado (<code>monto_reclamado</code>) y monto de convenio (<code>monto_convenio</code>).</li><li><strong>Programación de audiencias</strong> con fecha/hora y resultado registrado.</li><li><strong>Datos de conciliación:</strong> tipo de despido (justificado/injustificado/voluntario/ rescisión/otro), prestaciones reclamadas, <strong>folio</strong> y fecha de trámite.</li><li><strong>Seguimiento:</strong> fecha de próxima acción, notas internas, prioridad (baja/media/alta).</li><li><strong>Interruptor de automatización WhatsApp por caso</strong> (<code>notificar_whatsapp_auto</code>).</li></ul>
+<h3>Máquina de estados con transiciones validadas</h3>
+<pre><code>nuevo → solicitud → citatorio → audiencia → no_notificado ─┐
+                                        ├→ reprogramacion ─┤
+                                        ├→ convenio ───────┤
+                                        ├→ sin_conciliacion─┼→ demanda → audiencia/convenio/cerrado
+                                        └→ cerrado (desde cualquier estado)</code></pre>
+<p>El modelo <strong>rechaza transiciones ilegales</strong> (ej. saltar de <code>nuevo</code> a <code>audiencia</code>) con un mensaje claro que enumera las transiciones permitidas. Cada estado tiene un color asociado para las insignias de la interfaz.</p>
+<h3>3.3 Documentos (`Documento`)</h3>
+<ul><li>Subida de PDFs/imágenes por caso con clasificación por tipo (INE, contrato, evidencia, screenshot/captura, citatorio, PDF, otro) y descripción; se registra quién subió y cuándo.</li><li>Organizados en disco por año/mes.</li></ul>
+<h3>3.4 Notas e historial de actividad</h3>
+<ul><li><strong>Notas</strong> — notas libres por caso con autor y fecha.</li><li><strong>Movimientos</strong> — rastro de auditoría automático de cada acción: creación, cambio de estado, actualización, subida de documento, nota agregada, resultado de audiencia (quién, cuándo, qué cambió).</li></ul>
+<h3>3.5 Notificaciones (campana)</h3>
+<p>Notificaciones internas para el usuario: transferencias, avisos, mensajes del sistema, recordatorios. Cada notificación puede llevar un enlace; se pueden marcar como leídas individualmente o <strong>todas de una vez</strong>.</p>
+<h3>3.6 Solicitudes de transferencia entre asesores</h3>
+<p>Cuando un asesor no puede asistir a una audiencia (conflicto de horario, etc.):</p>
+<ul><li>Solicita una <strong>transferencia</strong> del caso, opcionalmente sugiriendo un asesor destino, con un motivo obligatorio.</li><li>El área administrativa revisa la solicitud, opcionalmente <strong>reasigna</strong> a otro asesor y aprueba o rechaza con un comentario.</li><li>Estados: pendiente → aprobada / rechazada / cancelada. Las notificaciones mantienen informados a todos.</li></ul>
+<h3>3.7 Avisos obligatorios del administrador</h3>
+<ul><li>El administrador crea avisos/pendientes con título, contenido, prioridad y <strong>fecha de vencimiento opcional</strong> (se ocultan automáticamente al vencer).</li><li>Se muestran en el dashboard de todos los asesores y administradores; los usuarios pueden marcarlos como <strong>leídos/entendidos</strong> (se registra por usuario mediante M2M).</li></ul>
+<h3>3.8 Búsqueda global y filtros</h3>
+<ul><li><strong>Búsqueda global</strong> en expedientes, clientes, folios y empresas.</li><li>Filtros avanzados en la lista de expedientes; los asesores solo ven sus propios casos.</li></ul>
+<h3>3.9 Calendario</h3>
+<ul><li><strong>Calendario de audiencias</strong> (<code>calendario</code>) que agrega todas las audiencias programadas.</li></ul>
+<h3>3.10 Reportes y exportaciones</h3>
+<ul><li><strong>Exportación a Excel</strong> de expedientes.</li><li><strong>Reportes administrativos</strong> (<code>reportes_admin</code>) — productividad y totales por asesor.</li><li><strong>PDF por expediente</strong> (<code>pdf_expediente</code>) generado con WeasyPrint.</li></ul>
+<hr>
+<h2>4. Dashboards (por rol)</h2>
+<table><thead><tr><th>Dashboard</th><th>Qué muestra</th></tr></thead><tbody><tr><td><strong>Asesor</strong></td><td>KPIs personales, sus casos por estado, próximas acciones/audiencias, tareas pendientes, avisos</td></tr><tr><td><strong>Abogada</strong></td><td>Vista orientada a la abogada del despacho (casos y documentos)</td></tr><tr><td><strong>Admin</strong></td><td>Todos los casos, reportes de productividad, montos totales, avisos, acciones de exportación</td></tr><tr><td><strong>Finanzas</strong></td><td>KPIs financieros (ver módulo de Finanzas)</td></tr><tr><td><strong>Superadmin</strong></td><td>Panel de administración de la plataforma + matriz de permisos</td></tr></tbody></table>
+<hr>
+<h2>5. Motor de Cálculo Laboral (Cálculo Laboral)</h2>
+<h3>5.1 Reglas legales configurables (`LegalConfig`)</h3>
+<p>Todos los parámetros legales se almacenan en la base de datos y son editables desde el admin de Django — <strong>sin necesidad de tocar código cuando cambian las leyes</strong>:</p>
+<ul><li><strong>UMA</strong> diaria, salario mínimo general y <strong>salario mínimo de la zona libre de la frontera norte (ZLF)</strong>.</li><li><strong>Días de aguinaldo</strong> (mínimo legal: 15).</li><li><strong>% de prima vacacional</strong> (mínimo 25%).</li><li><strong>Prima de antigüedad:</strong> días por año (12) + tipo de tope salarial (2× UMA / 2× SM / 2× SM frontera) y múltiplo.</li><li><strong>Días de indemnización</strong> (3 meses = 90).</li><li>Solo una configuración puede estar *activa* a la vez; al guardar una se desactivan las demás.</li></ul>
+<h3>5.2 Tabla de vacaciones (Reforma LFT 2023)</h3>
+<p>El sistema implementa la tabla de vacaciones vigente en México (año 1 → 12 días, +2 por año hasta 20, después +2 cada 5 años), extrapolando más allá de la tabla cuando es necesario.</p>
+<h3>5.3 Conceptos calculados</h3>
+<table><thead><tr><th>Concepto</th><th>Artículo</th><th>Tipo</th></tr></thead><tbody><tr><td>Aguinaldo proporcional</td><td>Art. 87 LFT</td><td>automático</td></tr><tr><td>Vacaciones proporcionales</td><td>Art. 76 LFT</td><td>automático</td></tr><tr><td>Prima vacacional</td><td>Art. 80 LFT</td><td>automático</td></tr><tr><td>Prima de antigüedad (con indicador de tope)</td><td>Art. 162 LFT</td><td>automático</td></tr><tr><td>Indemnización constitucional (90 días)</td><td>Art. 50 LFT</td><td>automático</td></tr><tr><td>Indemnización 20 días por año</td><td>Art. 50-II LFT</td><td>automático</td></tr><tr><td>Vacaciones vencidas (días manuales)</td><td>Art. 76 LFT</td><td>semiautomático</td></tr><tr><td>Horas extras (horas manuales)</td><td>Art. 66-68 LFT</td><td>semiautomático</td></tr><tr><td>Salarios devengados (monto manual)</td><td>Art. 48 LFT</td><td>manual</td></tr><tr><td>Días festivos (días manuales)</td><td>Art. 75 LFT</td><td>semiautomático</td></tr></tbody></table>
+<h3>5.4 Cálculo por caso (`CalculoLaboral`)</h3>
+<ul><li>Un cálculo por expediente que guarda una <strong>instantánea de los datos de entrada</strong> para conservar el histórico.</li><li><strong>Casillas de verificación</strong> que permiten al asesor elegir qué conceptos incluir (con valores por defecto sensatos).</li><li><strong>Sustitución manual</strong> de los días de vacaciones realmente adeudados (cuando algunos años ya se pagaron o disfrutaron) — se muestra con el indicador *override aplicado*.</li><li>Muestra salario diario, días trabajados, años de servicio, desglose por concepto con referencia legal, advertencias de tope aplicado y <strong>total</strong>.</li><li><strong>Recálculo automático</strong> cuando cambian los datos del cliente/expediente o las reglas legales (<code>recalcular</code>).</li><li><strong>Simulación rápida</strong> (<code>simulacion-rapida</code>) — estimación instantánea para un prospecto sin crear un caso: captura salario + fechas y obtén el desglose completo.</li></ul>
+<hr>
+<h2>6. Generación de Documentos Legales</h2>
+<h3>6.1 Machotes (plantillas HTML reutilizables)</h3>
+<ul><li>Plantillas categorizadas como: <strong>Demanda Laboral, Carta Finiquito, Convenio, Solicitud, Citatorio, Otro</strong>; con jurisdicción (Federal / Estatal BC / Ambas), tipo de despido opcional, ícono, bandera de activo y orden.</li><li>Los machotes <strong>favoritos</strong> aparecen primero en el editor.</li><li>El cuerpo de la plantilla es HTML con <strong>marcadores</strong> como <code>{{ nombre }}</code>, <code>{{ empresa }}</code>, etc.</li></ul>
+<h3>6.2 Motor de inyección de marcadores (`marcadores.py`)</h3>
+<ul><li>~40 marcadores con <strong>datos reales del caso</strong>: cliente, empresa, expediente, fechas (en español, ej. "1 de enero de 2024"), formato de salarios <strong>y prestaciones calculadas</strong> (aguinaldo, vacaciones, indemnización…) obtenidas automáticamente del motor de cálculo.</li><li>Los datos faltantes se muestran como marcadores visibles (<code>[CURP]</code>, <code>[MONTO]</code>, …) en lugar de espacios en blanco o errores — el usuario sabe exactamente qué completar.</li><li><strong>Verificador de completitud</strong>: lista qué campos están completos/incompletos por sección (Cliente, Empleo, Empresa, Expediente) con <strong>enlaces directos de edición</strong> y un porcentaje de completitud.</li></ul>
+<h3>6.3 Flujo de documentos</h3>
+<ol start="1"><li>Elegir un machote del catálogo (o desde el expediente).</li><li><strong>Preparar</strong> — ver qué datos faltan y corregirlos con un clic.</li><li><strong>Editar/vista previa</strong> del documento renderizado en el navegador.</li><li><strong>Generar/descargar</strong> como PDF.</li><li>Opcionalmente <strong>guardar el documento editado como nuevo machote</strong> (la biblioteca de plantillas del equipo crece de forma orgánica).</li></ol>
+<h3>6.4 Importar machotes desde Word</h3>
+<ul><li>Los archivos <code>.docx</code> (ej. una carpeta con demandas existentes) se convierten en plantillas HTML mediante el comando <code>importar_machotes</code> o la importación web, conservando los marcadores cuando es posible.</li><li>La biblioteca de plantillas se administra desde el admin de Django o desde la interfaz de machotes.</li></ul>
+<h3>6.5 Generador de Demanda Laboral (`demanda_generator.py`)</h3>
+<ul><li>Genera una <strong>demanda laboral mexicana profesional</strong> (Word <code>.docx</code>) con todos los datos del caso, cálculos integrados y formato listo para imprimir y firmar.</li><li>Un <strong>asistente paso a paso</strong> (<code>demanda_asistente</code>) guía por las secciones de la demanda; un <strong>generador directo</strong> produce el documento en un solo clic.</li><li>Se descarga como <code>.docx</code> para edición/firma.</li></ul>
+<hr>
+<h2>7. Automatización de Conciliación (Portal de Baja California)</h2>
+<p>El sistema se integra con el portal oficial <code>app.conciliacionbc.gob.mx</code> en <strong>dos modos</strong>.</p>
+<h3>7.1 Automatización del lado del servidor (`conciliacion_automation.py` + Celery)</h3>
+<ul><li>Llena el flujo real de varias fases del portal: aviso de privacidad → industria → fecha del conflicto y objeto → trabajador (solicitante) → empresa (citado) → descripción → envío.</li><li>Se ejecuta <strong>headless</strong> (servidor) o en <strong>modo visible/debug</strong>.</li><li>Se ejecuta de forma asíncrona mediante un <strong>worker de Celery</strong> (o fallback con threads si no hay Redis) para que las peticiones HTTP nunca expiren.</li><li>Página de progreso en vivo (<code>conciliacion_procesando</code>) que muestra <strong>capturas de pantalla del navegador</strong> y el tiempo transcurrido; soporta reintentos.</li><li>Al completarse: captura el <strong>folio</strong>, guarda el <strong>PDF del acuse</strong> en el expediente y marca la TareaConciliacion como completada con bitácoras completas.</li><li>Comando de gestión <code>enviar_solicitud_conciliacion</code> para envíos por lotes/CLI.</li></ul>
+<h3>7.2 Parser de acuse (`acuse_parser.py`)</h3>
+<p>Cuando hay un PDF de acuse oficial disponible (descargado automáticamente o subido manualmente), el sistema <strong>extrae su texto con PyMuPDF</strong> y autocompleta el expediente:</p>
+<ul><li>Folio (ej. <code>TIJ/26427/2026</code>), fecha de solicitud, solicitante, empresa citada, fecha del conflicto, objeto, unidad de conciliación.</li><li><strong>Mapea el objeto de la conciliación → tipo de despido</strong> (ej. "Despido" → injustificado).</li><li><strong>Pantalla de vista previa</strong> que compara los valores detectados con los actuales (marcando los nuevos o los que difieren) y permite al asesor <strong>confirmar</strong> antes de guardar.</li></ul>
+<h3>7.3 Extensión de Chrome — "Conciliación BC Asistente"</h3>
+<p>Para cuando se detecta navegación automatizada o hay que resolver un CAPTCHA a mano, la <strong>extensión de Chrome complementaria (Manifest V3)</strong> llena el formulario del portal <strong>en el navegador del propio asesor</strong>:</p>
+<ul><li>El asesor hace clic en *Enviar a Conciliación → Desde mi navegador (Extensión de Chrome)*.</li><li>La extensión muestra las tareas pendientes (número de expediente, cliente, empresa, CURP) en su popup.</li><li><strong>🚀 Llenar en el portal</strong> abre el portal con el formulario <strong>ya llenado</strong> (aviso de privacidad, industria, fechas, trabajador, empresa, descripción) mediante un content script — el portal ve una sesión dirigida por una persona.</li><li>El asesor revisa, resuelve CAPTCHAs en vivo y hace clic en *Enviar solicitud* él mismo.</li><li><strong>🔍 Ya envié, detectar acuse</strong> — la extensión detecta el folio, descarga el PDF del acuse, toma una captura de pantalla y <strong>reporta todo a la API de la aplicación</strong> (autenticada con el token personal del usuario), adjuntando el PDF al expediente.</li><li>Pantalla de opciones que guarda la URL de la app + token y verifica la conexión.</li><li>El paquete de la extensión se puede <strong>descargar como .zip</strong> desde la app (<code>/extension/descargar/</code>), listo para cargarse descomprimido en Chrome.</li></ul>
+<h3>7.4 Fallbacks manuales</h3>
+<ul><li>Subir el PDF del acuse manualmente (<code>subir-conciliacion</code>) y luego previsualizar/ confirmar los datos parseados.</li><li>Descargar un <strong>formulario de conciliación prellenado (PDF)</strong> para presentarlo manualmente en el centro.</li><li>Subir el acuse mediante el flujo normal de documentos.</li></ul>
+<hr>
+<h2>8. Integración con WhatsApp</h2>
+<p>Dos métodos de envío:</p>
+<ol start="1"><li><strong>Deep links (wa.me)</strong> — gratis; abre WhatsApp con un mensaje pre-llenado.</li><li><strong>API de WhatsApp de Twilio</strong> — mensajes enviados desde el servidor (requiere credenciales de Twilio); cae automáticamente al deep link cuando no está configurado.</li></ol>
+<h3>Funcionalidades</h3>
+<ul><li><strong>Plantillas</strong> para: recordatorio de audiencia, citatorio, seguimiento de convenio, seguimiento general, solicitud de documentos y mensajes personalizados — con variables (<code>{cliente}</code>, <code>{fecha}</code>, <code>{asesor}</code>…).</li><li><strong>Mensajes automáticos por cambio de estado</strong>: cada estado del expediente tiene un mensaje configurado (caso nuevo, solicitud creada, citatorio, audiencia, no notificado, reprogramación, convenio, sin conciliación, demanda, cerrado). Interruptor por caso para activar/desactivar.</li><li><strong>Historial de mensajes</strong> por caso con estado (pendiente/enviado/fallido), canal y bitácoras de error.</li><li>Normalización de números mexicanos (agrega el código de país 52 y limpia formatos comunes).</li><li>Comando de gestión <code>enviar_whatsapp_automatico</code> para vaciar mensajes pendientes (con opciones <code>--dry-run</code> y <code>--send-twilio</code>).</li></ul>
+<hr>
+<h2>9. Importaciones y utilidades</h2>
+<h3>9.1 Importación CLT (citas desde Excel)</h3>
+<p>El archivo <code>CLT.xlsx</code> (citas de conciliación pre-programadas del CCL) se importa como <strong>expedientes con audiencias programadas</strong>:</p>
+<ul><li>Importación por hoja (ej. pestañas mensuales), <strong>creación automática de usuarios asesores</strong> encontrados en el archivo si es necesario, y opciones de limpieza para datos de prueba.</li><li>La CURP es opcional al importar y se captura después (para que los números fluyan rápido).</li></ul>
+<h3>9.2 Catálogo de empresas (`Empresa`)</h3>
+<ul><li>Importación desde <code>Empresas y Domicilios.xlsx</code> — <strong>idempotente</strong>, nombres normalizados (mayúsculas, sin acentos, espacios compactados) para que reimportar un archivo en crecimiento nunca duplique registros.</li><li>Tipo de persona detectado automáticamente; el domicilio desglosado se usa para el <strong>autocompletado en el formulario de cliente</strong> (endpoint AJAX <code>empresas/buscar/</code>).</li></ul>
+<h3>9.3 Generador de CURP</h3>
+<p>Herramienta independiente para <strong>generar una CURP válida</strong> a partir de los datos personales (nombre, fecha de nacimiento, género, estado) — ahorra búsquedas manuales al dar de alta clientes.</p>
+<h3>9.4 Ajustes del usuario</h3>
+<p>Página de ajustes por usuario: información del perfil, teléfono, preferencia de automatización de WhatsApp, gestión del token de API y configuración de la extensión.</p>
+<hr>
+<h2>10. Módulo de Finanzas</h2>
+<p>Organizado por <strong>oficina</strong> (sucursal) y por <strong>semana de trabajo</strong> para reportes operativos.</p>
+<h3>10.1 Oficinas</h3>
+<p>Catálogo de oficinas del despacho con dirección, teléfono, responsable y bandera de activa. Cada oficina tiene su propia operación de ingresos/gastos/caja diaria.</p>
+<h3>10.2 Semanas de trabajo</h3>
+<p>El sistema financiero gira alrededor de <strong>semanas</strong> (lunes–domingo): la semana actual se crea automáticamente; cada movimiento se puede atribuir a una semana. Las semanas se pueden abrir/cerrar. Totales por semana: <strong>ingresos</strong> (caja + pagos de convenios), <strong>gastos</strong> (caja + gastos + nómina) y <strong>balance</strong>, calculados dinámicamente.</p>
+<h3>10.3 Pagos de convenios (`SettlementPayment`)</h3>
+<p>Pagos recibidos por acuerdos (convenios): fecha, cliente, expediente, monto, forma de pago (efectivo/transferencia/cheque/tarjeta crédito/tarjeta débito/depósito/otro), oficina, notas y responsable del registro.</p>
+<h3>10.4 Gastos (`Expense`)</h3>
+<p>Gastos operativos por oficina con categoría (renta, luz, agua, internet, teléfono, papelería, publicidad, sueldos, gasolina, mantenimiento, impuestos, equipo, muebles, seguros, honorarios, otro), proveedor, folio fiscal/factura y responsable del registro.</p>
+<h3>10.5 Convenios y honorarios (`Agreement` / `Honorario`)</h3>
+<ul><li><strong>Convenios</strong> con el cliente: monto, estado (pendiente de firma → firmado → pagado / pagado parcialmente / cancelado), responsable, oficina y <strong>total de honorarios automático</strong>.</li><li><strong>Honorarios:</strong> una o varias partidas por convenio con un <strong>% de tarifa</strong> (25/30/35/40/50%); el monto se calcula automáticamente (<code>convenio × % ÷ 100</code>), con fechas estimada/pagada y sumas de pagado/pendiente agregadas en el convenio.</li></ul>
+<h3>10.6 Comisiones (`Commission`)</h3>
+<p>Comisiones de asesores sobre convenios cerrados: % configurable, <strong>monto calculado automáticamente</strong>, estado (pendiente/pagada/cancelada), fecha de pago, oficina y responsable del registro.</p>
+<h3>10.7 Empleados y nómina (`Employee` / `Payroll`)</h3>
+<ul><li>Catálogo de empleados con puesto (administrativo, asesor jurídico, supervisor, contador, recepcionista, auxiliar, director…), periodo de pago, salario, oficina y bandera de activo.</li><li><strong>Pagos de nómina</strong> por período: tipo de período (semanal/quincenal/mensual/ extraordinario/aguinaldo/prima vacacional/bono), rango del período, salario pagado, descuentos (ISR/IMSS) y <strong>total calculado automáticamente</strong> (<code>salario − descuentos</code>), oficina y responsable del registro.</li></ul>
+<h3>10.8 Caja diaria (`CashMovement`)</h3>
+<p>Movimientos de caja por oficina y fecha: <strong>ingresos</strong> (pago de convenio, pago de cliente, anticipo, devolución, otro) o <strong>egresos</strong> (papelería, gasolina, renta, luz, agua, internet, teléfono, viáticos, comisiones, honorarios, otro). La coherencia entre categoría y tipo se <strong>valida</strong> (ej. un ingreso no puede tener categoría de egreso). El campo de referencia vincula el movimiento al expediente/factura.</p>
+<h3>10.9 Socios, préstamos y distribución de utilidades</h3>
+<ul><li><strong>Socios (`Partner`):</strong> % de participación por socio para el reparto de utilidades.</li><li><strong>Préstamos entre socios (`PartnerLoan`):</strong> registro formal de préstamos entre socios (origen → destino, monto, concepto, estado, saldo pendiente), que reemplaza las notas informales tipo "le debo a…".</li><li><strong>Distribución de utilidades (`ProfitDistribution` + `PartnerProfit`):</strong></li><li>Calcula automáticamente la <strong>utilidad neta</strong> = monto del convenio − honorarios − comisiones − retenciones − gastos relacionados.</li><li>La distribuye entre los socios según su % de participación (<strong>participación individual calculada automáticamente</strong>), con estados (borrador → distribuida → confirmada/cancelada).</li><li><strong>Resúmenes acumulados por socio</strong> (generada / pagada / pendiente) que se actualizan automáticamente al confirmar distribuciones.</li></ul>
+<h3>10.10 Dashboard financiero</h3>
+<ul><li>KPIs por oficina y globales; <strong>flujo de caja mensual</strong> con gráfica alimentada por el endpoint JSON <code>api_flujo_mensual</code>; <strong>exportación a Excel</strong> de los totales del dashboard.</li><li><strong>Reporte de convenios</strong> (<code>reporte_convenios</code>) con exportación a Excel.</li></ul>
+<hr>
+<h2>11. Comandos de gestión (CLI)</h2>
+<table><thead><tr><th>Comando</th><th>Propósito</th></tr></thead><tbody><tr><td><code>crear_usuarios_prueba</code></td><td>Crear usuarios de prueba (1 superadmin, 4 admins, 15 asesores)</td></tr><tr><td><code>seed_datos</code> / <code>seed_clientes_prueba</code></td><td>Sembrar casos demo (10 escenarios laborales / clientes completos con cálculos)</td></tr><tr><td><code>enviar_recordatorios</code></td><td>Enviar recordatorios de próximas acciones/audiencias (<code>--days</code>, <code>--dry-run</code>)</td></tr><tr><td><code>enviar_solicitud_conciliacion</code></td><td>Enviar solicitudes de conciliación al portal de BC desde CLI (<code>--headless</code>)</td></tr><tr><td><code>enviar_whatsapp_automatico</code></td><td>Vaciar mensajes automáticos de WhatsApp pendientes (<code>--dry-run</code>, <code>--send-twilio</code>)</td></tr><tr><td><code>importar_clt</code></td><td>Importar citas de CLT.xlsx como expedientes con audiencias</td></tr><tr><td><code>importar_empresas</code></td><td>Importar el catálogo de empresas y domicilios (idempotente)</td></tr><tr><td><code>importar_machotes</code></td><td>Convertir plantillas <code>.docx</code> en machotes (<code>--reload</code>, <code>--file</code>)</td></tr><tr><td><code>migrate_sqlite_to_pg</code></td><td>Migración única de datos de SQLite a PostgreSQL</td></tr></tbody></table>
+<hr>
+<h2>12. Resumen de integraciones</h2>
+<table><thead><tr><th>Servicio</th><th>Uso</th><th>Configuración</th></tr></thead><tbody><tr><td><strong>Selenium</strong></td><td>Automatización del portal (headless/debug)</td><td>incluido</td></tr><tr><td><strong>Celery + Redis</strong></td><td>Tareas en segundo plano (automatización de conciliación); fallback con threads</td><td><code>REDIS_URL</code></td></tr><tr><td><strong>Twilio</strong></td><td>Envío por API de WhatsApp (opcional)</td><td>variables de entorno <code>TWILIO_*</code></td></tr><tr><td><strong>SMTP</strong></td><td>Correos de restablecimiento de contraseña (backend de consola en desarrollo)</td><td>variables de entorno <code>EMAIL_*</code></td></tr><tr><td><strong>WeasyPrint</strong></td><td>Generación de PDFs (expediente, documentos)</td><td>incluido</td></tr><tr><td><strong>python-docx</strong></td><td>Generación de demandas en Word (.docx)</td><td>incluido</td></tr><tr><td><strong>PyMuPDF (fitz)</strong></td><td>Extracción de texto de los PDFs de acuse</td><td>incluido</td></tr><tr><td><strong>openpyxl</strong></td><td>Importaciones (CLT, empresas) y exportaciones a Excel</td><td>incluido</td></tr><tr><td><strong>API de la extensión de Chrome</strong></td><td>Endpoints REST autenticados con token para la extensión</td><td><code>api_token</code> personal</td></tr><tr><td><strong>Railway</strong></td><td>Despliegue; detecta automáticamente dominio, PostgreSQL y Redis</td><td>variables de entorno</td></tr></tbody></table>
+<hr>
+<h2>13. Arquitectura y notas técnicas</h2>
+<ul><li><strong>Backend:</strong> Django 5.x, locale <code>es-mx</code>, zona horaria <code>America/Mexico_City</code>.</li><li><strong>Base de datos:</strong> SQLite (desarrollo) / PostgreSQL (producción) vía <code>DATABASE_URL</code>; detección automática del entorno de Railway (<code>PGHOST</code>…).</li><li><strong>Frontend:</strong> Tailwind CSS (CDN) + <strong>HTMX</strong> para interacciones dinámicas (sin framework JS pesado); diseño responsive.</li><li><strong>Archivos estáticos:</strong> Whitenoise (<code>CompressedManifestStaticFilesStorage</code>) para servir en producción sin Nginx.</li><li><strong>Trabajo en segundo plano:</strong> Celery cuando hay Redis, <strong>fallback con threads</strong> en caso contrario (degradación elegante para desarrollo local).</li><li><strong>Auditabilidad:</strong> cada entidad clave (pagos, gastos, nómina, caja, préstamos, distribuciones, comisiones) registra <code>registrado_por</code>/<code>creado_por</code>.</li><li><strong>Despliegue:</strong> Dockerfile, configuración de Railway, entrypoint (levanta el worker de Celery automáticamente cuando existe Redis), receta de Nginx + Gunicorn para VPS (droplet) y guía de despliegue para clientes.</li></ul>
+<hr>
+<h2>14. Pruebas</h2>
+<p>La suite incluye <strong>48 pruebas</strong> (expedientes, finanzas, automatización) que cubren la validación de transiciones de estado, los cálculos financieros y el script de verificación <code>verify_demandas_calculos.py</code> (usado por CI). Ejecución:</p>
+<pre><code>uv run python manage.py test</code></pre>
+<hr>
+<h2>15. Inicio rápido (desarrollo)</h2>
+<pre><code>uv sync                          # instalar dependencias
+uv run python manage.py migrate  # migraciones de BD
+uv run python manage.py crear_usuarios_prueba
+uv run python manage.py runserver</code></pre>
+<p>Accesos de prueba: <code>superadmin/Admin123!</code> · <code>admin1/Admin1!</code> · <code>asesor1/Asesor1!</code></p>
+</section>
+<section class="documento">
+<div class="cabecera-doc">Conciliación Laboral Tijuana &mdash; Manual de Usuario</div>
+<h1>📘 Manual de Usuario — Despacho Laboral</h1>
+<blockquote><strong>Para:</strong> Asesores, personal administrativo (admins) y superadmin <strong>Sistema:</strong> Conciliación Laboral Tijuana — Despacho Laboral <strong>Versión:</strong> 1.0 · Agosto 2026</blockquote>
+<p>Este manual explica <strong>paso a paso</strong> cómo hacer el trabajo diario en el sistema: desde crear un cliente y su expediente, hasta enviar la conciliación al portal, generar documentos legales, comunicarte con el cliente por WhatsApp y gestionar los reportes.</p>
+<hr>
+<h2>Índice</h2>
+<ol start="1"><li><a href="#1-primeros-pasos">Primeros pasos</a></li><li><a href="#2-el-dashboard-del-asesor">El dashboard del asesor</a></li><li><a href="#3-registrar-un-cliente">Registrar un cliente</a></li><li><a href="#4-crear-un-expediente-caso">Crear un expediente (caso)</a></li><li><a href="#5-la-ficha-del-expediente">La ficha del expediente</a></li><li><a href="#6-cálculos-laborales">Cálculos laborales</a></li><li><a href="#7-solicitud-de-conciliación">Solicitud de conciliación</a></li><li><a href="#8-enviar-al-portal-de-conciliación">Enviar al portal de conciliación</a></li><li><a href="#9-extensión-de-chrome">Extensión de Chrome</a></li><li><a href="#10-documentos-legales-machotes-y-demanda">Documentos legales (machotes y demanda)</a></li><li><a href="#11-whatsapp">WhatsApp</a></li><li><a href="#12-transferencias-de-casos">Transferencias de casos</a></li><li><a href="#13-notificaciones-y-avisos">Notificaciones y avisos</a></li><li><a href="#14-sección-de-administración">Sección de administración</a></li><li><a href="#15-búsqueda-global">Búsqueda global</a></li><li><a href="#16-solución-de-problemas-comunes">Solución de problemas comunes</a></li><li><a href="#17-referencia-rápida-de-estados">Referencia rápida de estados</a></li></ol>
+<hr>
+<h2>1. Primeros pasos</h2>
+<h3>1.1 Iniciar sesión</h3>
+<ol start="1"><li>Abre la URL de la aplicación en tu navegador (Chrome recomendado).</li><li>Escribe tu <strong>usuario</strong> y <strong>contraseña</strong>.</li><li>Presiona <strong>Iniciar sesión</strong>.</li></ol>
+<p>Al entrar, el sistema te lleva automáticamente a tu dashboard según tu rol (asesor → dashboard del asesor; admin → dashboard administrativo).</p>
+<h3>1.2 ¿Olvidaste tu contraseña?</h3>
+<ol start="1"><li>En la pantalla de login, haz clic en <strong>¿Olvidaste tu contraseña?</strong></li><li>Escribe tu correo y presiona <strong>Enviar</strong>.</li><li>Abre el correo y sigue el enlace para crear una nueva contraseña.</li></ol>
+<h3>1.3 Cerrar sesión</h3>
+<p>Usa el botón <strong>Salir</strong> en el menú superior. Cierra sesión siempre que te alejes de tu equipo.</p>
+<h3>1.4 Navegación general</h3>
+<ul><li><strong>Menú superior:</strong> accesos a tu dashboard, expedientes, clientes, calendario, reportes (según tu rol) y tu nombre de usuario (para cerrar sesión).</li><li><strong>🔔 Campana de notificaciones:</strong> avisos del sistema, transferencias y recordatorios. Haz clic en una notificación para ir a donde te lleva.</li><li><strong>🔍 Búsqueda global:</strong> siempre disponible en la parte superior.</li></ul>
+<hr>
+<h2>2. El dashboard del asesor</h2>
+<p>Al entrar verás tu panel personal con:</p>
+<table><thead><tr><th>Sección</th><th>Qué contiene</th></tr></thead><tbody><tr><td><strong>Avisos y Pendientes de la Semana</strong></td><td>Avisos obligatorios del administrador (🔴 alta, 🟡 media, 🟢 baja prioridad). Léelos y márcalos como vistos cuando el administrador lo pida.</td></tr><tr><td><strong>Tarjetas de estadísticas</strong></td><td>Total de casos, casos activos, casos cerrados, pendientes y <strong>alertas</strong> (casos que requieren tu atención).</td></tr><tr><td><strong>Próximas Audiencias</strong></td><td>Tus audiencias programadas con fecha y hora. Haz clic para abrir el expediente.</td></tr><tr><td><strong>Próximas Asesorías Gratuitas</strong></td><td>Clientes con asesoría gratuita agendada. Haz clic para ver/editar al cliente.</td></tr><tr><td><strong>Mis Casos Recientes</strong></td><td>Tus casos más recientes con número, cliente, estado y prioridad. Botón <strong>Ver</strong> para abrir cada uno y <strong>Ver todos →</strong> para la lista completa.</td></tr></tbody></table>
+<blockquote>⚠️ <strong>Importante:</strong> como asesor solo ves <strong>tus</strong> casos. Si un caso no aparece, probablemente está asignado a otro asesor o aún no te lo asignan.</blockquote>
+<hr>
+<h2>3. Registrar un cliente</h2>
+<ol start="1"><li>Ve a <strong>Clientes → Nuevo cliente</strong> (o desde el dashboard, en el menú superior).</li><li>Llena los datos en secciones:</li></ol>
+<ul><li><strong>Identidad:</strong> nombre completo, CURP, RFC, teléfono, WhatsApp, correo, fecha de nacimiento y género.</li><li><strong>Dirección particular:</strong> calle, número, código postal y colonia.</li><li><strong>Datos del patrón (empresa):</strong> nombre, actividad económica, teléfono, razón social, domicilio y referencias.</li><li><strong>Empleo:</strong> puesto, salario mensual, periodo de pago, horas semanales, jornada, fecha de ingreso y fecha de salida/despido.</li><li><strong>Captación y oficina:</strong> cómo se enteró del despacho y qué oficina atendió (Plaza Patria, Otay, CLT).</li><li><strong>Asesoría gratuita:</strong> marca si se ofreció, si se agendó y la fecha.</li></ul>
+<ol start="3"><li>Consejos:</li></ol>
+<ul><li><strong>CURP:</strong> si no la tienes, usa el <strong>Generador de CURP</strong> (sección utilidades) y cópiala.</li><li><strong>Empresa:</strong> escribe el nombre y usa el <strong>buscador de empresas</strong> que aparece para autocompletar nombre y domicilio del catálogo. Si no aparece, captúralo a mano.</li></ul>
+<ol start="4"><li>Presiona <strong>Guardar</strong>.</li></ol>
+<blockquote>💡 <strong>Dato clave:</strong> mientras más completo esté el cliente, más automático será todo lo demás (formularios, documentos y envío al portal). Los datos del cliente se usan en TODOS los documentos.</blockquote>
+<hr>
+<h2>4. Crear un expediente (caso)</h2>
+<ol start="1"><li>Ve a <strong>Expedientes → Nuevo expediente</strong>.</li><li>Selecciona el <strong>cliente</strong> (busca por nombre o CURP). Si no existe, créalo primero.</li><li>Selecciona el <strong>asesor asignado</strong> (por defecto eres tú).</li><li>Completa los datos del caso:</li></ol>
+<ul><li><strong>Monto reclamado</strong> y <strong>monto convenio</strong> (si ya hay acuerdo).</li><li><strong>Tipo de despido</strong> (justificado, injustificado, voluntario, rescisión, otro).</li><li><strong>Prestaciones reclamadas</strong> (texto libre).</li><li><strong>Fecha de audiencia</strong>, <strong>próxima acción</strong> y <strong>prioridad</strong> (baja/media/alta).</li><li><strong>Notas internas</strong> (opcional).</li></ul>
+<ol start="5"><li>Presiona <strong>Guardar</strong>.</li></ol>
+<p>El sistema genera el <strong>número de expediente automáticamente</strong> (formato <code>AAAA-####</code>, ej. <code>2026-0042</code>) — no lo puedes cambiar.</p>
+<hr>
+<h2>5. La ficha del expediente</h2>
+<p>Al abrir un expediente (<code>Ver</code> en tu lista) encuentras todo el caso en una sola pantalla:</p>
+<h3>5.1 Barra de acciones (parte superior)</h3>
+<table><thead><tr><th>Botón</th><th>Qué hace</th></tr></thead><tbody><tr><td><strong>Cálculos</strong></td><td>Abre el cálculo laboral del caso.</td></tr><tr><td><strong>WhatsApp</strong></td><td>Envía mensajes al cliente.</td></tr><tr><td><strong>Solicitud</strong></td><td>Llena el formato oficial de solicitud de conciliación.</td></tr><tr><td><strong>🌐 Conciliación ▾</strong></td><td>Menú desplegable con: Envío Automático, Descargar Formulario (PDF) y Subir Acuse manual.</td></tr><tr><td><strong>Documentos</strong></td><td>Catálogo de machotes para generar documentos (solo si tienes permiso).</td></tr><tr><td><strong>Demanda / Asistente de Demanda</strong></td><td>Genera la demanda laboral (solo si tienes permiso).</td></tr><tr><td><strong>Transferir</strong></td><td>Solicita transferir el caso a otro asesor.</td></tr><tr><td><strong>Editar / Editar Cliente</strong></td><td>Modifica el expediente o los datos del cliente.</td></tr><tr><td><strong>PDF</strong></td><td>Descarga el expediente en PDF.</td></tr></tbody></table>
+<h3>5.2 Información del caso</h3>
+<ul><li>Asesor, cliente (con CURP), empresa, oficina, fecha de creación.</li><li><strong>Formulario de Conciliación:</strong> tipo de despido, folio de trámite, fecha de trámite, resultado de audiencia y prestaciones reclamadas.</li><li><strong>Montos:</strong> monto reclamado y monto convenio.</li><li><strong>Fechas:</strong> audiencia, próxima acción, última actualización.</li><li><strong>Notas internas</strong> del expediente.</li></ul>
+<h3>5.3 Cambiar el estado del caso</h3>
+<ol start="1"><li>En el bloque <strong>Cambiar Estado</strong>, el sistema muestra <strong>solo las transiciones permitidas</strong> desde el estado actual (botones de colores).</li><li>Haz clic en el estado nuevo (ej. <strong>Solicitud creada</strong> cuando envíes la solicitud).</li><li>La página se recarga y el estado queda actualizado. El sistema <strong>no permite saltos inválidos</strong> (ej. de "Nuevo" a "Audiencia" directamente).</li></ol>
+<h3>5.4 Registrar el resultado de una audiencia</h3>
+<p>Cuando el caso está en <strong>Audiencia programada</strong>, aparece el bloque <strong>Registrar Resultado de Audiencia</strong> con 4 tarjetas:</p>
+<ul><li>❌ <strong>No notificado</strong> → se genera una nueva audiencia.</li><li>🤝 <strong>Convenio</strong> → te pide capturar el <strong>monto del convenio</strong> antes de guardar.</li><li>🚫 <strong>Sin conciliación</strong> → el caso queda listo para preparar la demanda.</li><li>🔄 <strong>Reprogramar</strong> → nueva fecha.</li></ul>
+<p>Haz clic en la tarjeta correspondiente; si es convenio, escribe el monto y confirma.</p>
+<h3>5.5 Documentos del caso</h3>
+<ol start="1"><li>En el bloque <strong>Documentos</strong>, selecciona el archivo (PDF, imagen…).</li><li>Escribe una <strong>descripción</strong> (ej. "INE del cliente") y elige el <strong>tipo</strong> (INE, contrato, evidencia, screenshot, citatorio, PDF, otro).</li><li>Presiona <strong>Subir Documento</strong>.</li><li>Cada documento muestra quién lo subió y cuándo. Puedes abrirlo (clic en el nombre) o eliminarlo con <strong>Eliminar</strong>.</li></ol>
+<h3>5.6 Notas y seguimiento</h3>
+<ul><li>Escribe una nota en <strong>Notas y Seguimiento</strong> y presiona <strong>Agregar Nota</strong>.</li><li>Las notas quedan en un <strong>timeline</strong> con autor y fecha (como un chat interno del caso).</li><li>La <strong>Línea de Tiempo</strong> al final muestra todo el historial de movimientos del expediente (creación, cambios de estado, documentos, notas, audiencias).</li></ul>
+<hr>
+<h2>6. Cálculos laborales</h2>
+<h3>6.1 Calcular prestaciones de un caso</h3>
+<ol start="1"><li>Abre el expediente y presiona <strong>Cálculos</strong> (o desde la lista de expedientes).</li><li>Revisa los datos base (salario, fechas, periodo de pago). El sistema calcula el <strong>salario diario</strong>, <strong>días trabajados</strong> y <strong>años de servicio</strong>.</li><li>Marca/desmarca con <strong>checkboxes</strong> qué conceptos incluir (aguinaldo, vacaciones, prima vacacional, prima de antigüedad, indemnización 90 días, 20 días por año, vacaciones vencidas, horas extras, salarios devengados, días festivos).</li><li>Para conceptos semiautomáticos, captura los datos extra (ej. <strong>días de vacaciones vencidas</strong>, <strong>cantidad de horas extra</strong>, <strong>días festivos</strong>).</li><li>Presiona <strong>Calcular / Guardar</strong>. Verás el <strong>desglose por concepto</strong> con su artículo de la LFT, el <strong>tope aplicado</strong> (si aplica) y el <strong>total</strong>.</li></ol>
+<blockquote>💡 <strong>Override de vacaciones:</strong> si el caso no corresponde a los días por antigüedad (ej. ya se pagaron algunos años), captura en el campo "Días de vacaciones a pagar (manual)" los días realmente adeudados. El sistema lo indica con la bandera *override aplicado*.</blockquote>
+<h3>6.2 Simulación rápida (sin crear caso)</h3>
+<ol start="1"><li>Ve a <strong>Simulación Rápida</strong> (sección cálculos).</li><li>Captura salario, fechas de ingreso y salida, y periodo de pago.</li><li>Presiona <strong>Simular</strong> para ver el desglose completo. Ideal para cotizar una asesoría antes de abrir el caso.</li></ol>
+<blockquote>⚠️ Los valores legales (UMA, salario mínimo, días de aguinaldo, etc.) los actualiza el administrador. No modifiques nada en el panel de admin de Django a menos que sepas lo que haces.</blockquote>
+<hr>
+<h2>7. Solicitud de conciliación</h2>
+<p>El formato oficial <strong>"Solicitud de Conciliación"</strong> del Centro de Conciliación Laboral de Baja California se llena con los datos del expediente (la mayoría vienen prellenados y solo se editan desde la ficha del cliente).</p>
+<ol start="1"><li>Abre el expediente y presiona <strong>Solicitud</strong>.</li><li>Revisa los datos del trabajador, dirección, empleo y empresa (son de solo lectura).</li><li>Captura lo que sí se edita:</li></ol>
+<ul><li><strong>Fecha del conflicto</strong>, <strong>horas semanales</strong>, <strong>periodo de pago</strong>.</li><li><strong>Objeto de la solicitud</strong> (puedes marcar varios: Despido, Terminación voluntaria, Derecho de antigüedad, Rescisión, Pago de prestaciones, Preferencia, Ascenso, Acoso laboral).</li><li><strong>Quién entregará el citatorio</strong> (el solicitante o el notificador del centro).</li><li><strong>Discapacidad</strong> (motriz, visual, auditiva, psicosocial, habla) si aplica.</li><li><strong>Traductor</strong> (señas / lengua de origen) si aplica.</li><li><strong>Firma:</strong> nombre del firmante y fecha.</li></ul>
+<ol start="4"><li>Opciones al terminar:</li></ol>
+<ul><li><strong>💾 Guardar borrador</strong> — guarda en tu navegador (mismo equipo) para continuar después.</li><li><strong>✅ Guardar solicitud</strong> — guarda el formato en el expediente.</li></ul>
+<ol start="5"><li>Puedes <strong>Imprimir</strong> el formato desde el botón superior.</li></ol>
+<hr>
+<h2>8. Enviar al portal de conciliación</h2>
+<p>El envío al portal oficial (<code>app.conciliacionbc.gob.mx</code>) tiene <strong>3 modos</strong>. En el expediente, abre <strong>🌐 Conciliación ▾ → Envío Automático</strong> y elige:</p>
+<h3>Modo A — 🤖 Automático (Headless) *(recomendado)*</h3>
+<ol start="1"><li>En la pantalla de confirmación, revisa el <strong>resumen de datos</strong> que se enviarán (cliente, CURP, teléfono, empresa, tipo de despido, folio actual).</li><li>Si el expediente ya tiene folio, el sistema te lo advierte (se generará uno nuevo).</li><li>Selecciona <strong>Automático (Headless)</strong> y presiona <strong>🚀 Enviar al Portal de Conciliación</strong>.</li><li>El navegador automatizado trabaja en segundo plano; la página te muestra el <strong>progreso en vivo</strong> con capturas de pantalla y tiempo transcurrido.</li><li>Al terminar, el sistema <strong>guarda el folio</strong> en el expediente y <strong>adjunta el PDF del acuse</strong>. Verás el resultado en el bloque <strong>🌐 Envíos al Portal de Conciliación</strong> de la ficha del expediente.</li></ol>
+<h3>Modo B — 👁️ Visible (Debug)</h3>
+<p>Igual que el automático, pero el navegador se abre en pantalla para que veas cada paso. Útil para detectar por qué un envío falla.</p>
+<h3>Modo C — 📲 Desde mi navegador (Extensión de Chrome)</h3>
+<p>Cuando la automatización se traba (CAPTCHA, cambios en el portal), usa la extensión que llena el formulario <strong>en tu propio navegador</strong> y tú das el clic final. Detalles en la <a href="#9-extensión-de-chrome">sección 9</a>.</p>
+<h3>8.1 Si el envío falla</h3>
+<ul><li>En la ficha del expediente, el bloque de envíos muestra <strong>❌ Error</strong> con el motivo.</li><li>Presiona <strong>🔄 Reintentar</strong> para volver a intentarlo.</li><li>Si sigue fallando, usa el <strong>Modo C (extensión)</strong> o el <strong>fallback manual</strong>:</li></ul>
+<h3>8.2 Fallback manual — subir el acuse</h3>
+<ol start="1"><li>En el expediente, abre <strong>🌐 Conciliación ▾</strong>.</li><li>En <strong>📄 Subir PDF Manual</strong>, selecciona el PDF del acuse descargado del portal y presiona <strong>📥 Subir Acuse y Extraer Datos</strong>.</li><li>El sistema <strong>lee el acuse automáticamente</strong> y te muestra una <strong>vista previa</strong>: folio, solicitante, empresa citada, fecha del conflicto, tipo de despido y unidad.</li><li>Revisa los valores detectados vs. los actuales (marca los que son nuevos o difieren) y presiona <strong>Confirmar</strong> para guardarlos en el expediente.</li></ol>
+<h3>8.3 Descargar el formulario prellenado</h3>
+<p>En <strong>🌐 Conciliación ▾ → 📥 Descargar Formulario</strong> obtienes el PDF del formato de solicitud ya llenado, para presentarlo manualmente en el centro si así se requiere.</p>
+<hr>
+<h2>9. Extensión de Chrome</h2>
+<h3>9.1 Instalación (una vez por computadora)</h3>
+<ol start="1"><li>Abre Chrome y ve a <strong>`chrome://extensions`</strong>.</li><li>Activa el <strong>Modo de desarrollador</strong> (interruptor arriba a la derecha).</li><li>Haz clic en <strong>"Cargar descomprimida"</strong> y selecciona la carpeta de la extensión (descárgala desde la app: <strong>Extensión de Chrome → Descargar paquete (.zip)</strong> y descomprímela).</li><li>La extensión <strong>"Conciliación BC — Asistente"</strong> queda instalada.</li></ol>
+<h3>9.2 Configuración (una vez)</h3>
+<ol start="1"><li>Haz clic en el ícono de la extensión → <strong>⚙️ Opciones</strong>.</li><li>Pega la <strong>URL de la app</strong> (ej. <code>https://tu-app.railway.app</code>).</li><li>Pega tu <strong>token personal</strong>:</li></ol>
+<ul><li>En la app: abre cualquier expediente → <strong>Enviar a Conciliación</strong> → enlace a <strong>"Extensión de Chrome"</strong> (o entra a <code>/extension/config/</code>).</li><li>Copia el token que aparece ahí. Si se filtra, regenera uno nuevo desde esa misma página.</li></ul>
+<ol start="4"><li><strong>💾 Guardar configuración</strong> (verifica la conexión automáticamente).</li></ol>
+<h3>9.3 Uso por caso</h3>
+<ol start="1"><li>En la app, abre el expediente → <strong>Enviar a Conciliación</strong> → elige <strong>"📲 Desde mi navegador (Extensión de Chrome)"</strong> → <strong>Enviar</strong>.</li><li>Haz clic en el ícono de la extensión → verás la tarea pendiente → <strong>🚀 Llenar en el portal</strong>.</li><li>Se abre el portal con el formulario <strong>ya llenado</strong>. <strong>Revisa los datos</strong>, resuelve el CAPTCHA si aparece y haz clic en <strong>"Enviar solicitud"</strong>.</li><li>En la página del acuse, haz clic en <strong>"🔍 Ya envié, detectar acuse"</strong> (o se detecta solo). La extensión guarda el <strong>folio</strong> en la app, descarga el <strong>acuse PDF</strong> y lo adjunta al expediente.</li><li>Si la descarga automática del acuse falla, descárgalo del portal y súbelo con el flujo manual (<a href="#82-fallback-manual--subir-el-acuse">sección 8.2</a>).</li></ol>
+<hr>
+<h2>10. Documentos legales (machotes y demanda)</h2>
+<blockquote>🔒 <strong>Permiso:</strong> solo usuarios con el permiso <strong>"Puede generar documentos legales"</strong> (configurado por el administrador) ven estos botones.</blockquote>
+<h3>10.1 Generar un documento desde una plantilla (machote)</h3>
+<ol start="1"><li>Abre el expediente y presiona <strong>Documentos</strong> (catálogo de machotes).</li><li>Elige la plantilla adecuada (Demanda Laboral, Carta Finiquito, Convenio, Solicitud, Citatorio, Otro). Las favoritas aparecen primero.</li><li>En <strong>Preparar documento</strong> verás <strong>qué datos faltan</strong> (ej. CURP, salario, dirección de la empresa) con su porcentaje de completitud. Haz clic en el enlace de cada campo faltante para <strong>editarlo directamente</strong>.</li><li>Cuando esté completo, <strong>Generar</strong> el documento → se abre el <strong>editor</strong> con el texto ya llenado (los <code>{{ marcadores }}</code> se reemplazaron con los datos del caso).</li><li>Revisa, ajusta lo necesario y <strong>Descargar PDF</strong>.</li><li>Opcional: <strong>Guardar como machote</strong> para que el equipo reutilice tu versión.</li></ol>
+<h3>10.2 Asistente de Demanda (paso a paso)</h3>
+<ol start="1"><li>En el expediente, presiona <strong>Asistente de Demanda</strong>.</li><li>Responde cada sección guiada (actor, demandado, hechos, prestaciones, cálculos).</li><li>Al final, <strong>genera la demanda</strong> lista para descargar.</li></ol>
+<h3>10.3 Generar la demanda directamente</h3>
+<ul><li>En el expediente, presiona <strong>Demanda</strong> → se genera el documento de <strong>Demanda Laboral</strong> en Word (<code>.docx</code>) con todos los datos y cálculos integrados → <strong>Descargar</strong>.</li></ul>
+<blockquote>💡 El administrador gestiona las plantillas desde <strong>Machotes → Catálogo/Importar</strong>. Los archivos Word existentes se pueden importar como plantillas.</blockquote>
+<hr>
+<h2>11. WhatsApp</h2>
+<h3>11.1 Enviar un mensaje</h3>
+<ol start="1"><li>En el expediente, presiona <strong>WhatsApp</strong> (botón verde).</li><li>Elige una <strong>plantilla</strong> (recordatorio de audiencia, citatorio, seguimiento de convenio, seguimiento, solicitud de documentos o mensaje personalizado).</li><li>Revisa el mensaje (puedes editarlo) y el destino (WhatsApp o teléfono del cliente).</li><li>Elige cómo enviarlo:</li></ol>
+<ul><li><strong>Enlace wa.me</strong> (gratis): se abre WhatsApp con el mensaje listo; tú presionas enviar.</li><li><strong>API Twilio</strong> (si está configurada): se envía directo desde el sistema.</li></ul>
+<ol start="5"><li>Presiona <strong>Enviar</strong>. El mensaje queda en el <strong>historial</strong> con su estado (pendiente / enviado / fallido).</li></ol>
+<h3>11.2 Mensajes automáticos por cambio de estado</h3>
+<ul><li>El expediente tiene un interruptor <strong>🤖 Activo/Inactivo</strong> en la sección WhatsApp.</li><li>Con <strong>Activo</strong>, cada cambio de estado genera un mensaje automático al cliente (caso registrado, solicitud creada, citatorio, audiencia, convenio, demanda, cierre…).</li><li>Los mensajes generados aparecen en la ficha como <strong>Mensajes Automáticos</strong> con estado *pendiente*; el administrador los envía con el comando programado.</li></ul>
+<blockquote>⚠️ Verifica siempre que el número del cliente tenga el <strong>código de país</strong> (ej. <code>+52...</code>) para que los enlaces funcionen.</blockquote>
+<hr>
+<h2>12. Transferencias de casos</h2>
+<p>Si no puedes atender un caso (audiencia simultánea, conflicto de horario, etc.):</p>
+<ol start="1"><li>Abre el expediente → <strong>Transferir</strong>.</li><li>Explica el <strong>motivo</strong> (obligatorio) y opcionalmente <strong>sugiere un asesor destino</strong>.</li><li>Presiona <strong>Enviar solicitud</strong>.</li><li>La administración revisa, <strong>reasigna</strong> si lo considera y aprueba o rechaza.</li><li>Puedes <strong>cancelar</strong> tu solicitud mientras esté pendiente (botón en el historial).</li><li>El estado y las notificaciones te mantienen informado del resultado.</li></ol>
+<hr>
+<h2>13. Notificaciones y avisos</h2>
+<ul><li><strong>🔔 Campana:</strong> notificaciones de transferencias, avisos y recordatorios. Haz clic en una para abrirla; usa <strong>marcar todas como leídas</strong> para limpiar la campana.</li><li><strong>Avisos y Pendientes:</strong> los publica la administración en tu dashboard. Léelos a diario: pueden contener instrucciones, cambios de proceso o pendientes de la semana.</li></ul>
+<hr>
+<h2>14. Sección de administración</h2>
+<p>*(Solo usuarios con rol administrativo, superadmin o finanzas)*</p>
+<h3>14.1 Reportes y exportación</h3>
+<ol start="1"><li>Ve a <strong>Reportes</strong>.</li><li>Consulta productividad por asesor, montos totales y estadísticas del despacho.</li><li>Usa <strong>Exportar Excel</strong> para descargar la información y trabajarla fuera del sistema.</li></ol>
+<h3>14.2 Gestionar transferencias</h3>
+<ol start="1"><li>Ve a <strong>Transferencias</strong> (lista de solicitudes pendientes).</li><li>Revisa el motivo y el asesor sugerido.</li><li>Decide: <strong>Aprobar</strong> (con o sin reasignación a otro asesor, dejando un comentario opcional) o <strong>Rechazar</strong> (con comentario).</li><li>Al aprobar, el expediente queda asignado al nuevo asesor y se notifica a todos.</li></ol>
+<h3>14.3 Crear avisos y pendientes</h3>
+<ol start="1"><li>Ve a <strong>Avisos → Crear aviso</strong>.</li><li>Captura <strong>título</strong>, <strong>contenido</strong>, <strong>prioridad</strong> (alta/media/baja) y <strong>fecha de vencimiento</strong> (opcional; al vencer el aviso deja de mostrarse).</li><li>Presiona <strong>Publicar</strong>. El aviso aparece en el dashboard de todos.</li></ol>
+<h3>14.4 Matriz de permisos (superadmin)</h3>
+<ol start="1"><li>Ve a <strong>Superadmin → Matriz de permisos</strong>.</li><li>Cambia el <strong>rol</strong> de los usuarios y/o el permiso <strong>"puede generar documentos"</strong>.</li><li>Presiona <strong>Guardar</strong>. Cada cambio queda <strong>auditado</strong> (quién, cuándo y qué cambió).</li><li>Puedes <strong>exportar la matriz a Excel</strong> para respaldarla.</li><li>Usa <strong>Cargar datos demo</strong> solo en ambientes de prueba.</li></ol>
+<blockquote>⚠️ Cambiar el rol de un asesor le quita el acceso a sus casos en el dashboard del asesor. Hazlo solo cuando sea intencional.</blockquote>
+<h3>14.5 Configuración legal (panel de Django)</h3>
+<p>Cuando cambien los valores legales (UMA, salario mínimo, días de aguinaldo, etc.):</p>
+<ol start="1"><li>Entra al <strong>admin de Django</strong> (enlace desde el menú, solo admin/superadmin).</li><li>Busca <strong>Configuraciones Legales</strong> y edita la fila activa con los nuevos valores.</li><li>Guarda. Los cálculos nuevos usan los valores actualizados (los existentes se pueden recalcular desde cada expediente con <strong>Cálculos</strong>).</li></ol>
+<hr>
+<h2>15. Búsqueda global</h2>
+<ul><li>Escribe en la barra de búsqueda: número de expediente, nombre del cliente, CURP, folio o empresa.</li><li>El resultado te lleva directo al expediente o cliente que buscas.</li></ul>
+<hr>
+<h2>16. Solución de problemas comunes</h2>
+<table><thead><tr><th>Problema</th><th>Solución</th></tr></thead><tbody><tr><td>No veo un expediente</td><td>Verifica que esté asignado a ti; si lo está y no aparece, escribe al administrador.</td></tr><tr><td>"No se puede cambiar el estado"</td><td>El sistema solo permite transiciones válidas. Revisa el orden del proceso (ej. debes crear la solicitud antes de pasar a citatorio).</td></tr><tr><td>El envío automático falla</td><td>Reintenta; si sigue fallando usa la <strong>extensión de Chrome</strong> o sube el acuse manualmente.</td></tr><tr><td>La extensión no responde</td><td>Verifica URL + token en Opciones; regenera el token si lo cambiaste en la app.</td></tr><tr><td>El documento sale con <code>[CURP]</code> o <code>[MONTO]</code></td><td>Falta ese dato en el cliente/expediente. Usa la pantalla de <strong>Preparar</strong> para editarlo.</td></tr><tr><td>No veo los botones Documentos/Demanda</td><td>Necesitas el permiso <strong>"Puede generar documentos legales"</strong> — pídelo al administrador.</td></tr><tr><td>WhatsApp no abre</td><td>Confirma el número con código de país (+52) en la ficha del cliente.</td></tr><tr><td>La campana tiene muchas notificaciones</td><td>Marca <strong>todas como leídas</strong>; las pendientes se limpian.</td></tr></tbody></table>
+<hr>
+<h2>17. Referencia rápida de estados</h2>
+<table><thead><tr><th>Estado</th><th>Significado</th><th>Siguientes pasos típicos</th></tr></thead><tbody><tr><td>🟦 <strong>Nuevo</strong></td><td>Caso recién creado</td><td>Llenar solicitud de conciliación</td></tr><tr><td>🟪 <strong>Solicitud creada</strong></td><td>Formato de solicitud listo</td><td>Enviar al portal / generar citatorio</td></tr><tr><td>🟨 <strong>Citatorio generado</strong></td><td>Citatorio preparado</td><td>Programar audiencia</td></tr><tr><td>🟨 <strong>Audiencia programada</strong></td><td>Fecha de audiencia asignada</td><td>Asistir y registrar resultado</td></tr><tr><td>🟥 <strong>No notificado</strong></td><td>No se pudo notificar</td><td>Nueva audiencia / reprogramación</td></tr><tr><td>🟧 <strong>Reprogramación</strong></td><td>Audiencia reprograda</td><td>Nueva fecha de audiencia</td></tr><tr><td>🟩 <strong>Convenio</strong></td><td>Se llegó a acuerdo</td><td>Registrar monto y dar seguimiento de pagos</td></tr><tr><td>⬜ <strong>Sin conciliación</strong></td><td>No hubo acuerdo</td><td>Preparar demanda</td></tr><tr><td>🟥 <strong>Demanda</strong></td><td>Demanda presentada</td><td>Seguimiento del juicio</td></tr><tr><td>⬛ <strong>Cerrado</strong></td><td>Caso terminado</td><td>(sin más acciones)</td></tr></tbody></table>
+<hr>
+<p>*¿Dudas? Contacta al administrador del sistema o al área de soporte del despacho.*</p>
+</section>
+<section class="documento">
+<div class="cabecera-doc">Conciliación Laboral Tijuana &mdash; Manual de Administración</div>
+<h1>📘 Manual de Administración — Despacho Laboral</h1>
+<blockquote><strong>Para:</strong> Administrativos, finanzas y superadmin <strong>Sistema:</strong> Conciliación Laboral Tijuana — Despacho Laboral <strong>Versión:</strong> 1.0 · Agosto 2026</blockquote>
+<p>Este manual cubre las tareas de <strong>administración</strong> del sistema: gestión de usuarios y permisos, actualización de la configuración legal, operación del <strong>módulo financiero</strong> completo y los comandos de administración.</p>
+<blockquote>📖 Complementa al *Manual de Usuario* (trabajo diario de asesores) y a la *Documentación Funcional* (visión completa del sistema).</blockquote>
+<hr>
+<h2>Índice</h2>
+<ol start="1"><li><a href="#1-roles-administrativos">Roles administrativos</a></li><li><a href="#2-gestión-de-usuarios-y-matriz-de-permisos">Gestión de usuarios y matriz de permisos</a></li><li><a href="#3-configuración-legal">Configuración legal</a></li><li><a href="#4-avisos-y-pendientes">Avisos y pendientes</a></li><li><a href="#5-gestión-de-transferencias">Gestión de transferencias</a></li><li><a href="#6-comandos-de-administración">Comandos de administración</a></li><li><a href="#7-módulo-financiero--introducción">Módulo financiero — introducción</a></li><li><a href="#8-oficinas-y-semanas-de-trabajo">Oficinas y semanas de trabajo</a></li><li><a href="#9-caja-diaria-ingresos-y-egresos">Caja diaria (ingresos y egresos)</a></li><li><a href="#10-pagos-de-convenios">Pagos de convenios</a></li><li><a href="#11-gastos-operativos">Gastos operativos</a></li><li><a href="#12-convenios-y-honorarios">Convenios y honorarios</a></li><li><a href="#13-comisiones">Comisiones</a></li><li><a href="#14-empleados-y-nómina">Empleados y nómina</a></li><li><a href="#15-socios-y-préstamos">Socios y préstamos</a></li><li><a href="#16-distribución-de-utilidades">Distribución de utilidades</a></li><li><a href="#17-dashboard-financiero-y-reportes">Dashboard financiero y reportes</a></li><li><a href="#18-buenas-prácticas-de-consistencia">Buenas prácticas de consistencia</a></li><li><a href="#19-solución-de-problemas-comunes">Solución de problemas comunes</a></li></ol>
+<hr>
+<h2>1. Roles administrativos</h2>
+<table><thead><tr><th>Rol</th><th>Acceso administrativo</th></tr></thead><tbody><tr><td><strong>Superadmin</strong></td><td>Todo: matriz de permisos, admin de Django, superadmin dashboard, finanzas</td></tr><tr><td><strong>Administrativo (admin)</strong></td><td>Reportes, avisos, transferencias, admin de Django, finanzas</td></tr><tr><td><strong>Finanzas</strong></td><td>Dashboard financiero y módulo de finanzas (no gestiona usuarios)</td></tr></tbody></table>
+<blockquote>⚠️ Los cambios de <strong>rol</strong> y <strong>permisos</strong> de usuarios quedan <strong>auditados</strong> automáticamente (quién, cuándo y qué cambió). Úsalo con criterio.</blockquote>
+<hr>
+<h2>2. Gestión de usuarios y matriz de permisos</h2>
+<h3>2.1 Crear un usuario nuevo</h3>
+<ol start="1"><li>Entra al <strong>admin de Django</strong> (enlace desde el menú, solo admin/superadmin).</li><li>En <strong>Usuarios → Añadir usuario</strong>, captura usuario, contraseña y datos de contacto.</li><li>Al guardar, el perfil se crea automáticamente (rol <strong>asesor</strong> por defecto).</li><li>Ajusta el rol y permisos desde la <strong>Matriz de permisos</strong> (abajo) o desde el perfil del usuario en el admin.</li></ol>
+<h3>2.2 Matriz de permisos</h3>
+<ol start="1"><li>Ve a <strong>Superadmin → Matriz de permisos</strong>.</li><li>Verás una tabla con todos los usuarios y sus columnas:</li></ol>
+<ul><li><strong>Rol</strong> (superadmin, admin, asesor, abogada, finanzas).</li><li><strong>¿Puede generar documentos?</strong> — habilita los botones Documentos/Demanda en los expedientes (generadores de machotes y demanda laboral).</li><li><strong>Token API</strong> — token personal para la extensión de Chrome.</li></ul>
+<ol start="3"><li>Haz los cambios y presiona <strong>Guardar</strong>.</li></ol>
+<p><strong>Para cada cambio que hagas:</strong></p>
+<table><thead><tr><th>Acción</th><th>Qué pasa</th></tr></thead><tbody><tr><td>Cambiar rol</td><td>El usuario cambia de dashboard y de alcance de visibilidad.</td></tr><tr><td>Habilitar/deshabilitar "puede generar documentos"</td><td>Se conceden/revocan los generadores de documentos legales.</td></tr><tr><td>Regenerar token</td><td>El token anterior deja de funcionar (hazlo si se filtró).</td></tr></tbody></table>
+<ol start="4"><li>Usa <strong>Exportar Excel</strong> para descargar la matriz y respaldarla.</li></ol>
+<blockquote>⚠️ Cambiar el rol de un asesor <strong>le quita el acceso a sus casos</strong> en el dashboard del asesor. Hazlo solo cuando sea intencional (ej. ascenso a administrativo).</blockquote>
+<h3>2.3 Tokens de la extensión de Chrome</h3>
+<ul><li>Cada usuario ve su token en <strong>Ajustes → Extensión de Chrome</strong> (o <code>/extension/config/</code>).</li><li>Si un token se filtró, el propio usuario puede <strong>regenerarlo</strong> desde ahí; también puedes hacerlo desde el perfil en el admin.</li></ul>
+<h3>2.4 Cargar datos demo</h3>
+<p>Usa <strong>Superadmin → Cargar datos demo</strong> <strong>solo en ambientes de prueba</strong> (nunca en producción con datos reales). Crea usuarios y casos de ejemplo.</p>
+<hr>
+<h2>3. Configuración legal</h2>
+<p>Los valores legales del cálculo laboral viven en <strong>Configuraciones Legales</strong> (modelo <code>LegalConfig</code>) y se editan <strong>sin tocar código</strong> cuando cambian las leyes.</p>
+<h3>3.1 Qué parámetros se configuran</h3>
+<table><thead><tr><th>Parámetro</th><th>Uso</th><th>Valor de referencia (2024)</th></tr></thead><tbody><tr><td><strong>UMA diaria</strong></td><td>Base para topes y cálculos</td><td>$108.57</td></tr><tr><td><strong>Salario mínimo general</strong></td><td>Cálculos y topes</td><td>$248.93</td></tr><tr><td><strong>Salario mínimo frontera (ZLF)</strong></td><td>Zona Libre Frontera Norte</td><td>$374.89</td></tr><tr><td><strong>Días de aguinaldo</strong></td><td>Aguinaldo proporcional</td><td>15</td></tr><tr><td><strong>% prima vacacional</strong></td><td>Prima sobre vacaciones</td><td>25%</td></tr><tr><td><strong>Días por año (prima antigüedad)</strong></td><td>Prima de antigüedad</td><td>12</td></tr><tr><td><strong>Tipo de tope</strong></td><td>2× UMA / 2× SM / 2× SM frontera</td><td>UMA</td></tr><tr><td><strong>Múltiplo del tope</strong></td><td>Multiplicador del tope</td><td>2</td></tr><tr><td><strong>Días de indemnización</strong></td><td>Indemnización constitucional</td><td>90</td></tr></tbody></table>
+<h3>3.2 Cómo actualizarla (ej. al inicio de cada año)</h3>
+<ol start="1"><li>Entra al <strong>admin de Django</strong> → <strong>Configuraciones Legales</strong>.</li><li>Abre la fila <strong>activa</strong> (solo puede haber una activa; si creas otra y la marcas como activa, las demás se desactivan solas).</li><li>Actualiza la <strong>UMA</strong>, el <strong>salario mínimo</strong> y el <strong>salario mínimo frontera</strong> con los valores oficiales publicados (DOF), y cualquier otro parámetro que haya cambiado.</li><li>Guarda. Los <strong>cálculos nuevos</strong> usan los valores actualizados al instante.</li></ol>
+<h3>3.3 Recalcular cálculos existentes</h3>
+<p>Los cálculos ya guardados conservan su histórico. Para actualizarlos con las reglas nuevas, entra a cada expediente → <strong>Cálculos</strong> y guarda de nuevo (se recalcula con los valores vigentes). El modelo <code>CalculoLaboral.recalcular()</code> hace lo mismo por programa.</p>
+<blockquote>⚠️ <strong>No</strong> cambies estos valores sin confirmar el dato oficial. Un error en la UMA o el salario mínimo altera <strong>todos</strong> los cálculos del despacho.</blockquote>
+<hr>
+<h2>4. Avisos y pendientes</h2>
+<ol start="1"><li>Ve a <strong>Avisos → Crear aviso</strong> (o desde el dashboard administrativo).</li><li>Captura:</li></ol>
+<ul><li><strong>Título</strong> y <strong>contenido</strong> (instrucciones, pendientes, cambios de proceso).</li><li><strong>Prioridad:</strong> alta (🔴) / media (🟡) / baja (🟢).</li><li><strong>Fecha de vencimiento</strong> (opcional): al vencer, el aviso deja de mostrarse automáticamente.</li></ul>
+<ol start="3"><li>Presiona <strong>Publicar</strong>. Aparece en el dashboard de todos los asesores y admins.</li><li>Los avisos se pueden desactivar (bandera <strong>Activo</strong>) en el admin de Django.</li></ol>
+<blockquote>💡 Usa el vencimiento para pendientes con fecha límite; usa prioridad alta solo para lo urgente (si no, los avisos pierden peso).</blockquote>
+<hr>
+<h2>5. Gestión de transferencias</h2>
+<p>Cuando un asesor solicita transferir un caso (ej. audiencia simultánea):</p>
+<ol start="1"><li>Ve a <strong>Transferencias</strong> → verás las solicitudes <strong>pendientes</strong> con el motivo y el asesor sugerido (si lo hay).</li><li>Decide:</li></ol>
+<ul><li><strong>Aprobar:</strong> puedes <strong>reasignar</strong> a otro asesor antes de aprobar y dejar un comentario. Al aprobar, el expediente cambia de asesor y se notifica a todos.</li><li><strong>Rechazar:</strong> deja un comentario para que el asesor entienda el motivo.</li></ul>
+<ol start="3"><li>El asesor puede <strong>cancelar</strong> su solicitud mientras siga pendiente.</li></ol>
+<blockquote>💡 Revisa las transferencias a diario: un caso pendiente de reasignación puede dejar una audiencia sin atender.</blockquote>
+<hr>
+<h2>6. Comandos de administración</h2>
+<p>Los comandos se ejecutan en el servidor (consola). Ejemplos útiles:</p>
+<pre><code># Enviar recordatorios de próximas acciones/audiencias (próximos 3 días)
+uv run python manage.py enviar_recordatorios
+
+# Simular primero (no envía nada)
+uv run python manage.py enviar_recordatorios --days=7 --dry-run
+
+# Enviar mensajes de WhatsApp automáticos pendientes
+uv run python manage.py enviar_whatsapp_automatico
+
+# Importar citas del CLT.xlsx como expedientes con audiencias
+uv run python manage.py importar_clt
+
+# Importar catálogo de empresas y domicilios (idempotente, no duplica)
+uv run python manage.py importar_empresas
+
+# Importar plantillas .docx como machotes
+uv run python manage.py importar_machotes</code></pre>
+<blockquote>⚠️ La automatización de WhatsApp requiere configuración de Twilio (env vars <code>TWILIO_*</code>). Sin Twilio, los mensajes quedan como <strong>enlaces wa.me</strong> para abrir manualmente. Consulta <code>--help</code> de cada comando para más opciones.</blockquote>
+<hr>
+<h2>7. Módulo financiero — introducción</h2>
+<p>El módulo está organizado por <strong>oficina</strong> y por <strong>semana de trabajo</strong>. Todo lo que se registra tiene responsable (<code>registrado_por</code>) para auditoría.</p>
+<h3>Cómo se calculan los totales (importante)</h3>
+<table><thead><tr><th>Total</th><th>Se compone de</th></tr></thead><tbody><tr><td><strong>Ingresos</strong></td><td>Pagos de convenios (SettlementPayment) + Ingresos de caja</td></tr><tr><td><strong>Gastos</strong></td><td>Gastos operativos (Expense) + Egresos de caja + Nómina (Payroll)</td></tr><tr><td><strong>Utilidad</strong></td><td>Ingresos − Gastos</td></tr><tr><td><strong>Semana</strong></td><td>Ingresos (caja + pagos) − Gastos (caja + gastos + nómina)</td></tr></tbody></table>
+<blockquote>⚠️ Para <strong>no duplicar</strong> registros, usa cada módulo para su propósito: los pagos de convenios van en <strong>Pagos de Convenios</strong>; los gastos con factura en <strong>Gastos Operativos</strong>; la caja diaria es para el <strong>efectivo del día a día</strong>. Evita registrar lo mismo en dos lados.</blockquote>
+<hr>
+<h2>8. Oficinas y semanas de trabajo</h2>
+<h3>8.1 Oficinas</h3>
+<ol start="1"><li>Ve a <strong>Oficinas</strong> (admin de Django o menú de finanzas) → <strong>Nueva oficina</strong>.</li><li>Captura nombre, dirección, teléfono y responsable.</li><li>Usa la bandera <strong>Activa</strong> para desactivar una oficina <strong>sin eliminarla</strong> (la operación histórica se conserva).</li></ol>
+<h3>8.2 Semanas de trabajo</h3>
+<ol start="1"><li>Ve a <strong>Semanas</strong> → la semana actual se <strong>crea automáticamente</strong> (lunes–domingo) la primera vez que se consulta.</li><li>Las semanas se pueden <strong>crear/editar</strong> (número, fechas) y <strong>cerrar</strong> cuando el período termina.</li><li>Cada semana muestra <strong>ingresos, gastos y balance</strong> calculados con las fechas del rango.</li></ol>
+<blockquote>💡 Cierra la semana al terminar el período para congelar el reporte y revisar la siguiente semana con calma.</blockquote>
+<hr>
+<h2>9. Caja diaria (ingresos y egresos)</h2>
+<h3>9.1 Registrar un movimiento</h3>
+<ol start="1"><li>Ve a <strong>Caja → Nuevo movimiento</strong>.</li><li>Captura:</li></ol>
+<ul><li><strong>Fecha</strong> y <strong>oficina</strong>.</li><li><strong>Tipo:</strong> 💰 Ingreso o 💸 Egreso.</li><li><strong>Categoría</strong> (las opciones cambian según el tipo; el sistema valida la coherencia):</li><li>*Ingresos:* pago de convenio, pago de cliente, anticipo, devolución, otro.</li><li>*Egresos:* papelería, gasolina, renta, luz, agua, internet, teléfono, viáticos, comisiones, honorarios, otro.</li><li><strong>Monto</strong> y <strong>descripción</strong>.</li><li><strong>Referencia</strong> (opcional): N° de expediente, factura o nota relacionada.</li></ul>
+<ol start="3"><li>Presiona <strong>✅ Registrar movimiento</strong>.</li></ol>
+<h3>9.2 Lista y filtros</h3>
+<ul><li>La lista permite filtrar por <strong>tipo, oficina, categoría y rango de fechas</strong> y buscar por descripción/referencia.</li><li>Muestra <strong>totales de ingresos y egresos</strong> del listado filtrado.</li><li>Edita o elimina movimientos desde la lista (queda registro del responsable original).</li></ul>
+<blockquote>💡 Usa el campo <strong>referencia</strong> (ej. número de expediente) para poder rastrear después de qué caso salió o entró el dinero.</blockquote>
+<hr>
+<h2>10. Pagos de convenios</h2>
+<ol start="1"><li>Ve a <strong>Pagos de Convenios → Nuevo</strong>.</li><li>Captura <strong>fecha</strong>, <strong>cliente</strong>, <strong>expediente</strong>, <strong>monto</strong> y <strong>forma de pago</strong> (efectivo, transferencia, cheque, tarjeta crédito/débito, depósito, otro).</li><li>Selecciona la <strong>oficina</strong> que recibe el pago y agrega notas si hace falta.</li><li>Guarda. El pago se suma automáticamente a los <strong>ingresos</strong> del período y de la semana.</li></ol>
+<blockquote>💡 Estos pagos alimentan el dashboard (Ingresos por Pagos) y el detalle del convenio en <strong>Convenios → detalle → Pagos</strong>.</blockquote>
+<hr>
+<h2>11. Gastos operativos</h2>
+<ol start="1"><li>Ve a <strong>Gastos → Nuevo gasto</strong> (admin de Django).</li><li>Captura:</li></ol>
+<ul><li><strong>Fecha</strong>, <strong>categoría</strong> (renta, luz, agua, internet, teléfono, papelería, publicidad, sueldos, gasolina, mantenimiento, impuestos, equipo, muebles, seguros, honorarios profesionales, otro).</li><li><strong>Monto</strong>, <strong>descripción</strong>, <strong>proveedor</strong> y <strong>folio fiscal/factura</strong>.</li><li><strong>Oficina</strong> a la que pertenece.</li></ul>
+<ol start="3"><li>Guarda. Se suma a los <strong>gastos operativos</strong> del período.</li></ol>
+<blockquote>💡 Guarda el <strong>folio fiscal</strong> siempre: facilita la conciliación contable y fiscal.</blockquote>
+<hr>
+<h2>12. Convenios y honorarios</h2>
+<h3>12.1 Registrar un convenio</h3>
+<ol start="1"><li>Ve a <strong>Convenios → Nuevo convenio</strong>.</li><li>Captura <strong>cliente</strong>, <strong>empresa/contraparte</strong>, <strong>oficina</strong>, <strong>fecha</strong>, <strong>monto del convenio</strong> y <strong>responsable</strong> (abogado/asesor).</li><li>Estado inicial: <strong>Pendiente de firma</strong>. Ve actualizándolo conforme avanza (firmado → pagado / pagado parcialmente / cancelado).</li><li>Guarda. El campo <strong>honorarios totales</strong> se calcula solo al ir agregando honorarios.</li></ol>
+<h3>12.2 Agregar honorarios</h3>
+<ol start="1"><li>En el detalle del convenio, presiona <strong>Nuevo honorario</strong> (o desde el menú).</li><li>Elige el <strong>porcentaje</strong> (25/30/35/40/50%) — el <strong>monto se calcula automáticamente</strong> (monto del convenio × % ÷ 100).</li><li>Captura fecha estimada de pago y estado (pendiente / pagado / cancelado).</li><li>El convenio muestra <strong>honorarios pagados y pendientes</strong> en tiempo real.</li></ol>
+<blockquote>💡 Revisa periódicamente los convenios con honorarios <strong>pendientes</strong> para dar seguimiento de cobranza.</blockquote>
+<hr>
+<h2>13. Comisiones</h2>
+<ol start="1"><li>Cuando un asesor cierra un convenio, crea su comisión en <strong>Comisiones → Nueva</strong>.</li><li>Captura <strong>expediente</strong>, <strong>asesor</strong>, <strong>fecha</strong>, <strong>monto del convenio</strong>, <strong>%</strong> de comisión y <strong>oficina</strong>.</li><li>El <strong>monto de comisión se calcula automáticamente</strong> (monto × % ÷ 100).</li><li>Marca el <strong>estado</strong> (pendiente / pagada / cancelada) y la <strong>fecha de pago</strong> cuando se pague.</li><li>Las comisiones <strong>pagadas</strong> aparecen en el dashboard financiero por oficina y asesor.</li></ol>
+<blockquote>💡 Coordina comisiones con nómina: al pagar la comisión, regístrala también como egreso de caja (categoría "Comisiones") o en nómina según tu proceso, <strong>sin duplicar</strong>.</blockquote>
+<hr>
+<h2>14. Empleados y nómina</h2>
+<h3>14.1 Alta de empleados</h3>
+<ol start="1"><li>Ve a <strong>Empleados → Nuevo</strong> (admin de Django).</li><li>Captura nombre, <strong>puesto</strong> (administrativo, asesor jurídico, supervisor, contador, recepcionista, auxiliar, director…), <strong>periodo de pago</strong> (semanal/quincenal/mensual), <strong>salario</strong>, teléfono, correo y <strong>oficina</strong>.</li><li>Desactiva con la bandera <strong>Activo</strong> cuando alguien deje de trabajar (no lo borres).</li></ol>
+<h3>14.2 Pagos de nómina</h3>
+<ol start="1"><li>Ve a <strong>Pagos de Nómina → Nuevo</strong>.</li><li>Selecciona <strong>empleado</strong> y captura:</li></ol>
+<ul><li><strong>Fecha de pago</strong>, <strong>período</strong> (semanal/quincenal/mensual/extraordinario/aguinaldo/ prima vacacional/bono) y el rango del período.</li><li><strong>Salario pagado</strong> y <strong>descuentos</strong> (ISR, IMSS…).</li></ul>
+<ol start="3"><li>El <strong>total pagado se calcula solo</strong> (salario − descuentos).</li><li>Guarda con la <strong>oficina</strong> correspondiente.</li></ol>
+<blockquote>💡 Usa los períodos <strong>aguinaldo</strong>, <strong>prima vacacional</strong> y <strong>bono</strong> para esos pagos especiales: quedan diferenciados en los reportes.</blockquote>
+<hr>
+<h2>15. Socios y préstamos</h2>
+<h3>15.1 Socios</h3>
+<ol start="1"><li>Ve a <strong>Socios → Nuevo socio</strong>.</li><li>Captura <strong>nombre</strong>, <strong>% de participación</strong> (ej. 25.00 = 25%) y datos de contacto.</li><li>La ficha del socio muestra sus <strong>préstamos otorgados/recibidos</strong> y <strong>saldos</strong>.</li></ol>
+<h3>15.2 Préstamos entre socios</h3>
+<ol start="1"><li>Ve a <strong>Préstamos → Nuevo préstamo</strong>.</li><li>Selecciona <strong>socio origen</strong> (quién presta) y <strong>socio destino</strong> (quién recibe), monto, fecha y concepto.</li><li>Estado: <strong>pendiente</strong> → <strong>pagado</strong> (con fecha de pago) cuando se liquide.</li><li>El <strong>saldo neto</strong> de cada socio (otorgados − recibidos) se calcula automáticamente.</li></ol>
+<blockquote>💡 Esto reemplaza las notas informales tipo "le debo a…": todo queda registrado con fecha, concepto y responsable.</blockquote>
+<hr>
+<h2>16. Distribución de utilidades</h2>
+<h3>16.1 Crear una distribución</h3>
+<ol start="1"><li>Ve a <strong>Distribuciones → Nueva distribución</strong>.</li><li>Selecciona el <strong>convenio</strong> que genera la utilidad.</li><li>El sistema <strong>calcula automáticamente</strong>:</li></ol>
+<ul><li><strong>Monto del convenio</strong> y <strong>honorarios</strong> (del convenio).</li><li><strong>Comisiones</strong> (relacionadas al cliente).</li><li><strong>Retenciones/ISR</strong> y <strong>gastos relacionados</strong> (captúralos si aplican).</li><li><strong>Utilidad neta</strong> = monto − honorarios − comisiones − retenciones − gastos.</li></ul>
+<ol start="4"><li>Guarda. Se generan automáticamente las <strong>participaciones de todos los socios activos</strong> (utilidad neta × % de participación) y se actualizan los <strong>resúmenes</strong>.</li><li>Estado inicial: <strong>borrador</strong> → <strong>distribuida</strong> cuando la revisas.</li></ol>
+<h3>16.2 Confirmar la distribución</h3>
+<ol start="1"><li>En el detalle, revisa las participaciones de cada socio.</li><li>Presiona <strong>✅ Confirmar distribución</strong> (solo admin/superadmin).</li><li>Al confirmar, los <strong>resúmenes por socio</strong> (utilidad generada / pagada / pendiente) se actualizan.</li><li>Cuando se pague a un socio, marca su participación como <strong>pagada</strong> con fecha.</li></ol>
+<blockquote>⚠️ Confirma solo cuando los números estén correctos. Una confirmación es un evento contable; los ajustes posteriores deben justificarse.</blockquote>
+<hr>
+<h2>17. Dashboard financiero y reportes</h2>
+<h3>17.1 Dashboard financiero</h3>
+<ol start="1"><li>Ve a <strong>Dashboard Financiero</strong>.</li><li>Filtra por <strong>período</strong> (Este mes / Este año / Histórico) y <strong>oficina</strong>.</li><li>Verás:</li></ol>
+<ul><li><strong>Tarjetas:</strong> ingresos (pagos + caja), gastos (operación + nómina), <strong>utilidad</strong> y margen, y nº de oficinas activas.</li><li><strong>Barras Ingresos vs Gastos.</strong></li><li><strong>Gráfica de flujo de caja mensual (12 meses)</strong> — se actualiza con los filtros vía API.</li><li><strong>Resumen por oficina</strong> (ingresos, gastos, utilidad, margen, comisiones pagadas).</li><li><strong>Gastos por categoría</strong> y <strong>formas de pago</strong> más usadas.</li><li><strong>Productividad por asesor</strong> (casos, convenios, monto recuperado, comisiones).</li><li><strong>Movimientos de caja recientes.</strong></li></ul>
+<ol start="4"><li>Usa <strong>Exportar Excel</strong> para descargar todo en un archivo con <strong>5 hojas</strong>: Resumen Global, Gastos por Categoría, Formas de Pago, Asesores y Movimientos de Caja.</li></ol>
+<blockquote>💡 La exportación aplica <strong>los mismos filtros</strong> que tengas seleccionados y usa la misma lógica de totales que el dashboard (no hay diferencias entre pantalla y Excel).</blockquote>
+<h3>17.2 Reporte de convenios</h3>
+<ol start="1"><li>Ve a <strong>Reportes → Convenios</strong>.</li><li>Filtra por <strong>período</strong> (semanal / mensual / anual), año, mes, semana y oficina.</li><li>El reporte muestra:</li></ol>
+<ul><li><strong>Totales:</strong> convenios, monto, honorarios, y conteo por estado (pagados, pendientes, firmados, cancelados) + promedio.</li><li><strong>Por oficina</strong>, <strong>por estado</strong>, <strong>por responsable</strong> y <strong>top 10 clientes</strong>.</li><li><strong>Evolución mensual</strong> (gráfica) en la vista anual.</li><li><strong>Listado detallado</strong> de convenios del período.</li></ul>
+<ol start="4"><li><strong>Exportar Excel</strong> descarga el detalle con los mismos filtros.</li></ol>
+<h3>17.3 Flujo mensual por API</h3>
+<p>El endpoint <code>api_flujo_mensual</code> (JSON) alimenta la gráfica del dashboard. También puedes consumirlo para reportes externos (requiere rol admin/superadmin/finanzas).</p>
+<hr>
+<h2>18. Buenas prácticas de consistencia</h2>
+<ol start="1"><li><strong>Un registro, un propósito:</strong> convenios → Pagos de Convenios; facturas → Gastos Operativos; efectivo diario → Caja. Evita duplicar.</li><li><strong>Siempre la oficina correcta</strong> en cada movimiento: los reportes por sucursal dependen de ello.</li><li><strong>Fecha real</strong> del evento (no la fecha de captura) para que los reportes por período sean exactos.</li><li><strong>Referencias en caja:</strong> anota el N° de expediente o factura para trazabilidad.</li><li><strong>Cierra semanas y confirma distribuciones</strong> a tiempo; no dejes períodos abiertos eternamente.</li><li><strong>Auditoría:</strong> todo registro guarda quién lo hizo. Si algo se capturó mal, <strong>edita</strong> (no borres sin justificación) para conservar el rastro.</li><li><strong>Revisa el dashboard a diario:</strong> detecta montos atípicos o movimientos sin categoría correcta.</li></ol>
+<hr>
+<h2>19. Solución de problemas comunes</h2>
+<table><thead><tr><th>Problema</th><th>Solución</th></tr></thead><tbody><tr><td>La matriz de permisos no muestra a un usuario nuevo</td><td>Revisa que el usuario exista en el admin de Django; el perfil se crea automáticamente al crearlo.</td></tr><tr><td>Cambié un rol y el usuario "desapareció"</td><td>Es normal: cambió su dashboard. Regresa el rol anterior si fue un error.</td></tr><tr><td>La UMA/salario mínimo se actualizó pero los cálculos viejos no cambian</td><td>Es correcto: guarda/recalcula cada cálculo para aplicar los valores vigentes.</td></tr><tr><td>Los totales del dashboard no coinciden con la caja</td><td>Revisa duplicados: un pago de convenio registrado también como ingreso de caja se cuenta dos veces.</td></tr><tr><td>No puedo confirmar una distribución</td><td>Solo admin/superadmin pueden confirmar.</td></tr><tr><td>La semana actual no aparece</td><td>Se crea automáticamente al consultar <strong>Semanas</strong>; también puedes crearla a mano.</td></tr><tr><td>El Excel del dashboard "no trae todo"</td><td>La exportación respeta los filtros activos; quita filtros para el histórico completo.</td></tr><tr><td>Un asesor no ve sus botones de documentos</td><td>Verifica el permiso "puede generar documentos" en la matriz de permisos.</td></tr></tbody></table>
+<hr>
+<p>*¿Dudas? Contacta al superadmin del sistema o al área de soporte técnico.*</p>
+</section>
+<section class="documento">
+<div class="cabecera-doc">Conciliación Laboral Tijuana &mdash; System &amp; Features Document (English)</div>
+<h1>⚖️ Despacho Laboral — Complete System &amp; Features Document</h1>
+<blockquote><strong>System:</strong> Web application for managing labor law cases at a law firm in Tijuana, Mexico <strong>Product name:</strong> Conciliación Laboral Tijuana — Despacho Laboral <strong>Stack:</strong> Django 5.x · Tailwind CSS · HTMX · PostgreSQL/SQLite · Celery + Redis · Selenium <strong>Last updated:</strong> August 2026</blockquote>
+<hr>
+<h2>1. What the System Does</h2>
+<p><code>Despacho Laboral</code> is a <strong>case-management (CRM + legal workflow) platform</strong> for a labor law practice. It manages the complete life cycle of a labor claim — from the first client contact, through the mandatory pre-trial conciliation stage with the *Centro de Conciliación Laboral (CCL)* of Baja California, up to settlement (convenio) or filing a formal lawsuit (demanda laboral).</p>
+<p>Beyond case tracking, the platform automates the most repetitive and error-prone parts of the practice:</p>
+<ul><li><strong>Legal benefit calculations</strong> (aguinaldo, vacation premium, seniority premium, constitutional severance, etc.) computed automatically from Mexican labor law (LFT).</li><li><strong>Legal document generation</strong> from reusable HTML templates (machotes) with automatic data injection.</li><li><strong>Automated submission of conciliation requests</strong> to the official BC government portal (<code>app.conciliacionbc.gob.mx</code>) — both server-side and via a companion Chrome extension.</li><li><strong>WhatsApp notifications</strong> to clients (manual, automatic per state change, and reminders).</li><li><strong>A full finance module</strong> (payments, expenses, payroll, commissions, cash registers, partner loans, profit distribution) organized per office and per work week.</li></ul>
+<hr>
+<h2>2. Users, Roles &amp; Permissions</h2>
+<h3>2.1 Roles (5)</h3>
+<table><thead><tr><th>Role</th><th>Key</th><th>Scope</th></tr></thead><tbody><tr><td><strong>Superadmin</strong></td><td><code>superadmin</code></td><td>Full access: Django admin, all dashboards, permission matrix, user management</td></tr><tr><td><strong>Administrativo</strong></td><td><code>admin</code></td><td>Sees all cases, productivity reports, totals, Excel exports, Django admin access</td></tr><tr><td><strong>Asesor</strong></td><td><code>asesor</code></td><td>Only sees and edits <strong>his own</strong> cases; personal dashboard with stats</td></tr><tr><td><strong>Abogada</strong></td><td><code>abogada</code></td><td>Dedicated dashboard for the firm's attorney (case overview &amp; document focus)</td></tr><tr><td><strong>Finanzas</strong></td><td><code>finanzas</code></td><td>Financial dashboard and finance module access (counts as admin for permissions)</td></tr></tbody></table>
+<h3>2.2 Profile capabilities (`UserProfile`)</h3>
+<p>Each user profile additionally has:</p>
+<ul><li><strong>`puede_generar_documentos`</strong> — flag granting access to the legal document generators (demanda, machotes, legal documents). Off by default.</li><li><strong>`api_token`</strong> — personal API token used by the Chrome extension to authenticate against the app's extension API. Auto-generated on profile creation and can be regenerated (invalidating the old one) from the *Extensión de Chrome* config page.</li></ul>
+<h3>2.3 Permission audit (`PermisoAuditLog`)</h3>
+<p>Every time a superadmin/admin changes a user's role, document permissions, or other privileges, an <strong>audit entry</strong> is recorded: who was modified, who modified them, the action (<code>cambio_rol</code>, <code>cambio_docs</code>, <code>mixto</code>), and the detail (e.g. <code>Rol: asesor → admin</code>).</p>
+<h3>2.4 Superadmin module</h3>
+<ul><li><strong>Superadmin dashboard</strong> — overview panel for platform administration.</li><li><strong>Permission matrix</strong> (<code>matriz_permisos</code>) — grid to manage every user's role and document-generation permission, with <strong>Excel export</strong>.</li><li><strong>Load demo data</strong> — one-click seeding of demo users/cases for testing.</li></ul>
+<h3>2.5 Auth &amp; security</h3>
+<ul><li>Login / logout, full <strong>password reset</strong> flow via email (SMTP configurable; console backend by default in dev).</li><li>Redirect to the correct dashboard automatically per role after login.</li><li>Production hardening: HTTPS redirect, secure cookies, Railway domain auto-detection, env-driven <code>DEBUG</code>/<code>SECRET_KEY</code>/<code>ALLOWED_HOSTS</code>.</li></ul>
+<hr>
+<h2>3. Case Management (Módulo Expedientes)</h2>
+<h3>3.1 Clients (`Cliente`)</h3>
+<p>Rich client record built specifically for labor conciliation:</p>
+<ul><li><strong>Identity:</strong> name, <strong>CURP</strong> (unique), RFC, phone, WhatsApp, email, birth date, gender.</li><li><strong>Home address:</strong> street, number, ZIP, colonia — assembled into <code>direccion_completa</code>.</li><li><strong>Employer data:</strong> company name, economic activity, phone, legal name, full address and references.</li><li><strong>Employer person type</strong> (física / moral) — used by the conciliation portal form.</li><li><strong>Employment data:</strong> position, <strong>monthly salary</strong>, pay period (daily/weekly/biweekly/ monthly), weekly hours, work shift (diurna/nocturna/mixta), hire date, termination date.</li><li><strong>Marketing/source:</strong> how the client heard about the firm (Facebook, Google, recommendation, WhatsApp, TikTok, TV/radio, flyer…).</li><li><strong>Office assignment</strong> (Plaza Patria, Otay, CLT).</li><li><strong>Free consultation tracking:</strong> whether the free weekly consultation was offered, scheduled, and on which date.</li><li>Indexed for fast lookups by CURP, name, and consultation date.</li></ul>
+<h3>3.2 Case files (`Expediente`)</h3>
+<ul><li><strong>Automatic numbering</strong> <code>AAAA-####</code> (year + sequential), unique and non-editable.</li><li>Assigned to one <strong>asesor</strong> (legal advisor).</li><li><strong>Amounts:</strong> claimed amount (<code>monto_reclamado</code>) and settlement amount (<code>monto_convenio</code>).</li><li><strong>Hearing scheduling</strong> with date/time and recorded result.</li><li><strong>Conciliation data:</strong> dismissal type (justified/unjustified/voluntary/rescission/other), claimed benefits, <strong>folio</strong> and processing date.</li><li><strong>Follow-up:</strong> next action date, internal notes, priority (baja/media/alta).</li><li><strong>Per-case WhatsApp automation toggle</strong> (<code>notificar_whatsapp_auto</code>).</li></ul>
+<h3>State machine with validated transitions</h3>
+<pre><code>nuevo → solicitud → citatorio → audiencia → no_notificado ─┐
+                                        ├→ reprogramacion ─┤
+                                        ├→ convenio ───────┤
+                                        ├→ sin_conciliacion─┼→ demanda → audiencia/convenio/cerrado
+                                        └→ cerrado (from any state)</code></pre>
+<p>The model <strong>rejects illegal transitions</strong> (e.g. jumping from <code>nuevo</code> to <code>audiencia</code>) with a clear message listing the allowed transitions. States have associated colors for UI badges.</p>
+<h3>3.3 Documents (`Documento`)</h3>
+<ul><li>Upload PDFs/images per case with type classification (INE, contract, evidence, screenshot, citatorio, PDF, other) and description; uploader and date recorded.</li><li>Organized by year/month folders on disk.</li></ul>
+<h3>3.4 Notes &amp; Activity history</h3>
+<ul><li><strong>Notas</strong> — free-form notes per case with author and timestamp.</li><li><strong>Movimientos</strong> — automatic audit trail of every action: creation, state change, update, document upload, note added, hearing result (who, when, what changed).</li></ul>
+<h3>3.5 Notifications (bell)</h3>
+<p>In-app notifications for the user: transfers, avisos, system messages, reminders. Each notification can carry a link; mark single or <strong>all as read</strong>.</p>
+<h3>3.6 Transfer requests between advisors</h3>
+<p>When an asesor can't attend a hearing (schedule conflict, etc.):</p>
+<ul><li>He requests a <strong>transfer</strong> of the case, optionally suggesting a destination asesor, with a mandatory reason.</li><li>Administration reviews the request, optionally <strong>reassigns</strong> to another advisor, and approves or rejects with a comment.</li><li>Statuses: pending → approved / rejected / cancelled. Notifications keep everyone informed.</li></ul>
+<h3>3.7 Avisos (mandatory admin notices)</h3>
+<ul><li>Admin creates notices/pending items with title, content, priority, and <strong>optional expiry date</strong> (auto-hides after expiry).</li><li>Shown on every advisor/admin dashboard; users can mark them as <strong>read/understood</strong> (tracked per user via M2M).</li></ul>
+<h3>3.8 Global search &amp; filtering</h3>
+<ul><li><strong>Global search</strong> across cases, clients, folios, companies.</li><li>Advanced filters on the case list; asesores only see their own cases.</li></ul>
+<h3>3.9 Calendar</h3>
+<ul><li><strong>Hearing calendar</strong> (<code>calendario</code>) aggregating all scheduled hearings.</li></ul>
+<h3>3.10 Reports &amp; exports</h3>
+<ul><li><strong>Excel export</strong> of cases.</li><li><strong>Admin reports</strong> page (<code>reportes_admin</code>) — productivity, totals per advisor.</li><li><strong>PDF per case</strong> (<code>pdf_expediente</code>) generated with WeasyPrint.</li></ul>
+<hr>
+<h2>4. Dashboards (per role)</h2>
+<table><thead><tr><th>Dashboard</th><th>What it shows</th></tr></thead><tbody><tr><td><strong>Asesor</strong></td><td>Personal KPIs, his cases by state, upcoming actions/hearings, pending tasks, avisos</td></tr><tr><td><strong>Abogada</strong></td><td>Attorney-oriented overview of the practice's cases and documents</td></tr><tr><td><strong>Admin</strong></td><td>All cases, productivity reports, total amounts, avisos, export actions</td></tr><tr><td><strong>Finanzas</strong></td><td>Financial KPIs (see Finance module)</td></tr><tr><td><strong>Superadmin</strong></td><td>Platform administration panel + permission matrix</td></tr></tbody></table>
+<hr>
+<h2>5. Legal Calculation Engine (Cálculo Laboral)</h2>
+<h3>5.1 Configurable legal rules (`LegalConfig`)</h3>
+<p>All legal parameters are stored in the database and editable from the Django admin — <strong>no code changes needed when the law changes</strong>:</p>
+<ul><li><strong>UMA</strong> daily value, general minimum wage, <strong>northern border zone (ZLF) minimum wage</strong>.</li><li><strong>Aguinaldo</strong> days (min. legal 15).</li><li><strong>Vacation premium %</strong> (min. 25%).</li><li><strong>Seniority premium:</strong> days per year (12) + salary cap type (2× UMA / 2× SM / 2× ZLF SM) and multiplier.</li><li><strong>Constitutional severance days</strong> (3 months = 90).</li><li>Only one config can be *active* at a time; saving one deactivates the others.</li></ul>
+<h3>5.2 Vacation table (LFT 2023 reform)</h3>
+<p>The system implements the current Mexican vacation table (year 1 → 12 days, +2 per year up to 20, then +2 every 5 years), extrapolating beyond the table when needed.</p>
+<h3>5.3 Concepts calculated</h3>
+<table><thead><tr><th>Concept</th><th>Article</th><th>Type</th></tr></thead><tbody><tr><td>Aguinaldo proporcional</td><td>Art. 87 LFT</td><td>automatic</td></tr><tr><td>Vacaciones proporcionales</td><td>Art. 76 LFT</td><td>automatic</td></tr><tr><td>Prima vacacional</td><td>Art. 80 LFT</td><td>automatic</td></tr><tr><td>Prima de antigüedad (with cap flag)</td><td>Art. 162 LFT</td><td>automatic</td></tr><tr><td>Indemnización constitucional (90 days)</td><td>Art. 50 LFT</td><td>automatic</td></tr><tr><td>Indemnización 20 días por año</td><td>Art. 50-II LFT</td><td>automatic</td></tr><tr><td>Vacaciones vencidas (manual days)</td><td>Art. 76 LFT</td><td>semi-auto</td></tr><tr><td>Horas extras (manual hours)</td><td>Art. 66-68 LFT</td><td>semi-auto</td></tr><tr><td>Salarios devengados (manual amount)</td><td>Art. 48 LFT</td><td>manual</td></tr><tr><td>Días festivos (manual days)</td><td>Art. 75 LFT</td><td>semi-auto</td></tr></tbody></table>
+<h3>5.4 Per-case calculation (`CalculoLaboral`)</h3>
+<ul><li>One calculation per expediente, storing a <strong>snapshot of inputs</strong> for history.</li><li><strong>Checkboxes</strong> let the advisor choose which concepts to include (defaults sensible).</li><li><strong>Manual override</strong> for vacation days actually owed (when some years were already paid or enjoyed) — shown with an *override applied* flag.</li><li>Shows daily wage, days worked, years of service, per-concept breakdown with legal references, applied-cap warnings, and <strong>total</strong>.</li><li><strong>Auto-recalculation</strong> when client/case data or legal rules change (<code>recalcular</code>).</li><li><strong>Quick simulation</strong> (<code>simulacion-rapida</code>) — instant estimate for a prospect without creating a case: enter salary + dates and get the full breakdown.</li></ul>
+<hr>
+<h2>6. Legal Document Generation</h2>
+<h3>6.1 Machotes (reusable HTML templates)</h3>
+<ul><li>Templates categorized as: <strong>Demanda Laboral, Carta Finiquito, Convenio, Solicitud, Citatorio, Otro</strong>; with jurisdiction (Federal / Estatal BC / Both), optional dismissal type, icon, active flag, and ordering.</li><li><strong>Favorite</strong> templates float to the top of the editor.</li><li>Template body is HTML using <strong>markers</strong> like <code>{{ nombre }}</code>, <code>{{ empresa }}</code>, etc.</li></ul>
+<h3>6.2 Marker injection engine (`marcadores.py`)</h3>
+<ul><li>~40 markers with <strong>real case data</strong>: client, employer, case, dates (in Spanish, e.g. "1 de enero de 2024"), salary formatting, <strong>and computed benefits</strong> (aguinaldo, vacations, indemnity…) pulled automatically from the calculation engine.</li><li>Missing data renders as visible placeholders (<code>[CURP]</code>, <code>[MONTO]</code>, …) instead of blank or crashing — so the user knows exactly what to fill in.</li><li><strong>Completeness checker</strong>: lists which fields are complete/incomplete per section (Cliente, Empleo, Empresa, Expediente) with <strong>direct edit links</strong> and a completeness percentage.</li></ul>
+<h3>6.3 Document workflow</h3>
+<ol start="1"><li>Choose a machote from the catalog (or from the case).</li><li><strong>Prepare</strong> — see which data is missing, click through to fix it.</li><li><strong>Edit/preview</strong> the rendered document in the browser.</li><li><strong>Generate/download</strong> as PDF.</li><li>Optionally <strong>save the edited document as a new machote</strong> (team template library grows organically).</li></ol>
+<h3>6.4 Import machotes from Word</h3>
+<ul><li><code>.docx</code> files (e.g. a folder of existing demandas) are converted to HTML templates via the <code>importar_machotes</code> command or web import, preserving markers where possible.</li><li>Template library is managed from the Django admin or the machotes UI.</li></ul>
+<h3>6.5 Demanda Laboral generator (`demanda_generator.py`)</h3>
+<ul><li>Generates a <strong>professional Mexican labor lawsuit document</strong> (Word <code>.docx</code>) with all case data, integrated calculations, print/filing-ready formatting.</li><li>A <strong>step-by-step wizard</strong> (<code>demanda_asistente</code>) guides through sections of the demanda; a <strong>direct generator</strong> produces the document in one click.</li><li>Downloads as <code>.docx</code> for editing/signing.</li></ul>
+<hr>
+<h2>7. Conciliation Automation (Portal de Baja California)</h2>
+<p>The system integrates with the official portal <code>app.conciliacionbc.gob.mx</code> in <strong>two modes</strong>.</p>
+<h3>7.1 Server-side automation (`conciliacion_automation.py` + Celery)</h3>
+<ul><li>Fills the real multi-step portal flow: privacy notice → industry → conflict date &amp; object → worker (solicitante) → employer (citado) → description → submit.</li><li>Runs <strong>headless</strong> (server) or <strong>visible/debug</strong> mode.</li><li>Executed asynchronously via <strong>Celery worker</strong> (or threading fallback without Redis) so HTTP requests never time out.</li><li>Live progress page (<code>conciliacion_procesando</code>) showing <strong>screenshots of the browser</strong> and elapsed time; retry support.</li><li>On success: captures the <strong>folio</strong>, saves the <strong>acuse PDF</strong> into the case, marks TareaConciliacion as completed with full logs.</li><li>Management command <code>enviar_solicitud_conciliacion</code> for batch/CLI sending.</li></ul>
+<h3>7.2 Acuse parser (`acuse_parser.py`)</h3>
+<p>When an official acuse PDF is available (auto-downloaded or manually uploaded), the system <strong>extracts its text with PyMuPDF</strong> and auto-populates the case:</p>
+<ul><li>Folio (e.g. <code>TIJ/26427/2026</code>), request date, applicant name, cited company, conflict date, object, conciliation unit.</li><li><strong>Maps the conciliation object → dismissal type</strong> (e.g. "Despido" → injustificado).</li><li><strong>Preview screen</strong> shows detected values vs. current values (new/differing flagged) and lets the advisor <strong>confirm</strong> before saving.</li></ul>
+<h3>7.3 Chrome extension — "Conciliación BC Asistente"</h3>
+<p>For when automated navigation is detected or a CAPTCHA must be solved by a human, the companion <strong>Chrome extension (Manifest V3)</strong> fills the portal form <strong>in the advisor's own browser</strong>:</p>
+<ul><li>The advisor clicks *Enviar a Conciliación → Desde mi navegador (Extensión de Chrome)*.</li><li>The extension shows pending tasks (case number, client, company, CURP) in its popup.</li><li><strong>🚀 Llenar en el portal</strong> opens the portal with the form <strong>already filled</strong> (privacy, industry, dates, worker, employer, description) via a content script — so the portal sees a human-driven session.</li><li>The advisor reviews, solves CAPTCHAs live, and clicks *Enviar solicitud* himself.</li><li><strong>🔍 Ya envié, detectar acuse</strong> — the extension detects the folio, downloads the acuse PDF, takes a screenshot, and <strong>reports everything back to the app's API</strong> (authenticated with the user's personal token), attaching the PDF to the case.</li><li>Config screen (options) stores the app URL + token and verifies connectivity.</li><li>The extension package can be <strong>downloaded as a .zip</strong> from the app (<code>/extension/descargar/</code>), ready to load unpacked into Chrome.</li></ul>
+<h3>7.4 Manual fallbacks</h3>
+<ul><li>Upload the acuse PDF manually (<code>subir-conciliacion</code>), then preview/confirm the parsed data.</li><li>Download a <strong>pre-filled conciliation request PDF</strong> to file manually at the center.</li><li>Upload the acuse via the normal document flow.</li></ul>
+<hr>
+<h2>8. WhatsApp Integration</h2>
+<p>Two delivery methods:</p>
+<ol start="1"><li><strong>Deep links (wa.me)</strong> — free; opens WhatsApp with a pre-filled message.</li><li><strong>Twilio WhatsApp API</strong> — server-sent messages (needs Twilio credentials); falls back to deep link automatically when not configured.</li></ol>
+<h3>Features</h3>
+<ul><li><strong>Templates</strong> for: hearing reminder, citatorio, convenio follow-up, general follow-up, document request, custom messages — with variables (<code>{cliente}</code>, <code>{fecha}</code>, <code>{asesor}</code>…).</li><li><strong>Automatic messages on state changes</strong>: every case state has a configured message (new case, solicitud created, citatorio, hearing, not notified, rescheduled, convenio, no agreement, demanda, closed). Per-case toggle to enable/disable.</li><li><strong>Message history</strong> per case with status (pending/sent/failed), channel, and logs.</li><li>Mexican phone normalization (adds country code 52, strips common formatting).</li><li>Management command <code>enviar_whatsapp_automatico</code> to flush pending messages (with <code>--dry-run</code> and <code>--send-twilio</code> options).</li></ul>
+<hr>
+<h2>9. Imports &amp; Utilities</h2>
+<h3>9.1 CLT import (citas from Excel)</h3>
+<p><code>CLT.xlsx</code> (pre-scheduled conciliation appointments from the CCL) is imported as <strong>expedientes with scheduled hearings</strong>:</p>
+<ul><li>Per-sheet import (e.g. monthly tabs), auto-creates <strong>advisor users</strong> found in the file if needed, and cleanup options for test data.</li><li>CURP is optional at import time and captured later (so numbers flow in fast).</li></ul>
+<h3>9.2 Company catalog (`Empresa`)</h3>
+<ul><li>Import from <code>Empresas y Domicilios.xlsx</code> — <strong>idempotent</strong>, names normalized (uppercase, no accents, compacted spaces) so re-importing a growing file never duplicates.</li><li>Person type auto-detected; detailed address kept for <strong>autocomplete in the client form</strong> (<code>empresas/buscar/</code> AJAX endpoint).</li></ul>
+<h3>9.3 CURP generator</h3>
+<p>Standalone tool to <strong>generate a valid CURP</strong> from personal data (name, birth date, gender, state) — saves manual lookups when onboarding clients.</p>
+<h3>9.4 User settings (Ajustes)</h3>
+<p>Per-user settings page: profile info, phone, WhatsApp automation preference, API token management, extension configuration.</p>
+<hr>
+<h2>10. Finance Module (Módulo Finanzas)</h2>
+<p>Organized by <strong>office</strong> (sucursal) and by <strong>work week</strong> for operational reporting.</p>
+<h3>10.1 Offices</h3>
+<p>Catalog of firm offices with address, phone, manager, active flag. Each office has its own income/expense/cash-register operations.</p>
+<h3>10.2 Work weeks</h3>
+<p>The finance system revolves around <strong>weeks</strong> (Mon–Sun): the current week is created automatically; every movement can be attributed to a week. Weeks can be opened/closed. Totals per week: <strong>income</strong> (cash + settlement payments), <strong>expenses</strong> (cash + expenses + payroll) and <strong>balance</strong> are computed on the fly.</p>
+<h3>10.3 Settlement payments (`SettlementPayment`)</h3>
+<p>Payments received from settlement agreements (convenios): date, client, case, amount, payment method (cash/transfer/check/credit/debit/deposit/other), office, notes, auditor.</p>
+<h3>10.4 Expenses (`Expense`)</h3>
+<p>Operational expenses per office with category (rent, utilities, internet, stationery, advertising, salaries, gas, maintenance, taxes, equipment, furniture, insurance, professional fees, other), provider, tax folio/invoice, and auditor.</p>
+<h3>10.5 Agreements &amp; honorarios (`Agreement` / `Honorario`)</h3>
+<ul><li><strong>Convenios</strong> with the client: amount, state (pending signature → signed → paid / partially paid / cancelled), responsible person, office, and automatic <strong>total fees</strong>.</li><li><strong>Honorarios:</strong> one or more fee entries per convenio with a <strong>% tariff</strong> (25/30/35/40/50%); amount auto-computed (<code>convenio × % ÷ 100</code>), expected/payment dates, paid/pending sums aggregated on the convenio.</li></ul>
+<h3>10.6 Commissions (`Commission`)</h3>
+<p>Advisor commissions on closed convenios: % configurable, <strong>amount auto-computed</strong>, state (pending/paid/cancelled), payment date, office, auditor.</p>
+<h3>10.7 Employees &amp; payroll (`Employee` / `Payroll`)</h3>
+<ul><li>Employee catalog with position (administrative, legal advisor, supervisor, accountant, receptionist, assistant, director…), pay period, salary, office, active flag.</li><li><strong>Payroll payments</strong> per period: period type (weekly/biweekly/monthly/extraordinary/ aguinaldo/vacation premium/bonus), period range, salary paid, deductions (ISR/IMSS), <strong>total auto-computed</strong> (<code>salario − descuentos</code>), office, auditor.</li></ul>
+<h3>10.8 Cash register (`CashMovement`)</h3>
+<p>Daily cash movements per office and date: <strong>income</strong> (convenio payment, client payment, advance, refund, other) or <strong>expense</strong> (stationery, gas, rent, utilities, internet, phone, travel, commissions, fees, other). Category coherence with type is <strong>validated</strong> (e.g. an income can't have an expense category). Reference field links to case/invoice.</p>
+<h3>10.9 Partners, loans &amp; profit distribution</h3>
+<ul><li><strong>Partners (`Partner`):</strong> participation % per partner for profit sharing.</li><li><strong>Partner loans (`PartnerLoan`):</strong> formal record of loans between partners (origin → destination, amount, concept, status, pending balance), replacing informal IOUs.</li><li><strong>Profit distribution (`ProfitDistribution` + `PartnerProfit`):</strong></li><li>Auto-computes <strong>net profit</strong> = convenio amount − fees − commissions − withholdings − related expenses.</li><li>Distributes it among partners per their participation % (<strong>individual share auto-calculated</strong>), with states (draft → distributed → confirmed/cancelled).</li><li>Per-partner <strong>accumulated summaries</strong> (generated / paid / pending) auto-updated when distributions are confirmed.</li></ul>
+<h3>10.10 Financial dashboard</h3>
+<ul><li>KPIs per office and overall; <strong>monthly cash flow</strong> chart fed by the <code>api_flujo_mensual</code> JSON endpoint; <strong>Excel export</strong> of the dashboard totals.</li><li><strong>Convenio reports</strong> (<code>reporte_convenios</code>) with Excel export.</li></ul>
+<hr>
+<h2>11. Management Commands (CLI)</h2>
+<table><thead><tr><th>Command</th><th>Purpose</th></tr></thead><tbody><tr><td><code>crear_usuarios_prueba</code></td><td>Create test users (1 superadmin, 4 admins, 15 asesores)</td></tr><tr><td><code>seed_datos</code> / <code>seed_clientes_prueba</code></td><td>Seed demo cases (10 labor scenarios / full clients with calculations)</td></tr><tr><td><code>enviar_recordatorios</code></td><td>Send upcoming-action/hearing reminders (<code>--days</code>, <code>--dry-run</code>)</td></tr><tr><td><code>enviar_solicitud_conciliacion</code></td><td>Submit conciliation requests to the BC portal from CLI (<code>--headless</code>)</td></tr><tr><td><code>enviar_whatsapp_automatico</code></td><td>Flush pending automatic WhatsApp messages (<code>--dry-run</code>, <code>--send-twilio</code>)</td></tr><tr><td><code>importar_clt</code></td><td>Import CLT.xlsx citas as expedientes with hearings</td></tr><tr><td><code>importar_empresas</code></td><td>Import the companies/addresses catalog (idempotent)</td></tr><tr><td><code>importar_machotes</code></td><td>Convert <code>.docx</code> templates into machotes (<code>--reload</code>, <code>--file</code>)</td></tr><tr><td><code>migrate_sqlite_to_pg</code></td><td>One-shot data migration from SQLite to PostgreSQL</td></tr></tbody></table>
+<hr>
+<h2>12. Integrations Summary</h2>
+<table><thead><tr><th>Service</th><th>Use</th><th>Config</th></tr></thead><tbody><tr><td><strong>Selenium</strong></td><td>Portal automation (headless/debug)</td><td>included</td></tr><tr><td><strong>Celery + Redis</strong></td><td>Background tasks (conciliation automation); threading fallback</td><td><code>REDIS_URL</code></td></tr><tr><td><strong>Twilio</strong></td><td>WhatsApp API sending (optional)</td><td><code>TWILIO_*</code> env vars</td></tr><tr><td><strong>SMTP</strong></td><td>Password-reset emails (console backend in dev)</td><td><code>EMAIL_*</code> env vars</td></tr><tr><td><strong>WeasyPrint</strong></td><td>PDF generation (expediente PDFs, documents)</td><td>included</td></tr><tr><td><strong>python-docx</strong></td><td>Word (.docx) demanda generation</td><td>included</td></tr><tr><td><strong>PyMuPDF (fitz)</strong></td><td>Acuse PDF text extraction</td><td>included</td></tr><tr><td><strong>openpyxl</strong></td><td>Excel imports (CLT, companies) and exports</td><td>included</td></tr><tr><td><strong>Chrome extension API</strong></td><td>Token-authenticated REST endpoints for the extension</td><td>personal <code>api_token</code></td></tr><tr><td><strong>Railway</strong></td><td>Deployment; auto-detects domain, PostgreSQL and Redis env vars</td><td>env-driven</td></tr></tbody></table>
+<hr>
+<h2>13. Architecture &amp; Tech Notes</h2>
+<ul><li><strong>Backend:</strong> Django 5.x, <code>es-mx</code> locale, <code>America/Mexico_City</code> timezone.</li><li><strong>Database:</strong> SQLite (dev) / PostgreSQL (prod) via <code>DATABASE_URL</code>; Railway env auto-detection (<code>PGHOST</code>…).</li><li><strong>Frontend:</strong> Tailwind CSS (CDN) + <strong>HTMX</strong> for dynamic interactions (no heavy JS framework); responsive design.</li><li><strong>Static files:</strong> Whitenoise (<code>CompressedManifestStaticFilesStorage</code>) for zero-Nginx production serving.</li><li><strong>Background work:</strong> Celery when Redis is present, <strong>threading fallback</strong> otherwise (graceful degradation for local dev).</li><li><strong>Auditability:</strong> every key entity (payments, expenses, payroll, cash, loans, distributions, commissions) records <code>registrado_por</code>/<code>creado_por</code>.</li><li><strong>Deployment:</strong> Dockerfile, Railway config, entrypoint (auto-starts Celery worker when Redis exists), Nginx + Gunicorn recipe for VPS (droplet), and client-facing deploy guide.</li></ul>
+<hr>
+<h2>14. Testing</h2>
+<p>The suite includes <strong>48 tests</strong> (expedientes, finanzas, automation) covering state transition validation, financial calculations, and the verification script <code>verify_demandas_calculos.py</code> (used by CI). Run with:</p>
+<pre><code>uv run python manage.py test</code></pre>
+<hr>
+<h2>15. Quick Start (dev)</h2>
+<pre><code>uv sync                          # install dependencies
+uv run python manage.py migrate  # DB migrations
+uv run python manage.py crear_usuarios_prueba
+uv run python manage.py runserver</code></pre>
+<p>Test logins: <code>superadmin/Admin123!</code> · <code>admin1/Admin1!</code> · <code>asesor1/Asesor1!</code></p>
+</section></body>
+</html>

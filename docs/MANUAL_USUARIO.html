@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Manual de Usuario</title>
+<style>
+@page { size: A4; margin: 17mm 15mm; }
+* { box-sizing: border-box; }
+body { font-family: 'Segoe UI', 'Calibri', Arial, sans-serif; font-size: 10.5pt;
+       color: #1f2937; line-height: 1.5; margin: 0; }
+h1 { font-size: 19pt; color: #111827; border-bottom: 3px solid #1a6b3c;
+     padding-bottom: 5px; margin: 4px 0 14px; }
+h2 { font-size: 14pt; color: #1a6b3c; margin: 20px 0 8px; page-break-after: avoid; }
+h3 { font-size: 11.5pt; color: #374151; margin: 14px 0 6px; page-break-after: avoid; }
+p { margin: 6px 0; }
+ul, ol { margin: 6px 0 6px 4px; padding-left: 22px; }
+li { margin: 2px 0; }
+table { border-collapse: collapse; width: 100%; margin: 8px 0; font-size: 9pt;
+        page-break-inside: avoid; }
+th { background: #1f2937; color: #ffffff; text-align: left; padding: 5px 8px;
+     border: 1px solid #374151; }
+td { border: 1px solid #d1d5db; padding: 4px 8px; vertical-align: top; }
+tr:nth-child(even) td { background: #f9fafb; }
+code { font-family: Consolas, 'Courier New', monospace; font-size: 8.8pt;
+       background: #eef2ff; padding: 0 3px; border-radius: 3px; }
+pre { background: #f3f4f6; border: 1px solid #e5e7eb; padding: 8px 10px;
+      border-radius: 4px; white-space: pre-wrap; margin: 8px 0;
+      page-break-inside: avoid; }
+pre code { background: none; padding: 0; font-size: 8.5pt; }
+blockquote { border-left: 4px solid #f59e0b; background: #fffbeb; margin: 8px 0;
+             padding: 6px 12px; color: #78350f; }
+hr { border: none; border-top: 1px solid #e5e7eb; margin: 16px 0; }
+a { color: #2563eb; text-decoration: none; }
+strong { color: #111827; }
+.cabecera-doc { font-size: 9pt; color: #6b7280; border-bottom: 1px solid #e5e7eb;
+                padding-bottom: 6px; margin-bottom: 16px; }
+.pie-doc { margin-top: 24px; padding-top: 8px; border-top: 1px solid #e5e7eb;
+           font-size: 8.5pt; color: #9ca3af; text-align: center; }
+</style>
+</head>
+<body>
+<div class="cabecera-doc">Conciliación Laboral Tijuana &mdash; Manual de Usuario</div>
+<h1>📘 Manual de Usuario — Despacho Laboral</h1>
+<blockquote><strong>Para:</strong> Asesores, personal administrativo (admins) y superadmin <strong>Sistema:</strong> Conciliación Laboral Tijuana — Despacho Laboral <strong>Versión:</strong> 1.0 · Agosto 2026</blockquote>
+<p>Este manual explica <strong>paso a paso</strong> cómo hacer el trabajo diario en el sistema: desde crear un cliente y su expediente, hasta enviar la conciliación al portal, generar documentos legales, comunicarte con el cliente por WhatsApp y gestionar los reportes.</p>
+<hr>
+<h2>Índice</h2>
+<ol start="1"><li><a href="#1-primeros-pasos">Primeros pasos</a></li><li><a href="#2-el-dashboard-del-asesor">El dashboard del asesor</a></li><li><a href="#3-registrar-un-cliente">Registrar un cliente</a></li><li><a href="#4-crear-un-expediente-caso">Crear un expediente (caso)</a></li><li><a href="#5-la-ficha-del-expediente">La ficha del expediente</a></li><li><a href="#6-cálculos-laborales">Cálculos laborales</a></li><li><a href="#7-solicitud-de-conciliación">Solicitud de conciliación</a></li><li><a href="#8-enviar-al-portal-de-conciliación">Enviar al portal de conciliación</a></li><li><a href="#9-extensión-de-chrome">Extensión de Chrome</a></li><li><a href="#10-documentos-legales-machotes-y-demanda">Documentos legales (machotes y demanda)</a></li><li><a href="#11-whatsapp">WhatsApp</a></li><li><a href="#12-transferencias-de-casos">Transferencias de casos</a></li><li><a href="#13-notificaciones-y-avisos">Notificaciones y avisos</a></li><li><a href="#14-sección-de-administración">Sección de administración</a></li><li><a href="#15-búsqueda-global">Búsqueda global</a></li><li><a href="#16-solución-de-problemas-comunes">Solución de problemas comunes</a></li><li><a href="#17-referencia-rápida-de-estados">Referencia rápida de estados</a></li></ol>
+<hr>
+<h2>1. Primeros pasos</h2>
+<h3>1.1 Iniciar sesión</h3>
+<ol start="1"><li>Abre la URL de la aplicación en tu navegador (Chrome recomendado).</li><li>Escribe tu <strong>usuario</strong> y <strong>contraseña</strong>.</li><li>Presiona <strong>Iniciar sesión</strong>.</li></ol>
+<p>Al entrar, el sistema te lleva automáticamente a tu dashboard según tu rol (asesor → dashboard del asesor; admin → dashboard administrativo).</p>
+<h3>1.2 ¿Olvidaste tu contraseña?</h3>
+<ol start="1"><li>En la pantalla de login, haz clic en <strong>¿Olvidaste tu contraseña?</strong></li><li>Escribe tu correo y presiona <strong>Enviar</strong>.</li><li>Abre el correo y sigue el enlace para crear una nueva contraseña.</li></ol>
+<h3>1.3 Cerrar sesión</h3>
+<p>Usa el botón <strong>Salir</strong> en el menú superior. Cierra sesión siempre que te alejes de tu equipo.</p>
+<h3>1.4 Navegación general</h3>
+<ul><li><strong>Menú superior:</strong> accesos a tu dashboard, expedientes, clientes, calendario, reportes (según tu rol) y tu nombre de usuario (para cerrar sesión).</li><li><strong>🔔 Campana de notificaciones:</strong> avisos del sistema, transferencias y recordatorios. Haz clic en una notificación para ir a donde te lleva.</li><li><strong>🔍 Búsqueda global:</strong> siempre disponible en la parte superior.</li></ul>
+<hr>
+<h2>2. El dashboard del asesor</h2>
+<p>Al entrar verás tu panel personal con:</p>
+<table><thead><tr><th>Sección</th><th>Qué contiene</th></tr></thead><tbody><tr><td><strong>Avisos y Pendientes de la Semana</strong></td><td>Avisos obligatorios del administrador (🔴 alta, 🟡 media, 🟢 baja prioridad). Léelos y márcalos como vistos cuando el administrador lo pida.</td></tr><tr><td><strong>Tarjetas de estadísticas</strong></td><td>Total de casos, casos activos, casos cerrados, pendientes y <strong>alertas</strong> (casos que requieren tu atención).</td></tr><tr><td><strong>Próximas Audiencias</strong></td><td>Tus audiencias programadas con fecha y hora. Haz clic para abrir el expediente.</td></tr><tr><td><strong>Próximas Asesorías Gratuitas</strong></td><td>Clientes con asesoría gratuita agendada. Haz clic para ver/editar al cliente.</td></tr><tr><td><strong>Mis Casos Recientes</strong></td><td>Tus casos más recientes con número, cliente, estado y prioridad. Botón <strong>Ver</strong> para abrir cada uno y <strong>Ver todos →</strong> para la lista completa.</td></tr></tbody></table>
+<blockquote>⚠️ <strong>Importante:</strong> como asesor solo ves <strong>tus</strong> casos. Si un caso no aparece, probablemente está asignado a otro asesor o aún no te lo asignan.</blockquote>
+<hr>
+<h2>3. Registrar un cliente</h2>
+<ol start="1"><li>Ve a <strong>Clientes → Nuevo cliente</strong> (o desde el dashboard, en el menú superior).</li><li>Llena los datos en secciones:</li></ol>
+<ul><li><strong>Identidad:</strong> nombre completo, CURP, RFC, teléfono, WhatsApp, correo, fecha de nacimiento y género.</li><li><strong>Dirección particular:</strong> calle, número, código postal y colonia.</li><li><strong>Datos del patrón (empresa):</strong> nombre, actividad económica, teléfono, razón social, domicilio y referencias.</li><li><strong>Empleo:</strong> puesto, salario mensual, periodo de pago, horas semanales, jornada, fecha de ingreso y fecha de salida/despido.</li><li><strong>Captación y oficina:</strong> cómo se enteró del despacho y qué oficina atendió (Plaza Patria, Otay, CLT).</li><li><strong>Asesoría gratuita:</strong> marca si se ofreció, si se agendó y la fecha.</li></ul>
+<ol start="3"><li>Consejos:</li></ol>
+<ul><li><strong>CURP:</strong> si no la tienes, usa el <strong>Generador de CURP</strong> (sección utilidades) y cópiala.</li><li><strong>Empresa:</strong> escribe el nombre y usa el <strong>buscador de empresas</strong> que aparece para autocompletar nombre y domicilio del catálogo. Si no aparece, captúralo a mano.</li></ul>
+<ol start="4"><li>Presiona <strong>Guardar</strong>.</li></ol>
+<blockquote>💡 <strong>Dato clave:</strong> mientras más completo esté el cliente, más automático será todo lo demás (formularios, documentos y envío al portal). Los datos del cliente se usan en TODOS los documentos.</blockquote>
+<hr>
+<h2>4. Crear un expediente (caso)</h2>
+<ol start="1"><li>Ve a <strong>Expedientes → Nuevo expediente</strong>.</li><li>Selecciona el <strong>cliente</strong> (busca por nombre o CURP). Si no existe, créalo primero.</li><li>Selecciona el <strong>asesor asignado</strong> (por defecto eres tú).</li><li>Completa los datos del caso:</li></ol>
+<ul><li><strong>Monto reclamado</strong> y <strong>monto convenio</strong> (si ya hay acuerdo).</li><li><strong>Tipo de despido</strong> (justificado, injustificado, voluntario, rescisión, otro).</li><li><strong>Prestaciones reclamadas</strong> (texto libre).</li><li><strong>Fecha de audiencia</strong>, <strong>próxima acción</strong> y <strong>prioridad</strong> (baja/media/alta).</li><li><strong>Notas internas</strong> (opcional).</li></ul>
+<ol start="5"><li>Presiona <strong>Guardar</strong>.</li></ol>
+<p>El sistema genera el <strong>número de expediente automáticamente</strong> (formato <code>AAAA-####</code>, ej. <code>2026-0042</code>) — no lo puedes cambiar.</p>
+<hr>
+<h2>5. La ficha del expediente</h2>
+<p>Al abrir un expediente (<code>Ver</code> en tu lista) encuentras todo el caso en una sola pantalla:</p>
+<h3>5.1 Barra de acciones (parte superior)</h3>
+<table><thead><tr><th>Botón</th><th>Qué hace</th></tr></thead><tbody><tr><td><strong>Cálculos</strong></td><td>Abre el cálculo laboral del caso.</td></tr><tr><td><strong>WhatsApp</strong></td><td>Envía mensajes al cliente.</td></tr><tr><td><strong>Solicitud</strong></td><td>Llena el formato oficial de solicitud de conciliación.</td></tr><tr><td><strong>🌐 Conciliación ▾</strong></td><td>Menú desplegable con: Envío Automático, Descargar Formulario (PDF) y Subir Acuse manual.</td></tr><tr><td><strong>Documentos</strong></td><td>Catálogo de machotes para generar documentos (solo si tienes permiso).</td></tr><tr><td><strong>Demanda / Asistente de Demanda</strong></td><td>Genera la demanda laboral (solo si tienes permiso).</td></tr><tr><td><strong>Transferir</strong></td><td>Solicita transferir el caso a otro asesor.</td></tr><tr><td><strong>Editar / Editar Cliente</strong></td><td>Modifica el expediente o los datos del cliente.</td></tr><tr><td><strong>PDF</strong></td><td>Descarga el expediente en PDF.</td></tr></tbody></table>
+<h3>5.2 Información del caso</h3>
+<ul><li>Asesor, cliente (con CURP), empresa, oficina, fecha de creación.</li><li><strong>Formulario de Conciliación:</strong> tipo de despido, folio de trámite, fecha de trámite, resultado de audiencia y prestaciones reclamadas.</li><li><strong>Montos:</strong> monto reclamado y monto convenio.</li><li><strong>Fechas:</strong> audiencia, próxima acción, última actualización.</li><li><strong>Notas internas</strong> del expediente.</li></ul>
+<h3>5.3 Cambiar el estado del caso</h3>
+<ol start="1"><li>En el bloque <strong>Cambiar Estado</strong>, el sistema muestra <strong>solo las transiciones permitidas</strong> desde el estado actual (botones de colores).</li><li>Haz clic en el estado nuevo (ej. <strong>Solicitud creada</strong> cuando envíes la solicitud).</li><li>La página se recarga y el estado queda actualizado. El sistema <strong>no permite saltos inválidos</strong> (ej. de "Nuevo" a "Audiencia" directamente).</li></ol>
+<h3>5.4 Registrar el resultado de una audiencia</h3>
+<p>Cuando el caso está en <strong>Audiencia programada</strong>, aparece el bloque <strong>Registrar Resultado de Audiencia</strong> con 4 tarjetas:</p>
+<ul><li>❌ <strong>No notificado</strong> → se genera una nueva audiencia.</li><li>🤝 <strong>Convenio</strong> → te pide capturar el <strong>monto del convenio</strong> antes de guardar.</li><li>🚫 <strong>Sin conciliación</strong> → el caso queda listo para preparar la demanda.</li><li>🔄 <strong>Reprogramar</strong> → nueva fecha.</li></ul>
+<p>Haz clic en la tarjeta correspondiente; si es convenio, escribe el monto y confirma.</p>
+<h3>5.5 Documentos del caso</h3>
+<ol start="1"><li>En el bloque <strong>Documentos</strong>, selecciona el archivo (PDF, imagen…).</li><li>Escribe una <strong>descripción</strong> (ej. "INE del cliente") y elige el <strong>tipo</strong> (INE, contrato, evidencia, screenshot, citatorio, PDF, otro).</li><li>Presiona <strong>Subir Documento</strong>.</li><li>Cada documento muestra quién lo subió y cuándo. Puedes abrirlo (clic en el nombre) o eliminarlo con <strong>Eliminar</strong>.</li></ol>
+<h3>5.6 Notas y seguimiento</h3>
+<ul><li>Escribe una nota en <strong>Notas y Seguimiento</strong> y presiona <strong>Agregar Nota</strong>.</li><li>Las notas quedan en un <strong>timeline</strong> con autor y fecha (como un chat interno del caso).</li><li>La <strong>Línea de Tiempo</strong> al final muestra todo el historial de movimientos del expediente (creación, cambios de estado, documentos, notas, audiencias).</li></ul>
+<hr>
+<h2>6. Cálculos laborales</h2>
+<h3>6.1 Calcular prestaciones de un caso</h3>
+<ol start="1"><li>Abre el expediente y presiona <strong>Cálculos</strong> (o desde la lista de expedientes).</li><li>Revisa los datos base (salario, fechas, periodo de pago). El sistema calcula el <strong>salario diario</strong>, <strong>días trabajados</strong> y <strong>años de servicio</strong>.</li><li>Marca/desmarca con <strong>checkboxes</strong> qué conceptos incluir (aguinaldo, vacaciones, prima vacacional, prima de antigüedad, indemnización 90 días, 20 días por año, vacaciones vencidas, horas extras, salarios devengados, días festivos).</li><li>Para conceptos semiautomáticos, captura los datos extra (ej. <strong>días de vacaciones vencidas</strong>, <strong>cantidad de horas extra</strong>, <strong>días festivos</strong>).</li><li>Presiona <strong>Calcular / Guardar</strong>. Verás el <strong>desglose por concepto</strong> con su artículo de la LFT, el <strong>tope aplicado</strong> (si aplica) y el <strong>total</strong>.</li></ol>
+<blockquote>💡 <strong>Override de vacaciones:</strong> si el caso no corresponde a los días por antigüedad (ej. ya se pagaron algunos años), captura en el campo "Días de vacaciones a pagar (manual)" los días realmente adeudados. El sistema lo indica con la bandera *override aplicado*.</blockquote>
+<h3>6.2 Simulación rápida (sin crear caso)</h3>
+<ol start="1"><li>Ve a <strong>Simulación Rápida</strong> (sección cálculos).</li><li>Captura salario, fechas de ingreso y salida, y periodo de pago.</li><li>Presiona <strong>Simular</strong> para ver el desglose completo. Ideal para cotizar una asesoría antes de abrir el caso.</li></ol>
+<blockquote>⚠️ Los valores legales (UMA, salario mínimo, días de aguinaldo, etc.) los actualiza el administrador. No modifiques nada en el panel de admin de Django a menos que sepas lo que haces.</blockquote>
+<hr>
+<h2>7. Solicitud de conciliación</h2>
+<p>El formato oficial <strong>"Solicitud de Conciliación"</strong> del Centro de Conciliación Laboral de Baja California se llena con los datos del expediente (la mayoría vienen prellenados y solo se editan desde la ficha del cliente).</p>
+<ol start="1"><li>Abre el expediente y presiona <strong>Solicitud</strong>.</li><li>Revisa los datos del trabajador, dirección, empleo y empresa (son de solo lectura).</li><li>Captura lo que sí se edita:</li></ol>
+<ul><li><strong>Fecha del conflicto</strong>, <strong>horas semanales</strong>, <strong>periodo de pago</strong>.</li><li><strong>Objeto de la solicitud</strong> (puedes marcar varios: Despido, Terminación voluntaria, Derecho de antigüedad, Rescisión, Pago de prestaciones, Preferencia, Ascenso, Acoso laboral).</li><li><strong>Quién entregará el citatorio</strong> (el solicitante o el notificador del centro).</li><li><strong>Discapacidad</strong> (motriz, visual, auditiva, psicosocial, habla) si aplica.</li><li><strong>Traductor</strong> (señas / lengua de origen) si aplica.</li><li><strong>Firma:</strong> nombre del firmante y fecha.</li></ul>
+<ol start="4"><li>Opciones al terminar:</li></ol>
+<ul><li><strong>💾 Guardar borrador</strong> — guarda en tu navegador (mismo equipo) para continuar después.</li><li><strong>✅ Guardar solicitud</strong> — guarda el formato en el expediente.</li></ul>
+<ol start="5"><li>Puedes <strong>Imprimir</strong> el formato desde el botón superior.</li></ol>
+<hr>
+<h2>8. Enviar al portal de conciliación</h2>
+<p>El envío al portal oficial (<code>app.conciliacionbc.gob.mx</code>) tiene <strong>3 modos</strong>. En el expediente, abre <strong>🌐 Conciliación ▾ → Envío Automático</strong> y elige:</p>
+<h3>Modo A — 🤖 Automático (Headless) *(recomendado)*</h3>
+<ol start="1"><li>En la pantalla de confirmación, revisa el <strong>resumen de datos</strong> que se enviarán (cliente, CURP, teléfono, empresa, tipo de despido, folio actual).</li><li>Si el expediente ya tiene folio, el sistema te lo advierte (se generará uno nuevo).</li><li>Selecciona <strong>Automático (Headless)</strong> y presiona <strong>🚀 Enviar al Portal de Conciliación</strong>.</li><li>El navegador automatizado trabaja en segundo plano; la página te muestra el <strong>progreso en vivo</strong> con capturas de pantalla y tiempo transcurrido.</li><li>Al terminar, el sistema <strong>guarda el folio</strong> en el expediente y <strong>adjunta el PDF del acuse</strong>. Verás el resultado en el bloque <strong>🌐 Envíos al Portal de Conciliación</strong> de la ficha del expediente.</li></ol>
+<h3>Modo B — 👁️ Visible (Debug)</h3>
+<p>Igual que el automático, pero el navegador se abre en pantalla para que veas cada paso. Útil para detectar por qué un envío falla.</p>
+<h3>Modo C — 📲 Desde mi navegador (Extensión de Chrome)</h3>
+<p>Cuando la automatización se traba (CAPTCHA, cambios en el portal), usa la extensión que llena el formulario <strong>en tu propio navegador</strong> y tú das el clic final. Detalles en la <a href="#9-extensión-de-chrome">sección 9</a>.</p>
+<h3>8.1 Si el envío falla</h3>
+<ul><li>En la ficha del expediente, el bloque de envíos muestra <strong>❌ Error</strong> con el motivo.</li><li>Presiona <strong>🔄 Reintentar</strong> para volver a intentarlo.</li><li>Si sigue fallando, usa el <strong>Modo C (extensión)</strong> o el <strong>fallback manual</strong>:</li></ul>
+<h3>8.2 Fallback manual — subir el acuse</h3>
+<ol start="1"><li>En el expediente, abre <strong>🌐 Conciliación ▾</strong>.</li><li>En <strong>📄 Subir PDF Manual</strong>, selecciona el PDF del acuse descargado del portal y presiona <strong>📥 Subir Acuse y Extraer Datos</strong>.</li><li>El sistema <strong>lee el acuse automáticamente</strong> y te muestra una <strong>vista previa</strong>: folio, solicitante, empresa citada, fecha del conflicto, tipo de despido y unidad.</li><li>Revisa los valores detectados vs. los actuales (marca los que son nuevos o difieren) y presiona <strong>Confirmar</strong> para guardarlos en el expediente.</li></ol>
+<h3>8.3 Descargar el formulario prellenado</h3>
+<p>En <strong>🌐 Conciliación ▾ → 📥 Descargar Formulario</strong> obtienes el PDF del formato de solicitud ya llenado, para presentarlo manualmente en el centro si así se requiere.</p>
+<hr>
+<h2>9. Extensión de Chrome</h2>
+<h3>9.1 Instalación (una vez por computadora)</h3>
+<ol start="1"><li>Abre Chrome y ve a <strong>`chrome://extensions`</strong>.</li><li>Activa el <strong>Modo de desarrollador</strong> (interruptor arriba a la derecha).</li><li>Haz clic en <strong>"Cargar descomprimida"</strong> y selecciona la carpeta de la extensión (descárgala desde la app: <strong>Extensión de Chrome → Descargar paquete (.zip)</strong> y descomprímela).</li><li>La extensión <strong>"Conciliación BC — Asistente"</strong> queda instalada.</li></ol>
+<h3>9.2 Configuración (una vez)</h3>
+<ol start="1"><li>Haz clic en el ícono de la extensión → <strong>⚙️ Opciones</strong>.</li><li>Pega la <strong>URL de la app</strong> (ej. <code>https://tu-app.railway.app</code>).</li><li>Pega tu <strong>token personal</strong>:</li></ol>
+<ul><li>En la app: abre cualquier expediente → <strong>Enviar a Conciliación</strong> → enlace a <strong>"Extensión de Chrome"</strong> (o entra a <code>/extension/config/</code>).</li><li>Copia el token que aparece ahí. Si se filtra, regenera uno nuevo desde esa misma página.</li></ul>
+<ol start="4"><li><strong>💾 Guardar configuración</strong> (verifica la conexión automáticamente).</li></ol>
+<h3>9.3 Uso por caso</h3>
+<ol start="1"><li>En la app, abre el expediente → <strong>Enviar a Conciliación</strong> → elige <strong>"📲 Desde mi navegador (Extensión de Chrome)"</strong> → <strong>Enviar</strong>.</li><li>Haz clic en el ícono de la extensión → verás la tarea pendiente → <strong>🚀 Llenar en el portal</strong>.</li><li>Se abre el portal con el formulario <strong>ya llenado</strong>. <strong>Revisa los datos</strong>, resuelve el CAPTCHA si aparece y haz clic en <strong>"Enviar solicitud"</strong>.</li><li>En la página del acuse, haz clic en <strong>"🔍 Ya envié, detectar acuse"</strong> (o se detecta solo). La extensión guarda el <strong>folio</strong> en la app, descarga el <strong>acuse PDF</strong> y lo adjunta al expediente.</li><li>Si la descarga automática del acuse falla, descárgalo del portal y súbelo con el flujo manual (<a href="#82-fallback-manual--subir-el-acuse">sección 8.2</a>).</li></ol>
+<hr>
+<h2>10. Documentos legales (machotes y demanda)</h2>
+<blockquote>🔒 <strong>Permiso:</strong> solo usuarios con el permiso <strong>"Puede generar documentos legales"</strong> (configurado por el administrador) ven estos botones.</blockquote>
+<h3>10.1 Generar un documento desde una plantilla (machote)</h3>
+<ol start="1"><li>Abre el expediente y presiona <strong>Documentos</strong> (catálogo de machotes).</li><li>Elige la plantilla adecuada (Demanda Laboral, Carta Finiquito, Convenio, Solicitud, Citatorio, Otro). Las favoritas aparecen primero.</li><li>En <strong>Preparar documento</strong> verás <strong>qué datos faltan</strong> (ej. CURP, salario, dirección de la empresa) con su porcentaje de completitud. Haz clic en el enlace de cada campo faltante para <strong>editarlo directamente</strong>.</li><li>Cuando esté completo, <strong>Generar</strong> el documento → se abre el <strong>editor</strong> con el texto ya llenado (los <code>{{ marcadores }}</code> se reemplazaron con los datos del caso).</li><li>Revisa, ajusta lo necesario y <strong>Descargar PDF</strong>.</li><li>Opcional: <strong>Guardar como machote</strong> para que el equipo reutilice tu versión.</li></ol>
+<h3>10.2 Asistente de Demanda (paso a paso)</h3>
+<ol start="1"><li>En el expediente, presiona <strong>Asistente de Demanda</strong>.</li><li>Responde cada sección guiada (actor, demandado, hechos, prestaciones, cálculos).</li><li>Al final, <strong>genera la demanda</strong> lista para descargar.</li></ol>
+<h3>10.3 Generar la demanda directamente</h3>
+<ul><li>En el expediente, presiona <strong>Demanda</strong> → se genera el documento de <strong>Demanda Laboral</strong> en Word (<code>.docx</code>) con todos los datos y cálculos integrados → <strong>Descargar</strong>.</li></ul>
+<blockquote>💡 El administrador gestiona las plantillas desde <strong>Machotes → Catálogo/Importar</strong>. Los archivos Word existentes se pueden importar como plantillas.</blockquote>
+<hr>
+<h2>11. WhatsApp</h2>
+<h3>11.1 Enviar un mensaje</h3>
+<ol start="1"><li>En el expediente, presiona <strong>WhatsApp</strong> (botón verde).</li><li>Elige una <strong>plantilla</strong> (recordatorio de audiencia, citatorio, seguimiento de convenio, seguimiento, solicitud de documentos o mensaje personalizado).</li><li>Revisa el mensaje (puedes editarlo) y el destino (WhatsApp o teléfono del cliente).</li><li>Elige cómo enviarlo:</li></ol>
+<ul><li><strong>Enlace wa.me</strong> (gratis): se abre WhatsApp con el mensaje listo; tú presionas enviar.</li><li><strong>API Twilio</strong> (si está configurada): se envía directo desde el sistema.</li></ul>
+<ol start="5"><li>Presiona <strong>Enviar</strong>. El mensaje queda en el <strong>historial</strong> con su estado (pendiente / enviado / fallido).</li></ol>
+<h3>11.2 Mensajes automáticos por cambio de estado</h3>
+<ul><li>El expediente tiene un interruptor <strong>🤖 Activo/Inactivo</strong> en la sección WhatsApp.</li><li>Con <strong>Activo</strong>, cada cambio de estado genera un mensaje automático al cliente (caso registrado, solicitud creada, citatorio, audiencia, convenio, demanda, cierre…).</li><li>Los mensajes generados aparecen en la ficha como <strong>Mensajes Automáticos</strong> con estado *pendiente*; el administrador los envía con el comando programado.</li></ul>
+<blockquote>⚠️ Verifica siempre que el número del cliente tenga el <strong>código de país</strong> (ej. <code>+52...</code>) para que los enlaces funcionen.</blockquote>
+<hr>
+<h2>12. Transferencias de casos</h2>
+<p>Si no puedes atender un caso (audiencia simultánea, conflicto de horario, etc.):</p>
+<ol start="1"><li>Abre el expediente → <strong>Transferir</strong>.</li><li>Explica el <strong>motivo</strong> (obligatorio) y opcionalmente <strong>sugiere un asesor destino</strong>.</li><li>Presiona <strong>Enviar solicitud</strong>.</li><li>La administración revisa, <strong>reasigna</strong> si lo considera y aprueba o rechaza.</li><li>Puedes <strong>cancelar</strong> tu solicitud mientras esté pendiente (botón en el historial).</li><li>El estado y las notificaciones te mantienen informado del resultado.</li></ol>
+<hr>
+<h2>13. Notificaciones y avisos</h2>
+<ul><li><strong>🔔 Campana:</strong> notificaciones de transferencias, avisos y recordatorios. Haz clic en una para abrirla; usa <strong>marcar todas como leídas</strong> para limpiar la campana.</li><li><strong>Avisos y Pendientes:</strong> los publica la administración en tu dashboard. Léelos a diario: pueden contener instrucciones, cambios de proceso o pendientes de la semana.</li></ul>
+<hr>
+<h2>14. Sección de administración</h2>
+<p>*(Solo usuarios con rol administrativo, superadmin o finanzas)*</p>
+<h3>14.1 Reportes y exportación</h3>
+<ol start="1"><li>Ve a <strong>Reportes</strong>.</li><li>Consulta productividad por asesor, montos totales y estadísticas del despacho.</li><li>Usa <strong>Exportar Excel</strong> para descargar la información y trabajarla fuera del sistema.</li></ol>
+<h3>14.2 Gestionar transferencias</h3>
+<ol start="1"><li>Ve a <strong>Transferencias</strong> (lista de solicitudes pendientes).</li><li>Revisa el motivo y el asesor sugerido.</li><li>Decide: <strong>Aprobar</strong> (con o sin reasignación a otro asesor, dejando un comentario opcional) o <strong>Rechazar</strong> (con comentario).</li><li>Al aprobar, el expediente queda asignado al nuevo asesor y se notifica a todos.</li></ol>
+<h3>14.3 Crear avisos y pendientes</h3>
+<ol start="1"><li>Ve a <strong>Avisos → Crear aviso</strong>.</li><li>Captura <strong>título</strong>, <strong>contenido</strong>, <strong>prioridad</strong> (alta/media/baja) y <strong>fecha de vencimiento</strong> (opcional; al vencer el aviso deja de mostrarse).</li><li>Presiona <strong>Publicar</strong>. El aviso aparece en el dashboard de todos.</li></ol>
+<h3>14.4 Matriz de permisos (superadmin)</h3>
+<ol start="1"><li>Ve a <strong>Superadmin → Matriz de permisos</strong>.</li><li>Cambia el <strong>rol</strong> de los usuarios y/o el permiso <strong>"puede generar documentos"</strong>.</li><li>Presiona <strong>Guardar</strong>. Cada cambio queda <strong>auditado</strong> (quién, cuándo y qué cambió).</li><li>Puedes <strong>exportar la matriz a Excel</strong> para respaldarla.</li><li>Usa <strong>Cargar datos demo</strong> solo en ambientes de prueba.</li></ol>
+<blockquote>⚠️ Cambiar el rol de un asesor le quita el acceso a sus casos en el dashboard del asesor. Hazlo solo cuando sea intencional.</blockquote>
+<h3>14.5 Configuración legal (panel de Django)</h3>
+<p>Cuando cambien los valores legales (UMA, salario mínimo, días de aguinaldo, etc.):</p>
+<ol start="1"><li>Entra al <strong>admin de Django</strong> (enlace desde el menú, solo admin/superadmin).</li><li>Busca <strong>Configuraciones Legales</strong> y edita la fila activa con los nuevos valores.</li><li>Guarda. Los cálculos nuevos usan los valores actualizados (los existentes se pueden recalcular desde cada expediente con <strong>Cálculos</strong>).</li></ol>
+<hr>
+<h2>15. Búsqueda global</h2>
+<ul><li>Escribe en la barra de búsqueda: número de expediente, nombre del cliente, CURP, folio o empresa.</li><li>El resultado te lleva directo al expediente o cliente que buscas.</li></ul>
+<hr>
+<h2>16. Solución de problemas comunes</h2>
+<table><thead><tr><th>Problema</th><th>Solución</th></tr></thead><tbody><tr><td>No veo un expediente</td><td>Verifica que esté asignado a ti; si lo está y no aparece, escribe al administrador.</td></tr><tr><td>"No se puede cambiar el estado"</td><td>El sistema solo permite transiciones válidas. Revisa el orden del proceso (ej. debes crear la solicitud antes de pasar a citatorio).</td></tr><tr><td>El envío automático falla</td><td>Reintenta; si sigue fallando usa la <strong>extensión de Chrome</strong> o sube el acuse manualmente.</td></tr><tr><td>La extensión no responde</td><td>Verifica URL + token en Opciones; regenera el token si lo cambiaste en la app.</td></tr><tr><td>El documento sale con <code>[CURP]</code> o <code>[MONTO]</code></td><td>Falta ese dato en el cliente/expediente. Usa la pantalla de <strong>Preparar</strong> para editarlo.</td></tr><tr><td>No veo los botones Documentos/Demanda</td><td>Necesitas el permiso <strong>"Puede generar documentos legales"</strong> — pídelo al administrador.</td></tr><tr><td>WhatsApp no abre</td><td>Confirma el número con código de país (+52) en la ficha del cliente.</td></tr><tr><td>La campana tiene muchas notificaciones</td><td>Marca <strong>todas como leídas</strong>; las pendientes se limpian.</td></tr></tbody></table>
+<hr>
+<h2>17. Referencia rápida de estados</h2>
+<table><thead><tr><th>Estado</th><th>Significado</th><th>Siguientes pasos típicos</th></tr></thead><tbody><tr><td>🟦 <strong>Nuevo</strong></td><td>Caso recién creado</td><td>Llenar solicitud de conciliación</td></tr><tr><td>🟪 <strong>Solicitud creada</strong></td><td>Formato de solicitud listo</td><td>Enviar al portal / generar citatorio</td></tr><tr><td>🟨 <strong>Citatorio generado</strong></td><td>Citatorio preparado</td><td>Programar audiencia</td></tr><tr><td>🟨 <strong>Audiencia programada</strong></td><td>Fecha de audiencia asignada</td><td>Asistir y registrar resultado</td></tr><tr><td>🟥 <strong>No notificado</strong></td><td>No se pudo notificar</td><td>Nueva audiencia / reprogramación</td></tr><tr><td>🟧 <strong>Reprogramación</strong></td><td>Audiencia reprograda</td><td>Nueva fecha de audiencia</td></tr><tr><td>🟩 <strong>Convenio</strong></td><td>Se llegó a acuerdo</td><td>Registrar monto y dar seguimiento de pagos</td></tr><tr><td>⬜ <strong>Sin conciliación</strong></td><td>No hubo acuerdo</td><td>Preparar demanda</td></tr><tr><td>🟥 <strong>Demanda</strong></td><td>Demanda presentada</td><td>Seguimiento del juicio</td></tr><tr><td>⬛ <strong>Cerrado</strong></td><td>Caso terminado</td><td>(sin más acciones)</td></tr></tbody></table>
+<hr>
+<p>*¿Dudas? Contacta al administrador del sistema o al área de soporte del despacho.*</p><div class="pie-doc">Generado desde el proyecto Despacho Laboral &middot; Documento oficial del sistema</div>
+</body>
+</html>

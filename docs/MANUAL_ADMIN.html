@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Manual de Administracion</title>
+<style>
+@page { size: A4; margin: 17mm 15mm; }
+* { box-sizing: border-box; }
+body { font-family: 'Segoe UI', 'Calibri', Arial, sans-serif; font-size: 10.5pt;
+       color: #1f2937; line-height: 1.5; margin: 0; }
+h1 { font-size: 19pt; color: #111827; border-bottom: 3px solid #1a6b3c;
+     padding-bottom: 5px; margin: 4px 0 14px; }
+h2 { font-size: 14pt; color: #1a6b3c; margin: 20px 0 8px; page-break-after: avoid; }
+h3 { font-size: 11.5pt; color: #374151; margin: 14px 0 6px; page-break-after: avoid; }
+p { margin: 6px 0; }
+ul, ol { margin: 6px 0 6px 4px; padding-left: 22px; }
+li { margin: 2px 0; }
+table { border-collapse: collapse; width: 100%; margin: 8px 0; font-size: 9pt;
+        page-break-inside: avoid; }
+th { background: #1f2937; color: #ffffff; text-align: left; padding: 5px 8px;
+     border: 1px solid #374151; }
+td { border: 1px solid #d1d5db; padding: 4px 8px; vertical-align: top; }
+tr:nth-child(even) td { background: #f9fafb; }
+code { font-family: Consolas, 'Courier New', monospace; font-size: 8.8pt;
+       background: #eef2ff; padding: 0 3px; border-radius: 3px; }
+pre { background: #f3f4f6; border: 1px solid #e5e7eb; padding: 8px 10px;
+      border-radius: 4px; white-space: pre-wrap; margin: 8px 0;
+      page-break-inside: avoid; }
+pre code { background: none; padding: 0; font-size: 8.5pt; }
+blockquote { border-left: 4px solid #f59e0b; background: #fffbeb; margin: 8px 0;
+             padding: 6px 12px; color: #78350f; }
+hr { border: none; border-top: 1px solid #e5e7eb; margin: 16px 0; }
+a { color: #2563eb; text-decoration: none; }
+strong { color: #111827; }
+.cabecera-doc { font-size: 9pt; color: #6b7280; border-bottom: 1px solid #e5e7eb;
+                padding-bottom: 6px; margin-bottom: 16px; }
+.pie-doc { margin-top: 24px; padding-top: 8px; border-top: 1px solid #e5e7eb;
+           font-size: 8.5pt; color: #9ca3af; text-align: center; }
+</style>
+</head>
+<body>
+<div class="cabecera-doc">Conciliación Laboral Tijuana &mdash; Manual de Administracion</div>
+<h1>📘 Manual de Administración — Despacho Laboral</h1>
+<blockquote><strong>Para:</strong> Administrativos, finanzas y superadmin <strong>Sistema:</strong> Conciliación Laboral Tijuana — Despacho Laboral <strong>Versión:</strong> 1.0 · Agosto 2026</blockquote>
+<p>Este manual cubre las tareas de <strong>administración</strong> del sistema: gestión de usuarios y permisos, actualización de la configuración legal, operación del <strong>módulo financiero</strong> completo y los comandos de administración.</p>
+<blockquote>📖 Complementa al *Manual de Usuario* (trabajo diario de asesores) y a la *Documentación Funcional* (visión completa del sistema).</blockquote>
+<hr>
+<h2>Índice</h2>
+<ol start="1"><li><a href="#1-roles-administrativos">Roles administrativos</a></li><li><a href="#2-gestión-de-usuarios-y-matriz-de-permisos">Gestión de usuarios y matriz de permisos</a></li><li><a href="#3-configuración-legal">Configuración legal</a></li><li><a href="#4-avisos-y-pendientes">Avisos y pendientes</a></li><li><a href="#5-gestión-de-transferencias">Gestión de transferencias</a></li><li><a href="#6-comandos-de-administración">Comandos de administración</a></li><li><a href="#7-módulo-financiero--introducción">Módulo financiero — introducción</a></li><li><a href="#8-oficinas-y-semanas-de-trabajo">Oficinas y semanas de trabajo</a></li><li><a href="#9-caja-diaria-ingresos-y-egresos">Caja diaria (ingresos y egresos)</a></li><li><a href="#10-pagos-de-convenios">Pagos de convenios</a></li><li><a href="#11-gastos-operativos">Gastos operativos</a></li><li><a href="#12-convenios-y-honorarios">Convenios y honorarios</a></li><li><a href="#13-comisiones">Comisiones</a></li><li><a href="#14-empleados-y-nómina">Empleados y nómina</a></li><li><a href="#15-socios-y-préstamos">Socios y préstamos</a></li><li><a href="#16-distribución-de-utilidades">Distribución de utilidades</a></li><li><a href="#17-dashboard-financiero-y-reportes">Dashboard financiero y reportes</a></li><li><a href="#18-buenas-prácticas-de-consistencia">Buenas prácticas de consistencia</a></li><li><a href="#19-solución-de-problemas-comunes">Solución de problemas comunes</a></li></ol>
+<hr>
+<h2>1. Roles administrativos</h2>
+<table><thead><tr><th>Rol</th><th>Acceso administrativo</th></tr></thead><tbody><tr><td><strong>Superadmin</strong></td><td>Todo: matriz de permisos, admin de Django, superadmin dashboard, finanzas</td></tr><tr><td><strong>Administrativo (admin)</strong></td><td>Reportes, avisos, transferencias, admin de Django, finanzas</td></tr><tr><td><strong>Finanzas</strong></td><td>Dashboard financiero y módulo de finanzas (no gestiona usuarios)</td></tr></tbody></table>
+<blockquote>⚠️ Los cambios de <strong>rol</strong> y <strong>permisos</strong> de usuarios quedan <strong>auditados</strong> automáticamente (quién, cuándo y qué cambió). Úsalo con criterio.</blockquote>
+<hr>
+<h2>2. Gestión de usuarios y matriz de permisos</h2>
+<h3>2.1 Crear un usuario nuevo</h3>
+<ol start="1"><li>Entra al <strong>admin de Django</strong> (enlace desde el menú, solo admin/superadmin).</li><li>En <strong>Usuarios → Añadir usuario</strong>, captura usuario, contraseña y datos de contacto.</li><li>Al guardar, el perfil se crea automáticamente (rol <strong>asesor</strong> por defecto).</li><li>Ajusta el rol y permisos desde la <strong>Matriz de permisos</strong> (abajo) o desde el perfil del usuario en el admin.</li></ol>
+<h3>2.2 Matriz de permisos</h3>
+<ol start="1"><li>Ve a <strong>Superadmin → Matriz de permisos</strong>.</li><li>Verás una tabla con todos los usuarios y sus columnas:</li></ol>
+<ul><li><strong>Rol</strong> (superadmin, admin, asesor, abogada, finanzas).</li><li><strong>¿Puede generar documentos?</strong> — habilita los botones Documentos/Demanda en los expedientes (generadores de machotes y demanda laboral).</li><li><strong>Token API</strong> — token personal para la extensión de Chrome.</li></ul>
+<ol start="3"><li>Haz los cambios y presiona <strong>Guardar</strong>.</li></ol>
+<p><strong>Para cada cambio que hagas:</strong></p>
+<table><thead><tr><th>Acción</th><th>Qué pasa</th></tr></thead><tbody><tr><td>Cambiar rol</td><td>El usuario cambia de dashboard y de alcance de visibilidad.</td></tr><tr><td>Habilitar/deshabilitar "puede generar documentos"</td><td>Se conceden/revocan los generadores de documentos legales.</td></tr><tr><td>Regenerar token</td><td>El token anterior deja de funcionar (hazlo si se filtró).</td></tr></tbody></table>
+<ol start="4"><li>Usa <strong>Exportar Excel</strong> para descargar la matriz y respaldarla.</li></ol>
+<blockquote>⚠️ Cambiar el rol de un asesor <strong>le quita el acceso a sus casos</strong> en el dashboard del asesor. Hazlo solo cuando sea intencional (ej. ascenso a administrativo).</blockquote>
+<h3>2.3 Tokens de la extensión de Chrome</h3>
+<ul><li>Cada usuario ve su token en <strong>Ajustes → Extensión de Chrome</strong> (o <code>/extension/config/</code>).</li><li>Si un token se filtró, el propio usuario puede <strong>regenerarlo</strong> desde ahí; también puedes hacerlo desde el perfil en el admin.</li></ul>
+<h3>2.4 Cargar datos demo</h3>
+<p>Usa <strong>Superadmin → Cargar datos demo</strong> <strong>solo en ambientes de prueba</strong> (nunca en producción con datos reales). Crea usuarios y casos de ejemplo.</p>
+<hr>
+<h2>3. Configuración legal</h2>
+<p>Los valores legales del cálculo laboral viven en <strong>Configuraciones Legales</strong> (modelo <code>LegalConfig</code>) y se editan <strong>sin tocar código</strong> cuando cambian las leyes.</p>
+<h3>3.1 Qué parámetros se configuran</h3>
+<table><thead><tr><th>Parámetro</th><th>Uso</th><th>Valor de referencia (2024)</th></tr></thead><tbody><tr><td><strong>UMA diaria</strong></td><td>Base para topes y cálculos</td><td>$108.57</td></tr><tr><td><strong>Salario mínimo general</strong></td><td>Cálculos y topes</td><td>$248.93</td></tr><tr><td><strong>Salario mínimo frontera (ZLF)</strong></td><td>Zona Libre Frontera Norte</td><td>$374.89</td></tr><tr><td><strong>Días de aguinaldo</strong></td><td>Aguinaldo proporcional</td><td>15</td></tr><tr><td><strong>% prima vacacional</strong></td><td>Prima sobre vacaciones</td><td>25%</td></tr><tr><td><strong>Días por año (prima antigüedad)</strong></td><td>Prima de antigüedad</td><td>12</td></tr><tr><td><strong>Tipo de tope</strong></td><td>2× UMA / 2× SM / 2× SM frontera</td><td>UMA</td></tr><tr><td><strong>Múltiplo del tope</strong></td><td>Multiplicador del tope</td><td>2</td></tr><tr><td><strong>Días de indemnización</strong></td><td>Indemnización constitucional</td><td>90</td></tr></tbody></table>
+<h3>3.2 Cómo actualizarla (ej. al inicio de cada año)</h3>
+<ol start="1"><li>Entra al <strong>admin de Django</strong> → <strong>Configuraciones Legales</strong>.</li><li>Abre la fila <strong>activa</strong> (solo puede haber una activa; si creas otra y la marcas como activa, las demás se desactivan solas).</li><li>Actualiza la <strong>UMA</strong>, el <strong>salario mínimo</strong> y el <strong>salario mínimo frontera</strong> con los valores oficiales publicados (DOF), y cualquier otro parámetro que haya cambiado.</li><li>Guarda. Los <strong>cálculos nuevos</strong> usan los valores actualizados al instante.</li></ol>
+<h3>3.3 Recalcular cálculos existentes</h3>
+<p>Los cálculos ya guardados conservan su histórico. Para actualizarlos con las reglas nuevas, entra a cada expediente → <strong>Cálculos</strong> y guarda de nuevo (se recalcula con los valores vigentes). El modelo <code>CalculoLaboral.recalcular()</code> hace lo mismo por programa.</p>
+<blockquote>⚠️ <strong>No</strong> cambies estos valores sin confirmar el dato oficial. Un error en la UMA o el salario mínimo altera <strong>todos</strong> los cálculos del despacho.</blockquote>
+<hr>
+<h2>4. Avisos y pendientes</h2>
+<ol start="1"><li>Ve a <strong>Avisos → Crear aviso</strong> (o desde el dashboard administrativo).</li><li>Captura:</li></ol>
+<ul><li><strong>Título</strong> y <strong>contenido</strong> (instrucciones, pendientes, cambios de proceso).</li><li><strong>Prioridad:</strong> alta (🔴) / media (🟡) / baja (🟢).</li><li><strong>Fecha de vencimiento</strong> (opcional): al vencer, el aviso deja de mostrarse automáticamente.</li></ul>
+<ol start="3"><li>Presiona <strong>Publicar</strong>. Aparece en el dashboard de todos los asesores y admins.</li><li>Los avisos se pueden desactivar (bandera <strong>Activo</strong>) en el admin de Django.</li></ol>
+<blockquote>💡 Usa el vencimiento para pendientes con fecha límite; usa prioridad alta solo para lo urgente (si no, los avisos pierden peso).</blockquote>
+<hr>
+<h2>5. Gestión de transferencias</h2>
+<p>Cuando un asesor solicita transferir un caso (ej. audiencia simultánea):</p>
+<ol start="1"><li>Ve a <strong>Transferencias</strong> → verás las solicitudes <strong>pendientes</strong> con el motivo y el asesor sugerido (si lo hay).</li><li>Decide:</li></ol>
+<ul><li><strong>Aprobar:</strong> puedes <strong>reasignar</strong> a otro asesor antes de aprobar y dejar un comentario. Al aprobar, el expediente cambia de asesor y se notifica a todos.</li><li><strong>Rechazar:</strong> deja un comentario para que el asesor entienda el motivo.</li></ul>
+<ol start="3"><li>El asesor puede <strong>cancelar</strong> su solicitud mientras siga pendiente.</li></ol>
+<blockquote>💡 Revisa las transferencias a diario: un caso pendiente de reasignación puede dejar una audiencia sin atender.</blockquote>
+<hr>
+<h2>6. Comandos de administración</h2>
+<p>Los comandos se ejecutan en el servidor (consola). Ejemplos útiles:</p>
+<pre><code># Enviar recordatorios de próximas acciones/audiencias (próximos 3 días)
+uv run python manage.py enviar_recordatorios
+
+# Simular primero (no envía nada)
+uv run python manage.py enviar_recordatorios --days=7 --dry-run
+
+# Enviar mensajes de WhatsApp automáticos pendientes
+uv run python manage.py enviar_whatsapp_automatico
+
+# Importar citas del CLT.xlsx como expedientes con audiencias
+uv run python manage.py importar_clt
+
+# Importar catálogo de empresas y domicilios (idempotente, no duplica)
+uv run python manage.py importar_empresas
+
+# Importar plantillas .docx como machotes
+uv run python manage.py importar_machotes</code></pre>
+<blockquote>⚠️ La automatización de WhatsApp requiere configuración de Twilio (env vars <code>TWILIO_*</code>). Sin Twilio, los mensajes quedan como <strong>enlaces wa.me</strong> para abrir manualmente. Consulta <code>--help</code> de cada comando para más opciones.</blockquote>
+<hr>
+<h2>7. Módulo financiero — introducción</h2>
+<p>El módulo está organizado por <strong>oficina</strong> y por <strong>semana de trabajo</strong>. Todo lo que se registra tiene responsable (<code>registrado_por</code>) para auditoría.</p>
+<h3>Cómo se calculan los totales (importante)</h3>
+<table><thead><tr><th>Total</th><th>Se compone de</th></tr></thead><tbody><tr><td><strong>Ingresos</strong></td><td>Pagos de convenios (SettlementPayment) + Ingresos de caja</td></tr><tr><td><strong>Gastos</strong></td><td>Gastos operativos (Expense) + Egresos de caja + Nómina (Payroll)</td></tr><tr><td><strong>Utilidad</strong></td><td>Ingresos − Gastos</td></tr><tr><td><strong>Semana</strong></td><td>Ingresos (caja + pagos) − Gastos (caja + gastos + nómina)</td></tr></tbody></table>
+<blockquote>⚠️ Para <strong>no duplicar</strong> registros, usa cada módulo para su propósito: los pagos de convenios van en <strong>Pagos de Convenios</strong>; los gastos con factura en <strong>Gastos Operativos</strong>; la caja diaria es para el <strong>efectivo del día a día</strong>. Evita registrar lo mismo en dos lados.</blockquote>
+<hr>
+<h2>8. Oficinas y semanas de trabajo</h2>
+<h3>8.1 Oficinas</h3>
+<ol start="1"><li>Ve a <strong>Oficinas</strong> (admin de Django o menú de finanzas) → <strong>Nueva oficina</strong>.</li><li>Captura nombre, dirección, teléfono y responsable.</li><li>Usa la bandera <strong>Activa</strong> para desactivar una oficina <strong>sin eliminarla</strong> (la operación histórica se conserva).</li></ol>
+<h3>8.2 Semanas de trabajo</h3>
+<ol start="1"><li>Ve a <strong>Semanas</strong> → la semana actual se <strong>crea automáticamente</strong> (lunes–domingo) la primera vez que se consulta.</li><li>Las semanas se pueden <strong>crear/editar</strong> (número, fechas) y <strong>cerrar</strong> cuando el período termina.</li><li>Cada semana muestra <strong>ingresos, gastos y balance</strong> calculados con las fechas del rango.</li></ol>
+<blockquote>💡 Cierra la semana al terminar el período para congelar el reporte y revisar la siguiente semana con calma.</blockquote>
+<hr>
+<h2>9. Caja diaria (ingresos y egresos)</h2>
+<h3>9.1 Registrar un movimiento</h3>
+<ol start="1"><li>Ve a <strong>Caja → Nuevo movimiento</strong>.</li><li>Captura:</li></ol>
+<ul><li><strong>Fecha</strong> y <strong>oficina</strong>.</li><li><strong>Tipo:</strong> 💰 Ingreso o 💸 Egreso.</li><li><strong>Categoría</strong> (las opciones cambian según el tipo; el sistema valida la coherencia):</li><li>*Ingresos:* pago de convenio, pago de cliente, anticipo, devolución, otro.</li><li>*Egresos:* papelería, gasolina, renta, luz, agua, internet, teléfono, viáticos, comisiones, honorarios, otro.</li><li><strong>Monto</strong> y <strong>descripción</strong>.</li><li><strong>Referencia</strong> (opcional): N° de expediente, factura o nota relacionada.</li></ul>
+<ol start="3"><li>Presiona <strong>✅ Registrar movimiento</strong>.</li></ol>
+<h3>9.2 Lista y filtros</h3>
+<ul><li>La lista permite filtrar por <strong>tipo, oficina, categoría y rango de fechas</strong> y buscar por descripción/referencia.</li><li>Muestra <strong>totales de ingresos y egresos</strong> del listado filtrado.</li><li>Edita o elimina movimientos desde la lista (queda registro del responsable original).</li></ul>
+<blockquote>💡 Usa el campo <strong>referencia</strong> (ej. número de expediente) para poder rastrear después de qué caso salió o entró el dinero.</blockquote>
+<hr>
+<h2>10. Pagos de convenios</h2>
+<ol start="1"><li>Ve a <strong>Pagos de Convenios → Nuevo</strong>.</li><li>Captura <strong>fecha</strong>, <strong>cliente</strong>, <strong>expediente</strong>, <strong>monto</strong> y <strong>forma de pago</strong> (efectivo, transferencia, cheque, tarjeta crédito/débito, depósito, otro).</li><li>Selecciona la <strong>oficina</strong> que recibe el pago y agrega notas si hace falta.</li><li>Guarda. El pago se suma automáticamente a los <strong>ingresos</strong> del período y de la semana.</li></ol>
+<blockquote>💡 Estos pagos alimentan el dashboard (Ingresos por Pagos) y el detalle del convenio en <strong>Convenios → detalle → Pagos</strong>.</blockquote>
+<hr>
+<h2>11. Gastos operativos</h2>
+<ol start="1"><li>Ve a <strong>Gastos → Nuevo gasto</strong> (admin de Django).</li><li>Captura:</li></ol>
+<ul><li><strong>Fecha</strong>, <strong>categoría</strong> (renta, luz, agua, internet, teléfono, papelería, publicidad, sueldos, gasolina, mantenimiento, impuestos, equipo, muebles, seguros, honorarios profesionales, otro).</li><li><strong>Monto</strong>, <strong>descripción</strong>, <strong>proveedor</strong> y <strong>folio fiscal/factura</strong>.</li><li><strong>Oficina</strong> a la que pertenece.</li></ul>
+<ol start="3"><li>Guarda. Se suma a los <strong>gastos operativos</strong> del período.</li></ol>
+<blockquote>💡 Guarda el <strong>folio fiscal</strong> siempre: facilita la conciliación contable y fiscal.</blockquote>
+<hr>
+<h2>12. Convenios y honorarios</h2>
+<h3>12.1 Registrar un convenio</h3>
+<ol start="1"><li>Ve a <strong>Convenios → Nuevo convenio</strong>.</li><li>Captura <strong>cliente</strong>, <strong>empresa/contraparte</strong>, <strong>oficina</strong>, <strong>fecha</strong>, <strong>monto del convenio</strong> y <strong>responsable</strong> (abogado/asesor).</li><li>Estado inicial: <strong>Pendiente de firma</strong>. Ve actualizándolo conforme avanza (firmado → pagado / pagado parcialmente / cancelado).</li><li>Guarda. El campo <strong>honorarios totales</strong> se calcula solo al ir agregando honorarios.</li></ol>
+<h3>12.2 Agregar honorarios</h3>
+<ol start="1"><li>En el detalle del convenio, presiona <strong>Nuevo honorario</strong> (o desde el menú).</li><li>Elige el <strong>porcentaje</strong> (25/30/35/40/50%) — el <strong>monto se calcula automáticamente</strong> (monto del convenio × % ÷ 100).</li><li>Captura fecha estimada de pago y estado (pendiente / pagado / cancelado).</li><li>El convenio muestra <strong>honorarios pagados y pendientes</strong> en tiempo real.</li></ol>
+<blockquote>💡 Revisa periódicamente los convenios con honorarios <strong>pendientes</strong> para dar seguimiento de cobranza.</blockquote>
+<hr>
+<h2>13. Comisiones</h2>
+<ol start="1"><li>Cuando un asesor cierra un convenio, crea su comisión en <strong>Comisiones → Nueva</strong>.</li><li>Captura <strong>expediente</strong>, <strong>asesor</strong>, <strong>fecha</strong>, <strong>monto del convenio</strong>, <strong>%</strong> de comisión y <strong>oficina</strong>.</li><li>El <strong>monto de comisión se calcula automáticamente</strong> (monto × % ÷ 100).</li><li>Marca el <strong>estado</strong> (pendiente / pagada / cancelada) y la <strong>fecha de pago</strong> cuando se pague.</li><li>Las comisiones <strong>pagadas</strong> aparecen en el dashboard financiero por oficina y asesor.</li></ol>
+<blockquote>💡 Coordina comisiones con nómina: al pagar la comisión, regístrala también como egreso de caja (categoría "Comisiones") o en nómina según tu proceso, <strong>sin duplicar</strong>.</blockquote>
+<hr>
+<h2>14. Empleados y nómina</h2>
+<h3>14.1 Alta de empleados</h3>
+<ol start="1"><li>Ve a <strong>Empleados → Nuevo</strong> (admin de Django).</li><li>Captura nombre, <strong>puesto</strong> (administrativo, asesor jurídico, supervisor, contador, recepcionista, auxiliar, director…), <strong>periodo de pago</strong> (semanal/quincenal/mensual), <strong>salario</strong>, teléfono, correo y <strong>oficina</strong>.</li><li>Desactiva con la bandera <strong>Activo</strong> cuando alguien deje de trabajar (no lo borres).</li></ol>
+<h3>14.2 Pagos de nómina</h3>
+<ol start="1"><li>Ve a <strong>Pagos de Nómina → Nuevo</strong>.</li><li>Selecciona <strong>empleado</strong> y captura:</li></ol>
+<ul><li><strong>Fecha de pago</strong>, <strong>período</strong> (semanal/quincenal/mensual/extraordinario/aguinaldo/ prima vacacional/bono) y el rango del período.</li><li><strong>Salario pagado</strong> y <strong>descuentos</strong> (ISR, IMSS…).</li></ul>
+<ol start="3"><li>El <strong>total pagado se calcula solo</strong> (salario − descuentos).</li><li>Guarda con la <strong>oficina</strong> correspondiente.</li></ol>
+<blockquote>💡 Usa los períodos <strong>aguinaldo</strong>, <strong>prima vacacional</strong> y <strong>bono</strong> para esos pagos especiales: quedan diferenciados en los reportes.</blockquote>
+<hr>
+<h2>15. Socios y préstamos</h2>
+<h3>15.1 Socios</h3>
+<ol start="1"><li>Ve a <strong>Socios → Nuevo socio</strong>.</li><li>Captura <strong>nombre</strong>, <strong>% de participación</strong> (ej. 25.00 = 25%) y datos de contacto.</li><li>La ficha del socio muestra sus <strong>préstamos otorgados/recibidos</strong> y <strong>saldos</strong>.</li></ol>
+<h3>15.2 Préstamos entre socios</h3>
+<ol start="1"><li>Ve a <strong>Préstamos → Nuevo préstamo</strong>.</li><li>Selecciona <strong>socio origen</strong> (quién presta) y <strong>socio destino</strong> (quién recibe), monto, fecha y concepto.</li><li>Estado: <strong>pendiente</strong> → <strong>pagado</strong> (con fecha de pago) cuando se liquide.</li><li>El <strong>saldo neto</strong> de cada socio (otorgados − recibidos) se calcula automáticamente.</li></ol>
+<blockquote>💡 Esto reemplaza las notas informales tipo "le debo a…": todo queda registrado con fecha, concepto y responsable.</blockquote>
+<hr>
+<h2>16. Distribución de utilidades</h2>
+<h3>16.1 Crear una distribución</h3>
+<ol start="1"><li>Ve a <strong>Distribuciones → Nueva distribución</strong>.</li><li>Selecciona el <strong>convenio</strong> que genera la utilidad.</li><li>El sistema <strong>calcula automáticamente</strong>:</li></ol>
+<ul><li><strong>Monto del convenio</strong> y <strong>honorarios</strong> (del convenio).</li><li><strong>Comisiones</strong> (relacionadas al cliente).</li><li><strong>Retenciones/ISR</strong> y <strong>gastos relacionados</strong> (captúralos si aplican).</li><li><strong>Utilidad neta</strong> = monto − honorarios − comisiones − retenciones − gastos.</li></ul>
+<ol start="4"><li>Guarda. Se generan automáticamente las <strong>participaciones de todos los socios activos</strong> (utilidad neta × % de participación) y se actualizan los <strong>resúmenes</strong>.</li><li>Estado inicial: <strong>borrador</strong> → <strong>distribuida</strong> cuando la revisas.</li></ol>
+<h3>16.2 Confirmar la distribución</h3>
+<ol start="1"><li>En el detalle, revisa las participaciones de cada socio.</li><li>Presiona <strong>✅ Confirmar distribución</strong> (solo admin/superadmin).</li><li>Al confirmar, los <strong>resúmenes por socio</strong> (utilidad generada / pagada / pendiente) se actualizan.</li><li>Cuando se pague a un socio, marca su participación como <strong>pagada</strong> con fecha.</li></ol>
+<blockquote>⚠️ Confirma solo cuando los números estén correctos. Una confirmación es un evento contable; los ajustes posteriores deben justificarse.</blockquote>
+<hr>
+<h2>17. Dashboard financiero y reportes</h2>
+<h3>17.1 Dashboard financiero</h3>
+<ol start="1"><li>Ve a <strong>Dashboard Financiero</strong>.</li><li>Filtra por <strong>período</strong> (Este mes / Este año / Histórico) y <strong>oficina</strong>.</li><li>Verás:</li></ol>
+<ul><li><strong>Tarjetas:</strong> ingresos (pagos + caja), gastos (operación + nómina), <strong>utilidad</strong> y margen, y nº de oficinas activas.</li><li><strong>Barras Ingresos vs Gastos.</strong></li><li><strong>Gráfica de flujo de caja mensual (12 meses)</strong> — se actualiza con los filtros vía API.</li><li><strong>Resumen por oficina</strong> (ingresos, gastos, utilidad, margen, comisiones pagadas).</li><li><strong>Gastos por categoría</strong> y <strong>formas de pago</strong> más usadas.</li><li><strong>Productividad por asesor</strong> (casos, convenios, monto recuperado, comisiones).</li><li><strong>Movimientos de caja recientes.</strong></li></ul>
+<ol start="4"><li>Usa <strong>Exportar Excel</strong> para descargar todo en un archivo con <strong>5 hojas</strong>: Resumen Global, Gastos por Categoría, Formas de Pago, Asesores y Movimientos de Caja.</li></ol>
+<blockquote>💡 La exportación aplica <strong>los mismos filtros</strong> que tengas seleccionados y usa la misma lógica de totales que el dashboard (no hay diferencias entre pantalla y Excel).</blockquote>
+<h3>17.2 Reporte de convenios</h3>
+<ol start="1"><li>Ve a <strong>Reportes → Convenios</strong>.</li><li>Filtra por <strong>período</strong> (semanal / mensual / anual), año, mes, semana y oficina.</li><li>El reporte muestra:</li></ol>
+<ul><li><strong>Totales:</strong> convenios, monto, honorarios, y conteo por estado (pagados, pendientes, firmados, cancelados) + promedio.</li><li><strong>Por oficina</strong>, <strong>por estado</strong>, <strong>por responsable</strong> y <strong>top 10 clientes</strong>.</li><li><strong>Evolución mensual</strong> (gráfica) en la vista anual.</li><li><strong>Listado detallado</strong> de convenios del período.</li></ul>
+<ol start="4"><li><strong>Exportar Excel</strong> descarga el detalle con los mismos filtros.</li></ol>
+<h3>17.3 Flujo mensual por API</h3>
+<p>El endpoint <code>api_flujo_mensual</code> (JSON) alimenta la gráfica del dashboard. También puedes consumirlo para reportes externos (requiere rol admin/superadmin/finanzas).</p>
+<hr>
+<h2>18. Buenas prácticas de consistencia</h2>
+<ol start="1"><li><strong>Un registro, un propósito:</strong> convenios → Pagos de Convenios; facturas → Gastos Operativos; efectivo diario → Caja. Evita duplicar.</li><li><strong>Siempre la oficina correcta</strong> en cada movimiento: los reportes por sucursal dependen de ello.</li><li><strong>Fecha real</strong> del evento (no la fecha de captura) para que los reportes por período sean exactos.</li><li><strong>Referencias en caja:</strong> anota el N° de expediente o factura para trazabilidad.</li><li><strong>Cierra semanas y confirma distribuciones</strong> a tiempo; no dejes períodos abiertos eternamente.</li><li><strong>Auditoría:</strong> todo registro guarda quién lo hizo. Si algo se capturó mal, <strong>edita</strong> (no borres sin justificación) para conservar el rastro.</li><li><strong>Revisa el dashboard a diario:</strong> detecta montos atípicos o movimientos sin categoría correcta.</li></ol>
+<hr>
+<h2>19. Solución de problemas comunes</h2>
+<table><thead><tr><th>Problema</th><th>Solución</th></tr></thead><tbody><tr><td>La matriz de permisos no muestra a un usuario nuevo</td><td>Revisa que el usuario exista en el admin de Django; el perfil se crea automáticamente al crearlo.</td></tr><tr><td>Cambié un rol y el usuario "desapareció"</td><td>Es normal: cambió su dashboard. Regresa el rol anterior si fue un error.</td></tr><tr><td>La UMA/salario mínimo se actualizó pero los cálculos viejos no cambian</td><td>Es correcto: guarda/recalcula cada cálculo para aplicar los valores vigentes.</td></tr><tr><td>Los totales del dashboard no coinciden con la caja</td><td>Revisa duplicados: un pago de convenio registrado también como ingreso de caja se cuenta dos veces.</td></tr><tr><td>No puedo confirmar una distribución</td><td>Solo admin/superadmin pueden confirmar.</td></tr><tr><td>La semana actual no aparece</td><td>Se crea automáticamente al consultar <strong>Semanas</strong>; también puedes crearla a mano.</td></tr><tr><td>El Excel del dashboard "no trae todo"</td><td>La exportación respeta los filtros activos; quita filtros para el histórico completo.</td></tr><tr><td>Un asesor no ve sus botones de documentos</td><td>Verifica el permiso "puede generar documentos" en la matriz de permisos.</td></tr></tbody></table>
+<hr>
+<p>*¿Dudas? Contacta al superadmin del sistema o al área de soporte técnico.*</p><div class="pie-doc">Generado desde el proyecto Despacho Laboral &middot; Documento oficial del sistema</div>
+</body>
+</html>
