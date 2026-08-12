@@ -166,14 +166,18 @@ class DashboardFinancieroView(LoginRequiredMixin, AdminOrSuperOnlyMixin, Templat
         oficinas = Office.objects.filter(activa=True)
         resumen_oficinas = []
         for of in oficinas:
+            # OJO: cada agregado debe ir entre paréntesis con su propio `or 0`.
+            # Sin paréntesis, `A or 0 + B` se evalúa como `A or (0 + B)` → si A es
+            # None (sin pagos) y B es None (sin caja) lanza TypeError, y si A es
+            # distinto de cero ignora B (subestima los totales).
             ing_of = (
-                filtrar_por_fecha(of.settlementpayment_set.all()).aggregate(total=Sum('monto'))['total'] or 0
-                + filtrar_por_fecha(of.cashmovement_set.filter(tipo='ingreso')).aggregate(total=Sum('monto'))['total'] or 0
+                (filtrar_por_fecha(of.settlementpayment_set.all()).aggregate(total=Sum('monto'))['total'] or 0)
+                + (filtrar_por_fecha(of.cashmovement_set.filter(tipo='ingreso')).aggregate(total=Sum('monto'))['total'] or 0)
             )
             gas_of = (
-                filtrar_por_fecha(of.expense_set.all()).aggregate(total=Sum('monto'))['total'] or 0
-                + filtrar_por_fecha(of.cashmovement_set.filter(tipo='egreso')).aggregate(total=Sum('monto'))['total'] or 0
-                + filtrar_por_fecha(of.payroll_set.all(), campo_fecha='fecha_pago').aggregate(total=Sum('total_pagado'))['total'] or 0
+                (filtrar_por_fecha(of.expense_set.all()).aggregate(total=Sum('monto'))['total'] or 0)
+                + (filtrar_por_fecha(of.cashmovement_set.filter(tipo='egreso')).aggregate(total=Sum('monto'))['total'] or 0)
+                + (filtrar_por_fecha(of.payroll_set.all(), campo_fecha='fecha_pago').aggregate(total=Sum('total_pagado'))['total'] or 0)
             )
             uti_of = ing_of - gas_of
 
@@ -628,12 +632,15 @@ class HonorarioCreateView(LoginRequiredMixin, AdminOrSuperOnlyMixin, CreateView)
 
     def form_valid(self, form):
         form.instance.registrado_por = self.request.user
+        response = super().form_valid(form)
+        # monto_calculado se calcula dentro de Honorario.save() (llamado por
+        # super().form_valid), por lo que el mensaje debe construirse DESPUÉS.
         messages.success(
             self.request,
-            f'✅ Honorario de {form.instance.porcentaje}% creado correctamente. '
-            f'Monto calculado: ${form.instance.monto_calculado:,.2f}'
+            f'✅ Honorario de {self.object.porcentaje}% creado correctamente. '
+            f'Monto calculado: ${self.object.monto_calculado:,.2f}'
         )
-        return super().form_valid(form)
+        return response
 
     def get_success_url(self):
         if self.object:
@@ -869,14 +876,16 @@ def exportar_dashboard_financiero_excel(request):
 
         oficinas = Office.objects.filter(activa=True)
         for of in oficinas:
+            # Mismo arreglo de precedencia que en el dashboard: cada agregado
+            # con su propio `or 0` entre paréntesis (evita TypeError y subestimación).
             ing_of = (
-                filtrar_fecha(of.settlementpayment_set.all()).aggregate(t=Sum('monto'))['t'] or 0
-                + filtrar_fecha(of.cashmovement_set.filter(tipo='ingreso')).aggregate(t=Sum('monto'))['t'] or 0
+                (filtrar_fecha(of.settlementpayment_set.all()).aggregate(t=Sum('monto'))['t'] or 0)
+                + (filtrar_fecha(of.cashmovement_set.filter(tipo='ingreso')).aggregate(t=Sum('monto'))['t'] or 0)
             )
             gas_of = (
-                filtrar_fecha(of.expense_set.all()).aggregate(t=Sum('monto'))['t'] or 0
-                + filtrar_fecha(of.cashmovement_set.filter(tipo='egreso')).aggregate(t=Sum('monto'))['t'] or 0
-                + filtrar_fecha(of.payroll_set.all(), campo='fecha_pago').aggregate(t=Sum('total_pagado'))['t'] or 0
+                (filtrar_fecha(of.expense_set.all()).aggregate(t=Sum('monto'))['t'] or 0)
+                + (filtrar_fecha(of.cashmovement_set.filter(tipo='egreso')).aggregate(t=Sum('monto'))['t'] or 0)
+                + (filtrar_fecha(of.payroll_set.all(), campo='fecha_pago').aggregate(t=Sum('total_pagado'))['t'] or 0)
             )
             com_of = filtrar_fecha(Commission.objects.filter(oficina=of, estado='pagada')).aggregate(t=Sum('monto_comision'))['t'] or 0
             uti_of = ing_of - gas_of

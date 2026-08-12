@@ -62,8 +62,14 @@ class CashMovementForm(forms.ModelForm):
         self.user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
         self.fields['oficina'].queryset = Office.objects.filter(activa=True)
-        # Initial category choices based on default tipo (ingreso)
-        self.fields['categoria'].choices = CashMovement.CATEGORIA_INGRESO_CHOICES
+        # Categorías según el tipo (el JS del template también las intercambia)
+        # Al crear (sin instancia) se usan las de ingreso por defecto; al editar
+        # se usan las del tipo guardado; al reenviar un POST se usan las del POST.
+        tipo = self.data.get('tipo') if self.is_bound else getattr(self.instance, 'tipo', None)
+        if tipo == 'egreso':
+            self.fields['categoria'].choices = CashMovement.CATEGORIA_EGRESO_CHOICES
+        else:
+            self.fields['categoria'].choices = CashMovement.CATEGORIA_INGRESO_CHOICES
 
 
 class PartnerForm(forms.ModelForm):
