@@ -63,13 +63,25 @@ else:
     print('>>> No se necesita resincronización.')
 " || echo ">>> (Aviso: no se pudieron resincronizar sequences, ignorando)"
 
-# 5. Crear usuarios de prueba (idempotente — omite si ya existen)
-echo ">>> Creando usuarios de prueba..."
-uv run python manage.py crear_usuarios_prueba 2>&1 || echo ">>> (Aviso: no se pudieron crear usuarios de prueba — consulta los logs para más detalles)"
+# 5. Datos de prueba — SOLO en base de datos vacía (primer deploy)
+#    Si la BD ya tiene datos reales (expedientes), se omiten usuarios y
+#    datos de prueba para no contaminar producción.
+echo ">>> Verificando si la base de datos tiene datos reales..."
+HAS_EXPEDIENTES=$(uv run python manage.py shell -c "
+from expedientes.models import Expediente
+print(Expediente.objects.count())
+" 2>/dev/null | tail -1)
+HAS_EXPEDIENTES="${HAS_EXPEDIENTES:-0}"
 
-# 6. Sembrar datos de prueba (idempotente — omite si ya existen)
-echo ">>> Sembrando datos de prueba..."
-uv run python manage.py seed_datos 2>&1 || echo ">>> (Aviso: no se pudieron sembrar datos de prueba — consulta los logs para más detalles)"
+if [ "${HAS_EXPEDIENTES}" = "0" ]; then
+    echo ">>> Base de datos vacía — sembrando datos de prueba..."
+    # 5a. Crear usuarios de prueba (idempotente — omite si ya existen)
+    uv run python manage.py crear_usuarios_prueba 2>&1 || echo ">>> (Aviso: no se pudieron crear usuarios de prueba)"
+    # 5b. Sembrar datos de prueba (idempotente — omite si ya existen)
+    uv run python manage.py seed_datos 2>&1 || echo ">>> (Aviso: no se pudieron sembrar datos de prueba)"
+else
+    echo ">>> BD con datos reales (${HAS_EXPEDIENTES} expedientes) — se omiten usuarios y datos de prueba"
+fi
 
 # ══════════════════════════════════════════════════════════════════════
 #  7. Iniciar SERVICIOS (Gunicorn + Celery Worker en el mismo contenedor)
