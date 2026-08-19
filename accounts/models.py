@@ -95,6 +95,10 @@ class PermisoAuditLog(models.Model):
 
 @receiver(post_save, sender=User)
 def crear_perfil_usuario(sender, instance, created, **kwargs):
-    """Crea automáticamente un UserProfile al crear un User."""
+    """Crea automáticamente un UserProfile al crear un User.
+
+    Usa get_or_create para evitar IntegrityError cuando el admin
+    con inline ya creó el perfil antes de que el signal se ejecute.
+    """
     if created:
-        UserProfile.objects.create(user=instance)
+        UserProfile.objects.get_or_create(user=instance)

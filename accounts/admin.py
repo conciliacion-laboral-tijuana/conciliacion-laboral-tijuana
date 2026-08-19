@@ -68,6 +68,37 @@ class UserAdmin(BaseUserAdmin):
     get_puede_generar.short_description = 'Docs'
     get_puede_generar.admin_order_field = 'profile__puede_generar_documentos'
 
+    def save_formsets(self, request, form, formsets, change):
+        """Guarda el User y los inlines sin duplicar el UserProfile.
+
+        El signal ``crear_perfil_usuario`` ya crea un UserProfile al
+        guardar el User. Si el inline también intenta crear uno, se
+        produce un IntegrityError (OneToOneField duplicado).
+
+        Este método detecta si el perfil ya existe y, en ese caso,
+        actualiza los campos del inline en el perfil existente.
+        """
+        # 1. Guardar el User (dispara post_save → crea UserProfile)
+        form.save()
+
+        # 2. Procesar cada inline formset
+        for formset in formsets:
+            instances = formset.save(commit=False)
+            for instance in instances:
+                if isinstance(instance, UserProfile) and not instance.pk:
+                    # El perfil fue creado por el signal; actualizarlo
+                    existing = UserProfile.objects.filter(user=form.instance).first()
+                    if existing:
+                        existing.rol = instance.rol
+                        existing.telefono = instance.telefono
+                        existing.puede_generar_documentos = instance.puede_generar_documentos
+                        existing.save()
+                    else:
+                        instance.save()
+                else:
+                    instance.save()
+            formset.save_m2m()
+
 
 class PermisoAuditLogAdmin(admin.ModelAdmin):
     list_display = ['created_at', 'usuario_modificado', 'get_quien', 'accion', 'detalle_resumido']
