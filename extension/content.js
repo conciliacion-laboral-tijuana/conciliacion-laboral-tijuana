@@ -110,16 +110,24 @@
     document.body.classList.remove('modal-open');
   }
 
-  function clickValidarContinuar() {
-    const btns = document.querySelectorAll('button');
-    for (const btn of btns) {
-      const t = (btn.textContent || '').trim().toLowerCase();
-      if (t.includes('validar') && t.includes('continuar')) {
-        btn.click();
-        return true;
-      }
-    }
-    return false;
+  function clickValidarContinuar(timeoutMs = 6000) {
+    return new Promise(resolve => {
+      const start = Date.now();
+      const tryClick = () => {
+        const btns = document.querySelectorAll('button');
+        for (const btn of btns) {
+          const t = (btn.textContent || '').trim().toLowerCase();
+          if (t.includes('validar') && t.includes('continuar') && btn.offsetParent !== null) {
+            btn.click();
+            resolve(true);
+            return;
+          }
+        }
+        if (Date.now() - start < timeoutMs) setTimeout(tryClick, 250);
+        else resolve(false);
+      };
+      tryClick();
+    });
   }
 
   function separarNombre(nombreCompleto) {
@@ -317,7 +325,7 @@
     await sleep(600);
     closeModals();
     await sleep(300);
-    clickValidarContinuar();
+    await clickValidarContinuar();
     await sleep(1200);
     closeModals();
     await sleep(500);
@@ -333,7 +341,7 @@
       objetoSel.dispatchEvent(new Event('change', { bubbles: true }));
     }
     await sleep(400);
-    clickValidarContinuar();
+    await clickValidarContinuar();
     await sleep(1200);
     pasoActual = 3; setPasos(PASOS, pasoActual);
 
@@ -373,7 +381,7 @@
     pasoActual = 4; setPasos(PASOS, pasoActual);
 
     setEstado('Validando solicitante…');
-    clickValidarContinuar();
+    await clickValidarContinuar();
     await sleep(1200);
     pasoActual = 5; setPasos(PASOS, pasoActual);
 
@@ -401,7 +409,7 @@
     pasoActual = 6; setPasos(PASOS, pasoActual);
 
     setEstado('Validando citado…');
-    clickValidarContinuar();
+    await clickValidarContinuar();
     await sleep(1500);
     pasoActual = 7; setPasos(PASOS, pasoActual);
 
