@@ -88,7 +88,11 @@ def get_clientes_queryset(user):
     """Retorna queryset de clientes según el rol."""
     if hasattr(user, 'profile') and user.profile.rol in ['admin', 'superadmin', 'abogada']:
         return Cliente.objects.all()
-    return Cliente.objects.filter(expediente__asesor=user).distinct()
+    # Asesores ven: clientes con expediente asignado O clientes que ellos crearon
+    from django.db.models import Q
+    return Cliente.objects.filter(
+        Q(expediente__asesor=user) | Q(created_by=user)
+    ).distinct()
 
 
 ESTADO_COLORS = {
@@ -694,6 +698,10 @@ class ClienteCreateView(LoginRequiredMixin, CreateView):
     model = Cliente
     form_class = ClienteForm
     template_name = 'expedientes/cliente_form.html'
+
+    def form_valid(self, form):
+        form.instance.created_by = self.request.user
+        return super().form_valid(form)
 
     def get_success_url(self):
         return reverse_lazy('expediente_create') + f'?cliente={self.object.pk}'

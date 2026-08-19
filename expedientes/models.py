@@ -117,6 +117,13 @@ class Cliente(models.Model):
         help_text='Fecha programada para la asesoría gratuita'
     )
 
+    created_by = models.ForeignKey(
+        'auth.User', on_delete=models.SET_NULL,
+        null=True, blank=True,
+        verbose_name='Creado por',
+        help_text='Asesor que registró al cliente'
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
