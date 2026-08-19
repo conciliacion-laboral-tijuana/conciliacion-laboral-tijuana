@@ -1,10 +1,10 @@
 {% extends 'base.html' %}
-{% load custom_filters %}
+{% load custom_filters svg_tags %}
 {% block title %}Búsqueda Global - Conciliacion Laboral Tijuana{% endblock %}
 
 {% block content %}
 <div class="space-y-6">
-    <h1 class="text-base font-bold text-gray-800">🔍 Búsqueda Global</h1>
+    <h1 class="text-base font-bold text-gray-800">{% svg 'search' %} Búsqueda Global</h1>
 
     <div class="bg-white rounded shadow-sm border border-gray-200 p-4">
         <form method="get" class="space-y-3">
@@ -75,7 +75,7 @@
         </div>
         {% else %}
         <div class="p-8 text-center">
-            <span class="text-4xl block mb-3">🔍</span>
+            <span class="text-4xl block mb-3">{% svg 'search' %}</span>
             <p class="text-gray-500 text-sm">No se encontraron resultados para "{{ q }}"</p>
             <p class="text-gray-400 mt-1 text-xs">Intenta con otros términos de búsqueda</p>
         </div>

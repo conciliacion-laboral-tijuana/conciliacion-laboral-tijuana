@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load svg_tags %}
 {% load static %}
 {% block title %}{% if form.instance.pk %}Editar Socio{% else %}Nuevo Socio{% endif %} - Finanzas{% endblock %}
 
@@ -6,7 +7,7 @@
 <div class="max-w-2xl mx-auto">
     <div class="card">
         <div class="card-header" style="background: #2a3340; color: white; border-bottom: none;">
-            <h1 class="text-sm font-bold">{% if form.instance.pk %}✏️ Editar Socio{% else %}👥 Nuevo Socio{% endif %}</h1>
+            <h1 class="text-sm font-bold">{% if form.instance.pk %}{% svg 'edit' %} Editar Socio{% else %}{% svg 'account-group' %} Nuevo Socio{% endif %}</h1>
         </div>
         <div class="card-body">
             <form method="post" class="space-y-4">
@@ -20,7 +21,7 @@
                 </div>
                 {% endfor %}
                 <div class="flex space-x-3 pt-2">
-                    <button type="submit" class="btn btn-primary">💾 Guardar</button>
+                    <button type="submit" class="btn btn-primary">{% svg 'save' %} Guardar</button>
                     <a href="{% url 'partner_list' %}" class="btn" style="background:#6b7280; color:white;">Cancelar</a>
                 </div>
             </form>

@@ -1,12 +1,12 @@
 {% extends 'base.html' %}
-{% load custom_filters %}
+{% load custom_filters svg_tags %}
 {% block title %}Solicitud de Conciliación - {{ expediente.numero }}{% endblock %}
 
 {% block content %}
 <div class="max-w-5xl mx-auto py-6">
     <div class="flex items-center justify-between mb-6">
         <div>
-            <h1 class="text-base font-bold text-gray-800">📋 Solicitud de Conciliación</h1>
+            <h1 class="text-base font-bold text-gray-800">{% svg 'clipboard-text' %} Solicitud de Conciliación</h1>
             <p class="text-gray-500 text-xs">Expediente: <strong>{{ expediente.numero }}</strong> — {{ expediente.cliente.nombre }}</p>
         </div>
         <div class="flex gap-2">
@@ -16,7 +16,7 @@
             </a>
             <button onclick="window.print()"
                     class="bg-gray-800 text-white px-3 py-1.5 rounded hover:bg-gray-700 transition-colors text-xs">
-                🖨️ Imprimir
+                {% svg 'printer' %} Imprimir
             </button>
         </div>
     </div>
@@ -288,11 +288,11 @@
             <div class="flex gap-2">
                 <button type="button" onclick="guardarBorrador()"
                         class="px-3 py-1.5 text-sm border border-gray-400 rounded hover:bg-gray-100 transition-colors">
-                    💾 Guardar borrador
+                    {% svg 'save' %} Guardar borrador
                 </button>
                 <button type="submit"
                         class="px-4 py-1.5 text-sm bg-gray-800 text-white rounded hover:bg-gray-700 transition-colors font-medium">
-                    ✅ Guardar solicitud
+                    {% svg 'check-circle' %} Guardar solicitud
                 </button>
             </div>
         </div>
@@ -329,7 +329,7 @@ function guardarBorrador() {
         }
     }
     localStorage.setItem('solicitudConciliacion_' + '{{ expediente.pk }}', JSON.stringify(obj));
-    alert('✅ Borrador guardado localmente.');
+    alert('{% svg 'check-circle' %} Borrador guardado localmente.');
 }
 
 // Auto-cargar borrador si existe

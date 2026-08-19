@@ -1,9 +1,10 @@
+{% load svg_tags %}
 {% load humanize %}
 
 {% if resultado %}
     {% if resultado.success %}
     <div class="bg-green-50 border border-green-200 rounded-lg p-4">
-        <h4 class="font-bold text-green-900 text-sm mb-2">📊 Resultado de la Simulación</h4>
+        <h4 class="font-bold text-green-900 text-sm mb-2">{% svg 'chart' %} Resultado de la Simulación</h4>
         <dl class="space-y-1.5 text-sm">
             <div class="flex justify-between">
                 <dt class="text-green-700">Salario diario:</dt>
@@ -19,34 +20,34 @@
             </div>
             <hr class="border-green-200 my-1.5">
             <div class="flex justify-between">
-                <dt class="text-green-700">🎄 Aguinaldo:</dt>
+                <dt class="text-green-700">{% svg 'calendar' %} Aguinaldo:</dt>
                 <dd class="font-medium text-green-800">${{ resultado.desglose.aguinaldo|floatformat:2|intcomma }}</dd>
             </div>
             <div class="flex justify-between">
-                <dt class="text-green-700">🏖️ Vacaciones:</dt>
+                <dt class="text-green-700">{% svg 'compass' %}️ Vacaciones:</dt>
                 <dd class="font-medium text-green-800">${{ resultado.desglose.vacaciones|floatformat:2|intcomma }}</dd>
             </div>
             <div class="flex justify-between">
-                <dt class="text-green-700">✈️ Prima vacacional:</dt>
+                <dt class="text-green-700">{% svg 'external-link' %} Prima vacacional:</dt>
                 <dd class="font-medium text-green-800">${{ resultado.desglose.prima_vacacional|floatformat:2|intcomma }}</dd>
             </div>
             <div class="flex justify-between">
-                <dt class="text-green-700">📜 Prima antigüedad:</dt>
+                <dt class="text-green-700">{% svg 'file-document' %} Prima antigüedad:</dt>
                 <dd class="font-medium text-green-800">${{ resultado.desglose.prima_antiguedad|floatformat:2|intcomma }}</dd>
             </div>
             <div class="flex justify-between">
-                <dt class="text-green-700">⚖️ Indemnización (90 días):</dt>
+                <dt class="text-green-700">{% svg 'scale' %} Indemnización (90 días):</dt>
                 <dd class="font-medium text-green-800">${{ resultado.desglose.indemnizacion|floatformat:2|intcomma }}</dd>
             </div>
             {% if resultado.desglose.indemnizacion_20dias > 0 %}
             <div class="flex justify-between">
-                <dt class="text-green-700">📆 Indemnización 20 días/año:</dt>
+                <dt class="text-green-700">{% svg 'calendar' %} Indemnización 20 días/año:</dt>
                 <dd class="font-medium text-green-800">${{ resultado.desglose.indemnizacion_20dias|floatformat:2|intcomma }}</dd>
             </div>
             {% endif %}
             {% if resultado.desglose.vacaciones_vencidas > 0 %}
             <div class="flex justify-between">
-                <dt class="text-green-700">🗓️ Vacaciones vencidas:</dt>
+                <dt class="text-green-700">{% svg 'calendar' %} Vacaciones vencidas:</dt>
                 <dd class="font-medium text-green-800">${{ resultado.desglose.vacaciones_vencidas|floatformat:2|intcomma }}</dd>
             </div>
             {% endif %}
@@ -58,13 +59,13 @@
             {% endif %}
             {% if resultado.desglose.salarios_devengados > 0 %}
             <div class="flex justify-between">
-                <dt class="text-green-700">💰 Salarios devengados:</dt>
+                <dt class="text-green-700">{% svg 'cash' %} Salarios devengados:</dt>
                 <dd class="font-medium text-green-800">${{ resultado.desglose.salarios_devengados|floatformat:2|intcomma }}</dd>
             </div>
             {% endif %}
             {% if resultado.desglose.dias_festivos > 0 %}
             <div class="flex justify-between">
-                <dt class="text-green-700">🎉 Días festivos:</dt>
+                <dt class="text-green-700">{% svg 'sparkle' %} Días festivos:</dt>
                 <dd class="font-medium text-green-800">${{ resultado.desglose.dias_festivos|floatformat:2|intcomma }}</dd>
             </div>
             {% endif %}
@@ -77,7 +78,7 @@
     </div>
     {% else %}
     <div class="bg-red-50 border border-red-200 rounded-lg p-4">
-        <p class="text-red-700 text-sm">❌ {{ resultado.error }}</p>
+        <p class="text-red-700 text-sm">{% svg 'close-circle' %} {{ resultado.error }}</p>
     </div>
     {% endif %}
 {% endif %}

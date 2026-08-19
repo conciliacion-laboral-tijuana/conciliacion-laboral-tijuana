@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load svg_tags %}
 {% load static %}
 {% block title %}{% if form.instance.pk %}Editar Distribución{% else %}Nueva Distribución{% endif %} - Finanzas{% endblock %}
 
@@ -7,7 +8,7 @@
     <div class="flex items-center gap-3 mb-6">
         <a href="{% url 'profitdistribution_list' %}" class="text-gray-500 hover:text-gray-700 transition text-xl">←</a>
         <h1 class="text-2xl font-bold text-gray-800">
-            {% if form.instance.pk %}✏️ Editar Distribución{% else %}📊 Nueva Distribución de Utilidades{% endif %}
+            {% if form.instance.pk %}{% svg 'edit' %} Editar Distribución{% else %}{% svg 'chart' %} Nueva Distribución de Utilidades{% endif %}
         </h1>
     </div>
 
@@ -44,7 +45,7 @@
             </div>
 
             <div class="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-lg text-sm">
-                💡 <strong>Cálculo automático:</strong> Al guardar, el sistema calculará:
+                {% svg 'lightbulb' %} <strong>Cálculo automático:</strong> Al guardar, el sistema calculará:
                 <ul class="list-disc ml-5 mt-1 space-y-0.5">
                     <li>Honorarios del convenio</li>
                     <li>Comisiones relacionadas al cliente</li>
@@ -81,7 +82,7 @@
             <div class="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
                 <a href="{% url 'profitdistribution_list' %}" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 transition">Cancelar</a>
                 <button type="submit" class="px-6 py-2 bg-green-700 text-white rounded-lg font-semibold hover:bg-green-800 transition">
-                    {% if form.instance.pk %}💾 Guardar Cambios{% else %}✅ Calcular y Distribuir{% endif %}
+                    {% if form.instance.pk %}{% svg 'save' %} Guardar Cambios{% else %}{% svg 'check-circle' %} Calcular y Distribuir{% endif %}
                 </button>
             </div>
         </form>

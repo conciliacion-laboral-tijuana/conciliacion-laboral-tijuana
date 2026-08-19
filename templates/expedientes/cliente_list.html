@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load svg_tags %}
 {% load static %}
 {% block title %}Clientes - Conciliacion Laboral Tijuana{% endblock %}
 
@@ -46,11 +47,11 @@
                         <td>
                             {% if cliente.asesoria_gratuita_agendada and cliente.fecha_asesoria_gratuita %}
                             <span class="px-2 py-0.5 text-xs rounded-full bg-green-100 text-green-700 font-medium">
-                                📅 {{ cliente.fecha_asesoria_gratuita|date:"d/m/Y" }}
+                                {% svg 'calendar' %} {{ cliente.fecha_asesoria_gratuita|date:"d/m/Y" }}
                             </span>
                             {% elif cliente.asesoria_gratuita_ofrecida %}
                             <span class="px-2 py-0.5 text-xs rounded-full bg-amber-100 text-amber-700 font-medium">
-                                💬 Ofrecida
+                                {% svg 'chat' %} Ofrecida
                             </span>
                             {% else %}
                             <span class="text-xs text-gray-400">—</span>

@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load svg_tags %}
 {% load static %}
 {% block title %}{{ partner.nombre }} - Socios{% endblock %}
 
@@ -6,10 +7,10 @@
 <div class="max-w-4xl mx-auto space-y-4">
     <div class="card">
         <div class="card-header flex items-center justify-between" style="background: #2a3340; color: white; border-bottom: none;">
-            <h1 class="text-sm font-bold">👤 {{ partner.nombre }}</h1>
+            <h1 class="text-sm font-bold">{% svg 'account' %} {{ partner.nombre }}</h1>
             <div class="flex space-x-2">
-                <a href="{% url 'partner_update' partner.pk %}" class="btn btn-sm" style="background:#47505e; color:white;">✏️ Editar</a>
-                <a href="{% url 'partnerloan_create' %}?origen={{ partner.pk }}" class="btn btn-sm" style="background:#1a6b3c; color:white;">💰 Registrar Préstamo</a>
+                <a href="{% url 'partner_update' partner.pk %}" class="btn btn-sm" style="background:#47505e; color:white;">{% svg 'edit' %} Editar</a>
+                <a href="{% url 'partnerloan_create' %}?origen={{ partner.pk }}" class="btn btn-sm" style="background:#1a6b3c; color:white;">{% svg 'cash' %} Registrar Préstamo</a>
                 <a href="{% url 'partner_list' %}" class="btn btn-sm" style="background:#6b7280; color:white;">← Volver</a>
             </div>
         </div>
@@ -38,7 +39,7 @@
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <!-- Préstamos Otorgados -->
         <div class="card">
-            <div class="card-header">💰 Préstamos Otorgados</div>
+            <div class="card-header">{% svg 'cash' %} Préstamos Otorgados</div>
             <div class="card-body">
                 {% if prestamos_origen %}
                 <div class="space-y-2">
@@ -60,7 +61,7 @@
 
         <!-- Préstamos Recibidos -->
         <div class="card">
-            <div class="card-header">💰 Préstamos Recibidos</div>
+            <div class="card-header">{% svg 'cash' %} Préstamos Recibidos</div>
             <div class="card-body">
                 {% if prestamos_destino %}
                 <div class="space-y-2">

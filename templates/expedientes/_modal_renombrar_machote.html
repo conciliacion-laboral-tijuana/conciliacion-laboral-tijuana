@@ -1,3 +1,4 @@
+{% load svg_tags %}
 {# ─── Modal compartido: Renombrar machote ───────────────────────────────── #}
 {# Uso: {% include 'expedientes/_modal_renombrar_machote.html' %}           #}
 {#                                                                          #}
@@ -13,7 +14,7 @@
 <div id="modal-renombrar" class="fixed inset-0 z-50 items-center justify-center bg-black/50" style="display:none;">
     <div class="bg-white w-full max-w-md mx-3 shadow-xl border border-gray-200" style="border-radius: 4px;">
         <div class="px-4 py-3 border-b border-gray-200" style="background:#f5f6f7;">
-            <h3 class="text-sm font-bold text-gray-800">✏️ Renombrar machote</h3>
+            <h3 class="text-sm font-bold text-gray-800">{% svg 'edit' %} Renombrar machote</h3>
         </div>
         <form method="post" id="renombrar-form" action="">
             {% csrf_token %}

@@ -1,15 +1,15 @@
 {% extends 'base.html' %}
-{% load custom_filters %}
+{% load custom_filters svg_tags %}
 {% block title %}Eliminar Movimiento - Conciliacion Laboral Tijuana{% endblock %}
 
 {% block content %}
 <div class="max-w-lg mx-auto">
     <div class="card">
         <div class="card-header" style="background: #fef2f2; color: #8b3a3a; border-color: #fecaca;">
-            ⚠️ Confirmar eliminación
+            {% svg 'warning' %} Confirmar eliminación
         </div>
         <div class="card-body text-center py-6">
-            <div class="text-4xl mb-3">🗑️</div>
+            <div class="text-4xl mb-3">{% svg 'delete' %}</div>
             <h2 class="text-lg font-bold text-gray-800 mb-2">¿Eliminar este movimiento?</h2>
             <div class="bg-gray-50 rounded p-4 inline-block text-left mx-auto mb-4" style="border-radius: 4px;">
                 <table class="text-sm">
@@ -52,7 +52,7 @@
             <form method="post" class="flex items-center justify-center gap-2">
                 {% csrf_token %}
                 <a href="{% url 'cashmovement_list' %}" class="btn">Cancelar</a>
-                <button type="submit" class="btn btn-danger">🗑️ Sí, eliminar</button>
+                <button type="submit" class="btn btn-danger">{% svg 'delete' %} Sí, eliminar</button>
             </form>
         </div>
     </div>

@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load svg_tags %}
 {% block title %}{% if object %}Editar{% else %}Nuevo{% endif %} Cliente - Conciliacion Laboral Tijuana{% endblock %}
 
 {% block content %}
@@ -6,7 +7,7 @@
     <div class="bg-white rounded shadow-sm border border-gray-200">
         <div class="px-5 py-3 border-b border-gray-200">
             <h1 class="text-base font-bold text-gray-800">
-                {% if object %}✏️ Editar Cliente{% else %}👥 Nuevo Cliente{% endif %}
+                {% if object %}{% svg 'edit' %} Editar Cliente{% else %}{% svg 'account-group' %} Nuevo Cliente{% endif %}
             </h1>
         </div>
         <form method="post" class="p-5 space-y-5">
@@ -212,7 +213,7 @@
 
             <!-- Asesoría Gratuita -->
             <div>
-                <h2 class="text-sm font-semibold text-gray-800 mb-3 border-b pb-1.5">🎓 Asesoría Gratuita</h2>
+                <h2 class="text-sm font-semibold text-gray-800 mb-3 border-b pb-1.5">{% svg 'account' %} Asesoría Gratuita</h2>
                 <p class="text-xs text-gray-500 mb-3">Si el cliente no puede contratar en este momento, ofrécele una asesoría gratuita semanal y agenda una fecha.</p>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div class="flex items-center gap-2 pt-2">
@@ -233,7 +234,7 @@
                         {% if form.fecha_asesoria_gratuita.errors %}<p class="text-red-500 text-xs mt-1">{{ form.fecha_asesoria_gratuita.errors.0 }}</p>{% endif %}
                     </div>
                 </div>
-                <p class="text-xs text-gray-400 mt-2">💡 Las asesorías agendadas aparecerán en el dashboard del asesor y en el calendario.</p>
+                <p class="text-xs text-gray-400 mt-2">{% svg 'lightbulb' %} Las asesorías agendadas aparecerán en el dashboard del asesor y en el calendario.</p>
             </div>
 
             <div class="flex items-center justify-end gap-3 pt-4 border-t border-gray-200">

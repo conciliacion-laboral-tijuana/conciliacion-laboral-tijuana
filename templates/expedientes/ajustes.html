@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load svg_tags %}
 {% load static %}
 {% block title %}Ajustes - Conciliación{% endblock %}
 
@@ -8,7 +9,7 @@
     <!-- Encabezado -->
     <div class="card">
         <div class="card-header" style="background: #2a3340; color: white; border-bottom: none;">
-            <h1 class="text-sm font-bold">⚙️ Ajustes</h1>
+            <h1 class="text-sm font-bold">{% svg 'compass' %} Ajustes</h1>
         </div>
         <div class="card-body">
             <div class="flex items-center gap-3">
@@ -23,15 +24,15 @@
         </div>
     </div>
 
-    <!-- 📲 Extensión de Chrome -->
+    <!-- {% svg 'phone-cell' %} Extensión de Chrome -->
     <div class="card" id="extension">
         <div class="card-header" style="background: #2a3340; color: white; border-bottom: none;">
-            <h2 class="text-sm font-bold">📲 Extensión de Chrome — Conciliación BC</h2>
+            <h2 class="text-sm font-bold">{% svg 'phone-cell' %} Extensión de Chrome — Conciliación BC</h2>
         </div>
         <div class="card-body space-y-4">
 
             <div class="bg-green-50 border border-green-200 rounded-lg p-4 text-sm text-green-800">
-                <strong>✨ ¿Qué hace?</strong> Llena automáticamente el formulario de conciliación del
+                <strong>{% svg 'sparkle' %} ¿Qué hace?</strong> Llena automáticamente el formulario de conciliación del
                 portal del gobierno <strong>en tu navegador</strong>. Tú das el clic final, y el folio y
                 el acuse se guardan solos en la app. Ideal cuando la automatización del servidor se traba.
             </div>
@@ -41,17 +42,17 @@
                 <h3 class="text-sm font-semibold text-gray-800 mb-1">⬇️ Paso 1 — Descarga la extensión</h3>
                 <p class="text-xs text-gray-600 mb-3">Descarga el paquete (es un archivo .zip pequeño). Guárdalo donde lo encuentres (ej. Descargas).</p>
                 <a href="{% url 'extension_descargar' %}" class="btn btn-success">
-                    📦 Descargar extensión (.zip)
+                    {% svg 'package' %} Descargar extensión (.zip)
                 </a>
             </div>
 
             <!-- Token -->
             <div class="bg-gray-50 rounded-lg p-4">
-                <h3 class="text-sm font-semibold text-gray-700 mb-2">🔑 Paso 2 — Tu token personal</h3>
+                <h3 class="text-sm font-semibold text-gray-700 mb-2">{% svg 'key' %} Paso 2 — Tu token personal</h3>
                 <p class="text-xs text-gray-500 mb-2">Lo necesitarás para conectar la extensión con la app. Cópialo:</p>
                 <div class="flex items-center space-x-2">
                     <code id="token-field" class="flex-1 bg-white border border-gray-300 rounded px-3 py-2 text-sm font-mono break-all select-all">{{ token }}</code>
-                    <button onclick="copiarToken()" class="btn" style="background:#2563eb; color:white; white-space:nowrap;">📋 Copiar</button>
+                    <button onclick="copiarToken()" class="btn" style="background:#2563eb; color:white; white-space:nowrap;">{% svg 'clipboard-text' %} Copiar</button>
                 </div>
                 <form method="post" action="{% url 'extension_regenerar_token' %}" class="mt-2"
                       onsubmit="return confirm('¿Regenerar el token? La extensión dejará de funcionar hasta que lo actualices en sus opciones.');">
@@ -62,7 +63,7 @@
 
             <!-- Instrucciones -->
             <div class="bg-white border border-gray-200 rounded-lg p-4">
-                <h3 class="text-sm font-semibold text-gray-700 mb-2">🛠️ Paso 3 — Instalar (una sola vez)</h3>
+                <h3 class="text-sm font-semibold text-gray-700 mb-2">{% svg 'key' %} Paso 3 — Instalar (una sola vez)</h3>
                 <ol class="list-decimal ml-5 space-y-2 text-sm text-gray-700">
                     <li>Descomprime el <strong>.zip</strong> descargado (clic derecho → <em>Extraer aquí</em>).</li>
                     <li>Abre Chrome y escribe en la barra de direcciones:
@@ -73,7 +74,7 @@
                     <li>Pega la <strong>URL de la app</strong> y el <strong>token</strong> del paso 2 → Guardar.</li>
                 </ol>
                 <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mt-3 text-xs text-yellow-800">
-                    💡 <strong>¿Muchas computadoras?</strong> Si administras las laptops del despacho, pídele a
+                    {% svg 'lightbulb' %} <strong>¿Muchas computadoras?</strong> Si administras las laptops del despacho, pídele a
                     tu persona de soporte técnico que instale la extensión una vez en cada una — es el mismo
                     proceso y toma ~2 minutos. (Chrome no permite instalar extensiones automáticamente desde
                     una página web por seguridad.)
@@ -82,7 +83,7 @@
 
             <!-- Tareas pendientes -->
             <div class="bg-white border border-gray-200 rounded-lg p-4">
-                <h3 class="text-sm font-semibold text-gray-700 mb-2">📋 Tareas esperando a la extensión</h3>
+                <h3 class="text-sm font-semibold text-gray-700 mb-2">{% svg 'clipboard-text' %} Tareas esperando a la extensión</h3>
                 {% if tareas_pendientes %}
                 <ul class="space-y-2">
                     {% for t in tareas_pendientes %}
@@ -95,7 +96,7 @@
                 {% else %}
                 <p class="text-sm text-gray-500">
                     No hay tareas pendientes. En un expediente elige
-                    <strong>"📲 Desde mi navegador (Extensión)"</strong> y aparecerá aquí.
+                    <strong>"{% svg 'phone-cell' %} Desde mi navegador (Extensión)"</strong> y aparecerá aquí.
                 </p>
                 {% endif %}
             </div>
@@ -105,10 +106,10 @@
     <!-- Seguridad de la cuenta -->
     <div class="card">
         <div class="card-header" style="background: #2a3340; color: white; border-bottom: none;">
-            <h2 class="text-sm font-bold">🔐 Seguridad de la cuenta</h2>
+            <h2 class="text-sm font-bold">{% svg 'lock' %} Seguridad de la cuenta</h2>
         </div>
         <div class="card-body">
-            <a href="{% url 'password_reset' %}" class="btn">🔑 Cambiar contraseña</a>
+            <a href="{% url 'password_reset' %}" class="btn">{% svg 'key' %} Cambiar contraseña</a>
         </div>
     </div>
 
@@ -120,7 +121,7 @@ function copiarToken() {
     navigator.clipboard.writeText(el.textContent.trim()).then(() => {
         const btn = event.target;
         const original = btn.textContent;
-        btn.textContent = '✅ Copiado';
+        btn.textContent = '{% svg 'check-circle' %} Copiado';
         setTimeout(() => btn.textContent = original, 1500);
     });
 }

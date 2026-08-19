@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load svg_tags %}
 {% block title %}Solicitar Transferencia - {{ expediente.numero }}{% endblock %}
 
 {% block content %}
@@ -7,7 +8,7 @@
     <div class="card">
         <div class="card-header flex items-center justify-between" style="background: #2a3340; color: white; border-bottom: none;">
             <div class="flex items-center space-x-2">
-                <h1 class="text-sm font-bold">🔄 Solicitar Transferencia de Caso</h1>
+                <h1 class="text-sm font-bold">{% svg 'refresh' %} Solicitar Transferencia de Caso</h1>
                 <span class="badge {{ ESTADO_COLORS|get_item:expediente.estado }}">
                     {{ expediente.get_estado_display }}
                 </span>
@@ -40,7 +41,7 @@
             </div>
             {% if expediente.fecha_audiencia %}
             <div class="mt-2 pt-2 border-t border-gray-200">
-                <span class="text-[10px] text-gray-500 uppercase tracking-wider">📅 Próxima audiencia</span>
+                <span class="text-[10px] text-gray-500 uppercase tracking-wider">{% svg 'calendar' %} Próxima audiencia</span>
                 <p class="text-sm font-semibold text-amber-700 mt-0.5">{{ expediente.fecha_audiencia|date:"l d/m/Y H:i" }}</p>
             </div>
             {% endif %}
@@ -94,7 +95,7 @@
                             style="background: #8b3a3a; hover:background: #6b2a2a;"
                             onmouseover="this.style.background='#6b2a2a'"
                             onmouseout="this.style.background='#8b3a3a'">
-                        🔄 Enviar Solicitud
+                        {% svg 'refresh' %} Enviar Solicitud
                     </button>
                 </div>
             </div>

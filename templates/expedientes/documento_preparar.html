@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load custom_filters %}
+{% load custom_filters svg_tags %}
 {% block title %}Preparar {{ machote.nombre }} - {{ expediente.numero }}{% endblock %}
 
 {% block content %}
@@ -32,7 +32,7 @@
     <div class="card mb-4">
         <div class="card-body">
             <div class="flex items-center justify-between mb-2">
-                <span class="text-sm font-semibold text-gray-700">📋 Completitud de datos</span>
+                <span class="text-sm font-semibold text-gray-700">{% svg 'clipboard-text' %} Completitud de datos</span>
                 <span class="text-sm font-bold {% if stats.porcentaje >= 80 %}text-green-700{% elif stats.porcentaje >= 50 %}text-amber-700{% else %}text-red-700{% endif %}">
                     {{ stats.completos }}/{{ stats.total }} campos
                 </span>
@@ -47,11 +47,11 @@
             <div class="flex items-center justify-between mt-1">
                 <span class="text-[10px] text-gray-400">
                     {% if stats.completos == stats.total %}
-                    ✅ Todos los datos están completos. Puedes generar el documento.
+                    {% svg 'check-circle' %} Todos los datos están completos. Puedes generar el documento.
                     {% elif stats.porcentaje >= 80 %}
-                    ⚠️ La mayoría de los datos están listos. Revisa los campos pendientes.
+                    {% svg 'warning' %} La mayoría de los datos están listos. Revisa los campos pendientes.
                     {% else %}
-                    ❌ Faltan varios datos importantes. Complétalos para un mejor resultado.
+                    {% svg 'close-circle' %} Faltan varios datos importantes. Complétalos para un mejor resultado.
                     {% endif %}
                 </span>
                 <span class="text-[10px] text-gray-400">{{ stats.porcentaje }}% completo</span>
@@ -71,7 +71,7 @@
             <div class="card">
                 <div class="card-header flex items-center justify-between">
                     <span>
-                        {% if seccion.grouper == 'Cliente' %}👤{% elif seccion.grouper == 'Empleo' %}💼{% elif seccion.grouper == 'Empresa' %}🏢{% elif seccion.grouper == 'Expediente' %}📋{% endif %}
+                        {% if seccion.grouper == 'Cliente' %}{% svg 'account' %}{% elif seccion.grouper == 'Empleo' %}{% svg 'briefcase' %}{% elif seccion.grouper == 'Empresa' %}{% svg 'office-building' %}{% elif seccion.grouper == 'Expediente' %}{% svg 'clipboard-text' %}{% endif %}
                         {{ seccion.grouper }}
                     </span>
                     <span class="text-xs font-medium {% if sec_stats.completos == sec_stats.total %}text-green-600{% else %}text-amber-600{% endif %}">
@@ -84,7 +84,7 @@
                         <div class="flex items-center gap-2 flex-1 min-w-0">
                             <span class="flex-shrink-0">
                                 {% if campo.status == 'completo' %}
-                                <span class="w-5 h-5 flex items-center justify-center rounded-full bg-green-100 text-green-700 text-xs font-bold">✓</span>
+                                <span class="w-5 h-5 flex items-center justify-center rounded-full bg-green-100 text-green-700 text-xs font-bold">{% svg 'check' %}</span>
                                 {% else %}
                                 <span class="w-5 h-5 flex items-center justify-center rounded-full bg-red-100 text-red-700 text-xs font-bold">!</span>
                                 {% endif %}
@@ -119,7 +119,7 @@
         <div class="space-y-4">
             <!-- Resumen de Cálculos -->
             <div class="card">
-                <div class="card-header">📊 Cálculos Laborales</div>
+                <div class="card-header">{% svg 'chart' %} Cálculos Laborales</div>
                 <div class="card-body space-y-2">
                     {% if calculo.success and calculo.total > 0 %}
                     <div class="space-y-1.5">
@@ -171,7 +171,7 @@
 
             <!-- Marcadores disponibles en el machote -->
             <div class="card">
-                <div class="card-header">🏷️ Marcadores disponibles</div>
+                <div class="card-header">{% svg 'tag' %} Marcadores disponibles</div>
                 <div class="card-body">
                     <p class="text-[10px] text-gray-500 mb-2">Datos que se inyectarán automáticamente:</p>
                     <div class="flex flex-wrap gap-1">
@@ -188,7 +188,7 @@
             <!-- Botón de acción -->
             <div class="card" style="border-color: {% if stats.porcentaje >= 80 %}#3d6b4d{% else %}#d97706{% endif %};">
                 <div class="card-body text-center space-y-3">
-                    <p class="text-sm font-semibold text-gray-800">🚀 Generar documento</p>
+                    <p class="text-sm font-semibold text-gray-800">{% svg 'send' %} Generar documento</p>
                     <p class="text-xs text-gray-500">
                         {% if stats.completos == stats.total %}
                         Todos los datos están listos. El documento se generará con toda la información.
@@ -201,7 +201,7 @@
                     <a href="{% url 'machotes_generar' expediente.pk machote.pk %}"
                        class="block w-full px-4 py-2.5 text-sm font-bold text-white rounded-lg transition-all duration-150 {% if stats.porcentaje >= 80 %}hover:bg-green-800{% else %}hover:bg-amber-800{% endif %}"
                        style="background: {% if stats.porcentaje >= 80 %}#3d6b4d{% else %}#d97706{% endif %};">
-                        {% if stats.porcentaje >= 80 %}✅ Generar documento{% else %}⚠️ Generar de todas formas{% endif %}
+                        {% if stats.porcentaje >= 80 %}{% svg 'check-circle' %} Generar documento{% else %}{% svg 'warning' %} Generar de todas formas{% endif %}
                     </a>
                     <p class="text-[10px] text-gray-400">El documento se abrirá en el editor para que puedas revisarlo y ajustarlo antes de descargar.</p>
                 </div>
@@ -211,7 +211,7 @@
 
     <!-- Campos que se inyectarán (vista previa de valores) -->
     <div class="card">
-        <div class="card-header">📄 Vista previa de valores inyectados</div>
+        <div class="card-header">{% svg 'file-document' %} Vista previa de valores inyectados</div>
         <div class="card-body">
             <p class="text-xs text-gray-500 mb-2">Estos son los valores que se insertarán en el documento. Los que están en <span class="text-red-500">rojo</span> no tienen datos y quedarán como marcadores pendientes.</p>
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">

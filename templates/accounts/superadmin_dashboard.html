@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load static custom_filters %}
+{% load static custom_filters svg_tags %}
 {% block title %}Panel Superadmin - Conciliacion Laboral Tijuana{% endblock %}
 
 {% block content %}
@@ -20,7 +20,7 @@
                 <img src="{% static 'svg/arrow-down-bold-box-outline.svg' %}" class="w-3.5 h-3.5 icon-darkblue"> Exportar Excel
             </a>
             <a href="{% url 'cargar_datos_demo' %}" class="btn {% if total_expedientes == 0 %}btn-primary font-semibold animate-pulse{% endif %}" title="Cargar datos de demostración (clientes, expedientes, usuarios de prueba)">
-                📦 Cargar datos demo
+                {% svg 'package' %} Cargar datos demo
             </a>
         </div>
     </div>
@@ -221,7 +221,7 @@
                                 {{ u.rol|capfirst }}
                             </span>
                         </td>
-                        <td class="text-center">{% if u.es_staff %}<span class="text-gray-700">✓</span>{% else %}—{% endif %}</td>
+                        <td class="text-center">{% if u.es_staff %}<span class="text-gray-700">{% svg 'check' %}</span>{% else %}—{% endif %}</td>
                         <td class="text-center">{% if u.es_activo %}<span class="inline-block w-2 h-2 bg-gray-700" style="border-radius: 1px;"></span>{% else %}<span class="inline-block w-2 h-2 bg-red-500" style="border-radius: 1px;"></span>{% endif %}</td>
                         <td class="text-sm">
                             {% if u.ultimo_acceso %}

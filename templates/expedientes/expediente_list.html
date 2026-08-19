@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load static custom_filters %}
+{% load static custom_filters svg_tags %}
 {% block title %}Expedientes - Conciliacion Laboral Tijuana{% endblock %}
 
 {% block content %}
@@ -100,11 +100,11 @@
                         </td>
                         <td>
                             {% if exp.prioridad == 'alta' %}
-                            <span class="text-xs text-red-700">🔴 Alta</span>
+                            <span class="text-xs text-red-700">{% svg 'circle-red' %} Alta</span>
                             {% elif exp.prioridad == 'baja' %}
-                            <span class="text-xs text-gray-400">⚪ Baja</span>
+                            <span class="text-xs text-gray-400">{% svg 'circle-white' %} Baja</span>
                             {% else %}
-                            <span class="text-xs text-yellow-700">🟡 Media</span>
+                            <span class="text-xs text-yellow-700">{% svg 'circle-yellow' %} Media</span>
                             {% endif %}
                         </td>
                         <td>{% if exp.monto_reclamado %}${{ exp.monto_reclamado|floatformat:0 }}{% else %}—{% endif %}</td>

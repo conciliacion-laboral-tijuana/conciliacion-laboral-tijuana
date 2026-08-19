@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load svg_tags %}
 {% load static %}
 {% block title %}Gestión de Transferencias - Conciliacion Laboral Tijuana{% endblock %}
 
@@ -45,7 +46,7 @@
                     </div>
                     {% if solicitud.expediente.fecha_audiencia %}
                     <div class="text-right flex-shrink-0 ml-4">
-                        <span class="text-[10px] text-gray-500">📅 Audiencia</span>
+                        <span class="text-[10px] text-gray-500">{% svg 'calendar' %} Audiencia</span>
                         <p class="text-xs font-semibold text-amber-700">{{ solicitud.expediente.fecha_audiencia|date:"d/m/Y H:i" }}</p>
                     </div>
                     {% endif %}
@@ -61,7 +62,7 @@
             <!-- Asesor destino sugerido -->
             {% if solicitud.asesor_destino %}
             <div class="px-4 py-2" style="background: #f0f4ff; border-bottom: 1px solid #e0e7ff;">
-                <span class="text-xs text-blue-700">🤝 Asesor sugerido: <strong>{{ solicitud.asesor_destino.get_full_name|default:solicitud.asesor_destino.username }}</strong></span>
+                <span class="text-xs text-blue-700">{% svg 'handshake' %} Asesor sugerido: <strong>{{ solicitud.asesor_destino.get_full_name|default:solicitud.asesor_destino.username }}</strong></span>
             </div>
             {% endif %}
 
@@ -103,7 +104,7 @@
                         <button type="submit" formaction="{% url 'rechazar_transferencia' solicitud.pk %}"
                                 class="px-4 py-2 text-sm font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors"
                                 onclick="return confirm('¿Rechazar esta solicitud de transferencia?')">
-                            ❌ Rechazar
+                            {% svg 'close-circle' %} Rechazar
                         </button>
                         <!-- Aprobar -->
                         <button type="submit"
@@ -112,7 +113,7 @@
                                 onmouseover="this.style.background='#14532d'"
                                 onmouseout="this.style.background='#166534'"
                                 onclick="return confirm('¿Confirmar la transferencia y reasignación?')">
-                            ✅ Aprobar y Reasignar
+                            {% svg 'check-circle' %} Aprobar y Reasignar
                         </button>
                     </div>
                 </form>
@@ -123,7 +124,7 @@
     {% else %}
     <!-- Sin pendientes -->
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
-        <div class="text-5xl mb-3">✅</div>
+        <div class="text-5xl mb-3">{% svg 'check-circle' %}</div>
         <h3 class="text-lg font-semibold text-gray-700">No hay transferencias pendientes</h3>
         <p class="text-sm text-gray-500 mt-1">Todas las solicitudes han sido procesadas.</p>
     </div>
@@ -157,11 +158,11 @@
                         <td class="px-4 py-2 text-gray-600">{{ h.solicitante.get_full_name|default:h.solicitante.username }}</td>
                         <td class="px-4 py-2">
                             {% if h.estado == 'aprobada' %}
-                            <span class="px-2 py-0.5 text-xs font-semibold bg-green-100 text-green-800 rounded-full">✅ Aprobada</span>
+                            <span class="px-2 py-0.5 text-xs font-semibold bg-green-100 text-green-800 rounded-full">{% svg 'check-circle' %} Aprobada</span>
                             {% elif h.estado == 'rechazada' %}
-                            <span class="px-2 py-0.5 text-xs font-semibold bg-red-100 text-red-800 rounded-full">❌ Rechazada</span>
+                            <span class="px-2 py-0.5 text-xs font-semibold bg-red-100 text-red-800 rounded-full">{% svg 'close-circle' %} Rechazada</span>
                             {% elif h.estado == 'cancelada' %}
-                            <span class="px-2 py-0.5 text-xs font-semibold bg-gray-100 text-gray-800 rounded-full">🔙 Cancelada</span>
+                            <span class="px-2 py-0.5 text-xs font-semibold bg-gray-100 text-gray-800 rounded-full">{% svg 'arrow-back' %} Cancelada</span>
                             {% endif %}
                         </td>
                         <td class="px-4 py-2">{{ h.asesor_asignado.get_full_name|default:h.asesor_asignado.username|default:'—' }}</td>

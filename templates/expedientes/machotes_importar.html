@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load svg_tags %}
 {% load static %}
 {% block title %}Subir Demanda Word | Conciliacion Laboral Tijuana{% endblock %}
 
@@ -9,7 +10,7 @@
     </h1>
 
     <div class="card">
-        <div class="card-header">📥 Añadir documento a los machotes</div>
+        <div class="card-header">{% svg 'download' %} Añadir documento a los machotes</div>
         <div class="card-body">
             <p class="text-xs text-gray-500 mb-4 leading-relaxed">
                 Sube un documento <strong>.docx</strong> (demanda laboral, carta finiquito, convenio, etc.).
@@ -41,9 +42,9 @@
         <div class="card-header">ℹ️ ¿Cómo se clasifica?</div>
         <div class="card-body text-xs text-gray-600 space-y-1">
             <p>El sistema detecta la categoría según el nombre del archivo:</p>
-            <p>📌 <strong>demanda</strong> → Demanda Laboral &nbsp;|&nbsp; 📄 <strong>finiquito</strong> → Carta Finiquito</p>
-            <p>🤝 <strong>convenio</strong> → Convenio &nbsp;|&nbsp; 📋 <strong>solicitud</strong> → Solicitud</p>
-            <p>📬 <strong>citatorio</strong> → Citatorio &nbsp;|&nbsp; 📎 cualquier otro → Otro</p>
+            <p>{% svg 'bookmark' %} <strong>demanda</strong> → Demanda Laboral &nbsp;|&nbsp; {% svg 'file-document' %} <strong>finiquito</strong> → Carta Finiquito</p>
+            <p>{% svg 'handshake' %} <strong>convenio</strong> → Convenio &nbsp;|&nbsp; {% svg 'clipboard-text' %} <strong>solicitud</strong> → Solicitud</p>
+            <p>{% svg 'email' %} <strong>citatorio</strong> → Citatorio &nbsp;|&nbsp; {% svg 'paperclip' %} cualquier otro → Otro</p>
             <p class="pt-1 text-gray-400">Si el archivo ya fue importado antes, se mostrará un aviso y no se duplicará.</p>
         </div>
     </div>

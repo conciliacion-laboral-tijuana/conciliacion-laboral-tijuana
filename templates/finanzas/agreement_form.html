@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load svg_tags %}
 {% load static %}
 {% block title %}{% if form.instance.pk %}Editar Convenio{% else %}Nuevo Convenio{% endif %} - Finanzas{% endblock %}
 
@@ -7,7 +8,7 @@
     <div class="flex items-center gap-3 mb-6">
         <a href="{% url 'agreement_list' %}" class="text-gray-500 hover:text-gray-700 transition text-xl">←</a>
         <h1 class="text-2xl font-bold text-gray-800">
-            {% if form.instance.pk %}✏️ Editar Convenio{% else %}📋 Nuevo Convenio{% endif %}
+            {% if form.instance.pk %}{% svg 'edit' %} Editar Convenio{% else %}{% svg 'clipboard-text' %} Nuevo Convenio{% endif %}
         </h1>
     </div>
 
@@ -67,14 +68,14 @@
 
             {% if form.instance.pk %}
             <div class="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-lg text-sm">
-                💡 <strong>Honorarios:</strong> Los honorarios totales (${{ form.instance.honorarios|floatformat:2 }}) se calculan automáticamente a partir de los honorarios registrados en la pestaña "Honorarios".
+                {% svg 'lightbulb' %} <strong>Honorarios:</strong> Los honorarios totales (${{ form.instance.honorarios|floatformat:2 }}) se calculan automáticamente a partir de los honorarios registrados en la pestaña "Honorarios".
             </div>
             {% endif %}
 
             <div class="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
                 <a href="{% url 'agreement_list' %}" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 transition">Cancelar</a>
                 <button type="submit" class="px-6 py-2 bg-blue-700 text-white rounded-lg font-semibold hover:bg-blue-800 transition">
-                    {% if form.instance.pk %}💾 Guardar Cambios{% else %}✅ Crear Convenio{% endif %}
+                    {% if form.instance.pk %}{% svg 'save' %} Guardar Cambios{% else %}{% svg 'check-circle' %} Crear Convenio{% endif %}
                 </button>
             </div>
         </form>

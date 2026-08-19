@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load custom_filters %}
+{% load custom_filters svg_tags %}
 {% block title %}Editor de Demanda - {{ expediente.numero }}{% endblock %}
 
 {% block extra_head %}
@@ -113,7 +113,7 @@
   <!-- Header -->
   <div class="flex items-center justify-between mb-4 print-hidden">
     <div>
-      <h1 class="text-2xl font-bold text-gray-800">📝 Editor de Demanda Laboral</h1>
+      <h1 class="text-2xl font-bold text-gray-800">{% svg 'file-edit' %} Editor de Demanda Laboral</h1>
       <p class="text-gray-500 text-sm">
         Expediente: <strong>{{ expediente.numero }}</strong> — {{ expediente.cliente.nombre }}
         <span class="ml-2 px-2 py-0.5 text-xs rounded-full {{ ESTADO_COLORS|get_item:expediente.estado }}">{{ expediente.get_estado_display }}</span>
@@ -164,7 +164,7 @@
   <!-- Selector de Plantillas -->
   <div class="print-hidden mb-4">
     <div class="flex items-center gap-2 mb-3">
-      <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide">📋 Plantillas de Demanda</h2>
+      <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide">{% svg 'clipboard-text' %} Plantillas de Demanda</h2>
       <div class="flex-1 border-t border-gray-200"></div>
     </div>
     <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5" id="plantillaSelector">
@@ -194,7 +194,7 @@
     {% if machotes_demanda %}
     <!-- Machotes de casos reales -->
     <div class="flex items-center gap-2 mb-2.5 mt-5">
-      <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide">📄 Machotes de Casos Reales</h2>
+      <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide">{% svg 'file-document' %} Machotes de Casos Reales</h2>
       <span class="px-2 py-0.5 text-[10px] bg-amber-100 text-amber-700 rounded-full font-semibold">{{ machotes_demanda|length }} disponibles</span>
       <div class="flex-1 border-t border-gray-200"></div>
     </div>
@@ -228,7 +228,7 @@
           aria-label="Alternar favorito">
           <span class="text-sm leading-none {% if m.favorito %}text-amber-500{% else %}text-gray-300 hover:text-amber-400{% endif %} transition-colors"
                 data-star-machote="{{ m.id }}">
-            {% if m.favorito %}★{% else %}☆{% endif %}
+            {% if m.favorito %}{% svg 'star' %}{% else %}{% svg 'star-outline' %}{% endif %}
           </span>
         </button>
         <div onclick="cargarMachote({{ m.id }})" class="cursor-pointer">
@@ -280,7 +280,7 @@
 <div id="machoteModal" class="fixed inset-0 bg-black/50 z-50 hidden items-center justify-center p-4 print-hidden">
   <div class="bg-white rounded-xl shadow-2xl max-w-md w-full">
     <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-      <h3 class="font-semibold text-gray-800">📚 Guardar como Machote</h3>
+      <h3 class="font-semibold text-gray-800">{% svg 'file-document' %} Guardar como Machote</h3>
       <button onclick="cerrarModalMachote()" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
     </div>
     <form method="post" action="{% url 'demanda_guardar_machote' expediente.pk %}" id="machoteForm">
@@ -292,7 +292,7 @@
                placeholder="Ej: Demanda por despido injustificado con vacaciones vencidas">
         <input type="hidden" name="contenido" id="machoteContenidoInput">
         <p class="text-xs text-gray-400 mt-2">
-          💡 Los datos del cliente (nombre, CURP, salario, fechas, empresa) se convertirán automáticamente
+          {% svg 'lightbulb' %} Los datos del cliente (nombre, CURP, salario, fechas, empresa) se convertirán automáticamente
           en marcadores <code class="bg-gray-100 px-1 rounded">&#123;&#123; nombre_cliente &#125;&#125;</code> para reutilizar la plantilla en otros casos.
         </p>
       </div>

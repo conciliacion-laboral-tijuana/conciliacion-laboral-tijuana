@@ -1,3 +1,4 @@
+{% load svg_tags %}
 <!DOCTYPE html>
 <html>
 <head>
@@ -121,7 +122,7 @@
             flex-shrink: 0;
         }
         .check-box.checked::after {
-            content: "✓";
+            content: "{% svg 'check' %}";
             font-weight: bold;
             color: #1e3a8a;
         }
@@ -164,7 +165,7 @@
 </head>
 <body>
     <div class="no-print" style="background:#fef3cd;border:1px solid #f59e0b;padding:8px 12px;margin-bottom:12px;border-radius:4px;font-size:9pt;">
-        ⚠️ Esta es una vista previa. Usa <strong>Ctrl+P</strong> → "Guardar como PDF" para descargar.
+        {% svg 'warning' %} Esta es una vista previa. Usa <strong>Ctrl+P</strong> → "Guardar como PDF" para descargar.
     </div>
 
     <!-- HEADER -->
@@ -388,7 +389,7 @@
             </label>
         </div>
         <div style="margin-top:8px;font-size:8pt;color:#666;">
-            * Marque con una ✓ los objetos que aplican a su caso.
+            * Marque con una {% svg 'check' %} los objetos que aplican a su caso.
         </div>
     </div>
 

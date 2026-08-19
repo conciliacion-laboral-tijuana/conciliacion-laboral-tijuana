@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load svg_tags %}
 {% load static %}
 {% block title %}{{ agreement.cliente.nombre }} - Convenio - Finanzas{% endblock %}
 
@@ -8,10 +9,10 @@
     <div class="flex items-center justify-between flex-wrap gap-3">
         <div class="flex items-center gap-3">
             <a href="{% url 'agreement_list' %}" class="text-gray-500 hover:text-gray-700 transition text-xl">←</a>
-            <h1 class="text-2xl font-bold text-gray-800">📋 Convenio: {{ agreement.cliente.nombre }}</h1>
+            <h1 class="text-2xl font-bold text-gray-800">{% svg 'clipboard-text' %} Convenio: {{ agreement.cliente.nombre }}</h1>
         </div>
         <div class="flex gap-2">
-            <a href="{% url 'agreement_update' agreement.pk %}" class="px-4 py-2 bg-amber-500 text-white rounded-lg font-medium hover:bg-amber-600 transition">✏️ Editar</a>
+            <a href="{% url 'agreement_update' agreement.pk %}" class="px-4 py-2 bg-amber-500 text-white rounded-lg font-medium hover:bg-amber-600 transition">{% svg 'edit' %} Editar</a>
         </div>
     </div>
 
@@ -22,13 +23,13 @@
             <div class="text-3xl font-bold text-gray-800">${{ agreement.monto_convenio|floatformat:2 }}</div>
             <div class="text-xs text-gray-500 mt-1">
                 {% if agreement.estado == 'pagado' %}
-                    <span class="text-green-600 font-semibold">✅ Pagado</span>
+                    <span class="text-green-600 font-semibold">{% svg 'check-circle' %} Pagado</span>
                 {% elif agreement.estado == 'firmado' %}
-                    <span class="text-blue-600 font-semibold">📝 Firmado</span>
+                    <span class="text-blue-600 font-semibold">{% svg 'file-edit' %} Firmado</span>
                 {% elif agreement.estado == 'cancelado' %}
-                    <span class="text-red-600 font-semibold">❌ Cancelado</span>
+                    <span class="text-red-600 font-semibold">{% svg 'close-circle' %} Cancelado</span>
                 {% elif agreement.estado == 'parcial' %}
-                    <span class="text-yellow-600 font-semibold">🔄 Pago Parcial</span>
+                    <span class="text-yellow-600 font-semibold">{% svg 'refresh' %} Pago Parcial</span>
                 {% else %}
                     <span class="text-amber-600 font-semibold">⏳ Pendiente de firma</span>
                 {% endif %}
@@ -39,9 +40,9 @@
             <div class="text-3xl font-bold text-blue-700">${{ agreement.honorarios|floatformat:2 }}</div>
             <div class="text-xs text-gray-500 mt-1">
                 {% if total_honorarios_pendientes > 0 %}
-                    <span class="text-amber-600">💰 ${{ total_honorarios_pendientes|floatformat:2 }} pendientes</span>
+                    <span class="text-amber-600">{% svg 'cash' %} ${{ total_honorarios_pendientes|floatformat:2 }} pendientes</span>
                 {% else %}
-                    <span class="text-green-600">✅ Todo pagado</span>
+                    <span class="text-green-600">{% svg 'check-circle' %} Todo pagado</span>
                 {% endif %}
             </div>
         </div>
@@ -59,7 +60,7 @@
     <!-- Notes -->
     {% if agreement.notas %}
     <div class="bg-gray-50 rounded-xl border border-gray-200 p-4">
-        <div class="text-xs font-semibold text-gray-500 uppercase mb-1">📝 Notas</div>
+        <div class="text-xs font-semibold text-gray-500 uppercase mb-1">{% svg 'file-edit' %} Notas</div>
         <p class="text-gray-700 text-sm whitespace-pre-wrap">{{ agreement.notas }}</p>
     </div>
     {% endif %}
@@ -67,9 +68,9 @@
     <!-- Honorarios Section -->
     <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-            <h2 class="text-lg font-bold text-gray-800">💰 Honorarios</h2>
+            <h2 class="text-lg font-bold text-gray-800">{% svg 'cash' %} Honorarios</h2>
             <a href="{% url 'honorario_create' %}?convenio={{ agreement.pk }}" class="px-3 py-1.5 bg-blue-700 text-white rounded-lg text-sm font-medium hover:bg-blue-800 transition">
-                ➕ Agregar Honorario
+                {% svg 'plus' %} Agregar Honorario
             </a>
         </div>
         <div class="overflow-x-auto">
@@ -94,22 +95,22 @@
                         <td class="px-4 py-3">{{ h.fecha_pagado|date:"d/m/Y"|default:"—" }}</td>
                         <td class="px-4 py-3 text-center">
                             {% if h.estado == 'pagado' %}
-                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">✅ Pagado</span>
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">{% svg 'check-circle' %} Pagado</span>
                             {% elif h.estado == 'cancelado' %}
-                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">❌ Cancelado</span>
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">{% svg 'close-circle' %} Cancelado</span>
                             {% else %}
                                 <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">⏳ Pendiente</span>
                             {% endif %}
                         </td>
                         <td class="px-4 py-3 text-gray-500 max-w-[200px] truncate">{{ h.notas|default:"—" }}</td>
                         <td class="px-4 py-3 text-center">
-                            <a href="{% url 'honorario_update' h.pk %}" class="text-amber-600 hover:text-amber-800 text-xs font-medium" title="Editar">✏️</a>
+                            <a href="{% url 'honorario_update' h.pk %}" class="text-amber-600 hover:text-amber-800 text-xs font-medium" title="Editar">{% svg 'edit' %}</a>
                         </td>
                     </tr>
                     {% empty %}
                     <tr>
                         <td colspan="7" class="px-4 py-8 text-center text-gray-500">
-                            <div class="text-3xl mb-2">💰</div>
+                            <div class="text-3xl mb-2">{% svg 'cash' %}</div>
                             <p>No hay honorarios registrados para este convenio.</p>
                             <a href="{% url 'honorario_create' %}?convenio={{ agreement.pk }}" class="text-blue-600 hover:underline font-medium mt-2 inline-block">Agregar honorario →</a>
                         </td>
@@ -123,7 +124,7 @@
     <!-- Pagos Relacionados -->
     <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div class="px-5 py-4 border-b border-gray-100">
-            <h2 class="text-lg font-bold text-gray-800">💳 Pagos Relacionados</h2>
+            <h2 class="text-lg font-bold text-gray-800">{% svg 'credit-card' %} Pagos Relacionados</h2>
         </div>
         <div class="overflow-x-auto">
             <table class="w-full text-sm">

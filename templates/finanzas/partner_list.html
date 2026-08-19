@@ -1,11 +1,12 @@
 {% extends 'base.html' %}
+{% load svg_tags %}
 {% load static %}
 {% block title %}Socios - Finanzas{% endblock %}
 
 {% block content %}
 <div class="space-y-3">
     <div class="flex items-center justify-between">
-        <h1 class="text-lg font-bold text-gray-800">👥 Socios del Despacho</h1>
+        <h1 class="text-lg font-bold text-gray-800">{% svg 'account-group' %} Socios del Despacho</h1>
         <a href="{% url 'partner_create' %}" class="btn btn-primary">+ Nuevo Socio</a>
     </div>
 

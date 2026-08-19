@@ -1,25 +1,25 @@
 {% extends 'base.html' %}
-{% load static custom_filters %}
+{% load static custom_filters svg_tags %}
 {% block title %}Vista Previa del Acuse - {{ expediente.numero }}{% endblock %}
 
 {% block content %}
 <div class="max-w-3xl mx-auto space-y-4">
     <div class="card">
         <div class="card-header" style="background: #1a6b3c; color: white; border-bottom: none; display: flex; align-items: center; gap: 8px;">
-            <h1 class="text-sm font-bold">📄 Acuse de Conciliación — Vista Previa</h1>
+            <h1 class="text-sm font-bold">{% svg 'file-document' %} Acuse de Conciliación — Vista Previa</h1>
         </div>
 
         <div class="card-body space-y-4">
             <!-- Encabezado del acuse -->
             <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-4 text-sm text-emerald-900">
                 <div class="flex items-start gap-3">
-                    <div class="text-2xl">🗂️</div>
+                    <div class="text-2xl">{% svg 'folder-open' %}</div>
                     <div>
                         <p class="font-semibold">Archivo: <span class="font-mono text-xs">{{ nombre_archivo }}</span></p>
                         {% if datos.folio %}
                         <p class="mt-1"><strong>Folio detectado:</strong> <span class="font-mono bg-white px-2 py-0.5 rounded border border-emerald-300">{{ datos.folio }}</span></p>
                         {% else %}
-                        <p class="mt-1 text-amber-700">⚠️ No se detectó folio en el PDF.</p>
+                        <p class="mt-1 text-amber-700">{% svg 'warning' %} No se detectó folio en el PDF.</p>
                         {% endif %}
                     </div>
                 </div>
@@ -79,7 +79,7 @@
                             style="background:#1a6b3c;"
                             onmouseover="this.style.background='#145530'"
                             onmouseout="this.style.background='#1a6b3c'">
-                        ✅ Aplicar seleccionados
+                        {% svg 'check-circle' %} Aplicar seleccionados
                     </button>
                 </div>
             </form>
@@ -87,7 +87,7 @@
             {% else %}
             <!-- No se detectaron datos -->
             <div class="bg-amber-50 border border-amber-200 rounded-lg p-5 text-center">
-                <div class="text-3xl mb-2">🤔</div>
+                <div class="text-3xl mb-2">{% svg 'chat' %}</div>
                 <p class="text-sm font-semibold text-amber-800">No se pudieron extraer datos de este PDF</p>
                 <p class="text-xs text-amber-700 mt-1">
                     ¿Es un acuse de solicitud de conciliación del portal del Centro de Conciliación Laboral?
@@ -99,7 +99,7 @@
                         <input type="hidden" name="accion" value="solo_guardar">
                         <button type="submit"
                                 class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-100 rounded-lg transition">
-                            💾 Guardar PDF sin aplicar datos
+                            {% svg 'save' %} Guardar PDF sin aplicar datos
                         </button>
                     </form>
                     <a href="{% url 'expediente_detail' expediente.pk %}"

@@ -1,3 +1,4 @@
+{% load svg_tags %}
 {% if mensajes %}
 <div class="space-y-3">
     {% for msg in mensajes %}
@@ -5,7 +6,7 @@
         <div class="flex-shrink-0">
             <div class="w-8 h-8 {% if msg.estado == 'enviado' %}bg-green-100{% elif msg.estado == 'fallido' %}bg-red-100{% else %}bg-gray-100{% endif %} rounded-full flex items-center justify-center">
                 <span class="{% if msg.estado == 'enviado' %}text-green-600{% elif msg.estado == 'fallido' %}text-red-600{% else %}text-gray-600{% endif %} text-sm">
-                    {% if msg.estado == 'enviado' %}✅{% elif msg.estado == 'fallido' %}❌{% else %}⏳{% endif %}
+                    {% if msg.estado == 'enviado' %}{% svg 'check-circle' %}{% elif msg.estado == 'fallido' %}{% svg 'close-circle' %}{% else %}⏳{% endif %}
                 </span>
             </div>
         </div>
@@ -23,7 +24,7 @@
             </div>
             <p class="text-gray-700 text-sm whitespace-pre-wrap">{{ msg.mensaje|truncatechars:200 }}</p>
             <div class="flex items-center justify-between mt-2">
-                <span class="text-xs text-gray-500">📞 {{ msg.destino }} · {{ msg.enviado_por.get_full_name|default:msg.enviado_por.username }}</span>
+                <span class="text-xs text-gray-500">{% svg 'phone' %} {{ msg.destino }} · {{ msg.enviado_por.get_full_name|default:msg.enviado_por.username }}</span>
                 {% if msg.link_generado %}
                 <a href="{{ msg.link_generado }}" target="_blank"
                    class="text-xs text-green-600 hover:text-green-800 font-medium">
@@ -40,7 +41,7 @@
 </div>
 {% else %}
 <div class="text-center py-8">
-    <div class="text-4xl mb-2">💬</div>
+    <div class="text-4xl mb-2">{% svg 'chat' %}</div>
     <p class="text-gray-500">No hay mensajes de WhatsApp registrados.</p>
     <p class="text-xs text-gray-400 mt-1">Los mensajes que envíes aparecerán aquí.</p>
 </div>

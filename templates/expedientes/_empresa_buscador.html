@@ -1,9 +1,10 @@
+{% load svg_tags %}
 <!-- Buscador de empresas del catálogo (autocompletado del formulario de cliente).
      Al elegir una empresa se rellenan: razón social, teléfono, domicilio y tipo de persona.
      Incluir UNA vez por página dentro del formulario que contiene los campos id_empresa_*. -->
 <div class="md:col-span-2 relative" id="empresa-buscador">
   <label for="empresa-search-input" class="block text-sm font-medium text-gray-700 mb-1">
-    🔍 Buscar empresa en catálogo oficial
+    {% svg 'search' %} Buscar empresa en catálogo oficial
   </label>
   <div class="relative">
     <input

@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load svg_tags %}
 {% block title %}Matriz de Permisos - Conciliacion Laboral Tijuana{% endblock %}
 
 {% block content %}
@@ -6,12 +7,12 @@
     <!-- Header -->
     <div class="flex items-center justify-between">
         <div>
-            <h1 class="text-lg font-bold text-gray-800">🔐 Matriz de Permisos</h1>
+            <h1 class="text-lg font-bold text-gray-800">{% svg 'lock' %} Matriz de Permisos</h1>
             <p class="text-xs text-gray-500">Auditoría completa de usuarios y permisos del sistema — {{ fecha_generacion|date:"d/m/Y H:i" }}</p>
         </div>
         <div class="flex items-center gap-2">
             <a href="{% url 'exportar_matriz_permisos_excel' %}" class="btn btn-success btn-sm">
-                📥 Exportar Excel
+                {% svg 'download' %} Exportar Excel
             </a>
             <a href="{% url 'superadmin_dashboard' %}" class="btn">
                 ← Volver a Superadmin
@@ -62,7 +63,7 @@
     <!-- Matriz de Permisos -->
     <div class="card overflow-hidden">
         <div class="card-header flex items-center justify-between">
-            <span>👥 Permisos por Usuario</span>
+            <span>{% svg 'account-group' %} Permisos por Usuario</span>
             <span class="text-xs font-normal text-gray-500 normal-case">{{ permisos|length }} usuarios</span>
         </div>
         <div class="overflow-x-auto">
@@ -73,12 +74,12 @@
                         <th style="min-width: 80px;">Nombre</th>
                         <th style="min-width: 150px;">Email</th>
                         <th style="min-width: 80px;">Rol</th>
-                        <th class="text-center" style="min-width: 50px;" title="¿Puede generar documentos legales?">📄 Docs</th>
-                        <th class="text-center" style="min-width: 50px;" title="¿Es staff de Django?">🔑 Staff</th>
-                        <th class="text-center" style="min-width: 50px;" title="¿Es superusuario de Django?">👑 Super</th>
-                        <th class="text-center" style="min-width: 50px;" title="¿Está activo?">✅ Activo</th>
-                        <th class="text-center" style="min-width: 40px;">📋 Casos</th>
-                        <th class="text-center" style="min-width: 40px;">🔄 Mov.</th>
+                        <th class="text-center" style="min-width: 50px;" title="¿Puede generar documentos legales?">{% svg 'file-document' %} Docs</th>
+                        <th class="text-center" style="min-width: 50px;" title="¿Es staff de Django?">{% svg 'key' %} Staff</th>
+                        <th class="text-center" style="min-width: 50px;" title="¿Es superusuario de Django?">{% svg 'crown' %} Super</th>
+                        <th class="text-center" style="min-width: 50px;" title="¿Está activo?">{% svg 'check-circle' %} Activo</th>
+                        <th class="text-center" style="min-width: 40px;">{% svg 'clipboard-text' %} Casos</th>
+                        <th class="text-center" style="min-width: 40px;">{% svg 'refresh' %} Mov.</th>
                         <th style="min-width: 110px;">Último Acceso</th>
                         <th style="min-width: 100px;">Creado</th>
                     </tr>
@@ -100,21 +101,21 @@
                         </td>
                         <td class="text-center text-base">
                             {% if p.puede_generar_documentos %}
-                            <span title="Puede generar documentos" class="text-amber-600">📄</span>
+                            <span title="Puede generar documentos" class="text-amber-600">{% svg 'file-document' %}</span>
                             {% else %}
                             <span class="text-gray-300">—</span>
                             {% endif %}
                         </td>
                         <td class="text-center">
                             {% if p.is_staff %}
-                            <span class="text-blue-600 font-bold">✓</span>
+                            <span class="text-blue-600 font-bold">{% svg 'check' %}</span>
                             {% else %}
                             <span class="text-gray-300">—</span>
                             {% endif %}
                         </td>
                         <td class="text-center">
                             {% if p.is_superuser %}
-                            <span class="text-amber-600 font-bold">✓</span>
+                            <span class="text-amber-600 font-bold">{% svg 'check' %}</span>
                             {% else %}
                             <span class="text-gray-300">—</span>
                             {% endif %}
@@ -153,9 +154,9 @@
             <span class="font-bold text-gray-700 uppercase tracking-wider">Leyenda:</span>
             <span class="flex items-center gap-1"><span class="inline-block w-2.5 h-2.5 bg-green-500" style="border-radius: 50%;"></span> Activo</span>
             <span class="flex items-center gap-1"><span class="inline-block w-2.5 h-2.5 bg-red-500" style="border-radius: 50%;"></span> Inactivo</span>
-            <span>📄 Docs = Permiso para generar documentos legales</span>
-            <span>🔑 Staff = Puede acceder al admin de Django</span>
-            <span>👑 Super = Superusuario de Django</span>
+            <span>{% svg 'file-document' %} Docs = Permiso para generar documentos legales</span>
+            <span>{% svg 'key' %} Staff = Puede acceder al admin de Django</span>
+            <span>{% svg 'crown' %} Super = Superusuario de Django</span>
             <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 bg-gray-50 border border-gray-300"></span> Superadmin</span>
             <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 bg-blue-50/40 border border-gray-300"></span> Admin</span>
         </div>
@@ -164,7 +165,7 @@
     <!-- Auditoría de Cambios de Permisos -->
     <div class="card">
         <div class="card-header flex items-center justify-between">
-            <span>📋 Auditoría de Cambios de Permisos</span>
+            <span>{% svg 'clipboard-text' %} Auditoría de Cambios de Permisos</span>
             <span class="text-xs font-normal text-gray-500 normal-case">
                 {{ total_cambios_30d }} cambios en últimos 30 días
                 · <a href="{% url 'admin:accounts_permisoauditlog_changelist' %}" target="_blank" class="text-blue-600 hover:text-blue-800 underline">Ver todos</a>
@@ -241,13 +242,13 @@
     <!-- Acciones rápidas -->
     <div class="flex items-center gap-2">
         <a href="{% url 'admin:auth_user_changelist' %}" target="_blank" class="btn btn-primary btn-sm">
-            👤 Gestionar Usuarios (Admin)
+            {% svg 'account' %} Gestionar Usuarios (Admin)
         </a>
         <a href="{% url 'admin:accounts_permisoauditlog_changelist' %}" target="_blank" class="btn btn-sm">
-            📋 Ver Auditoría Completa
+            {% svg 'clipboard-text' %} Ver Auditoría Completa
         </a>
         <a href="{% url 'superadmin_dashboard' %}" class="btn btn-sm">
-            🔧 Volver al Panel Superadmin
+            {% svg 'key' %} Volver al Panel Superadmin
         </a>
     </div>
 </div>

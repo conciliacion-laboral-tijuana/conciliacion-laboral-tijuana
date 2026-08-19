@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load svg_tags %}
 {% block title %}WhatsApp - {{ expediente.numero }}{% endblock %}
 
 {% block content %}
@@ -6,7 +7,7 @@
     <div class="bg-white rounded shadow-sm border border-gray-200">
         <div class="px-5 py-3 border-b border-gray-200 flex items-center justify-between">
             <div>
-                <h1 class="text-base font-bold text-gray-800">💬 Enviar WhatsApp</h1>
+                <h1 class="text-base font-bold text-gray-800">{% svg 'chat' %} Enviar WhatsApp</h1>
                 <p class="text-xs text-gray-500 mt-0.5">
                     Expediente {{ expediente.numero }} — {{ expediente.cliente.nombre }}
                 </p>
@@ -22,13 +23,13 @@
 
             <!-- Tipo de mensaje -->
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">📋 {{ form.tipo.label }}</label>
+                <label class="block text-sm font-medium text-gray-700 mb-1">{% svg 'clipboard-text' %} {{ form.tipo.label }}</label>
                 {{ form.tipo }}
             </div>
 
             <!-- Número destino -->
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">📞 {{ form.destino.label }}</label>
+                <label class="block text-sm font-medium text-gray-700 mb-1">{% svg 'phone' %} {{ form.destino.label }}</label>
                 <div class="flex items-center space-x-2">
                     {{ form.destino }}
                     <button type="button"
@@ -45,7 +46,7 @@
 
             <!-- Método de envío -->
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">🚀 {{ form.via.label }}</label>
+                <label class="block text-sm font-medium text-gray-700 mb-1">{% svg 'send' %} {{ form.via.label }}</label>
                 {{ form.via }}
                 <p class="text-xs text-gray-500 mt-1">
                     <strong>Deep Link</strong>: Genera un enlace para abrir WhatsApp manualmente (recomendado).
@@ -55,7 +56,7 @@
 
             <!-- Mensaje -->
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">💬 {{ form.mensaje.label }}</label>
+                <label class="block text-sm font-medium text-gray-700 mb-1">{% svg 'chat' %} {{ form.mensaje.label }}</label>
                 {{ form.mensaje }}
             </div>
 
@@ -78,7 +79,7 @@
                     </a>
                     <button type="submit"
                             class="px-4 py-1.5 text-sm bg-gray-800 text-white rounded hover:bg-gray-700 transition-colors font-medium">
-                        💬 Generar Enlace WhatsApp
+                        {% svg 'chat' %} Generar Enlace WhatsApp
                     </button>
                 </div>
             </div>
@@ -93,7 +94,7 @@
             <li>2. Personaliza el mensaje si es necesario</li>
             <li>3. Haz clic en "Generar Enlace WhatsApp"</li>
             <li>4. Se abrirá WhatsApp Web/app con el mensaje pre-llenado</li>
-            <li>5. Solo queda presionar enviar 🚀</li>
+            <li>5. Solo queda presionar enviar {% svg 'send' %}</li>
         </ul>
     </div>
 </div>

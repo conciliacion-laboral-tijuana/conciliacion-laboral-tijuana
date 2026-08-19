@@ -1,4 +1,5 @@
 {% extends "admin/base_site.html" %}
+{% load svg_tags %}
 {% load i18n static %}
 
 {% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static "admin/css/dashboard.css" %}">
@@ -68,7 +69,7 @@
       <p>Ingresos vs Gastos · Utilidad por oficina · Flujo de caja · Reportes financieros</p>
     </div>
     <a href="{% url 'dashboard_financiero' %}" class="btn-dashboard" target="_blank">
-      <span class="icon">📊</span>
+      <span class="icon">{% svg 'chart' %}</span>
       Abrir Dashboard Financiero
     </a>
   </div>

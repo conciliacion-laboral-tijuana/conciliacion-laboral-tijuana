@@ -1,3 +1,4 @@
+{% load svg_tags %}
 <!DOCTYPE html>
 <html lang="es" class="h-full">
 <head>
@@ -520,7 +521,7 @@
                     {% endfor %}
                     {% else %}
                     <div class="px-3 py-6 text-center">
-                        <div class="text-2xl mb-1">🔔</div>
+                        <div class="text-2xl mb-1">{% svg 'bell' %}</div>
                         <p class="text-xs text-gray-400">No hay notificaciones</p>
                     </div>
                     {% endif %}
@@ -680,7 +681,7 @@
             <div style="padding:16px 20px; display:flex; align-items:center; gap:10px;
                         {% if aviso_obligatorio.prioridad == 'alta' %}background:#8b3a3a;{% elif aviso_obligatorio.prioridad == 'baja' %}background:#47505e;{% else %}background:#2563eb;{% endif %}">
                 <span style="font-size:22px;">
-                    {% if aviso_obligatorio.prioridad == 'alta' %}🚨{% elif aviso_obligatorio.prioridad == 'baja' %}📌{% else %}📢{% endif %}
+                    {% if aviso_obligatorio.prioridad == 'alta' %}{% svg 'warning' %}{% elif aviso_obligatorio.prioridad == 'baja' %}{% svg 'bookmark' %}{% else %}{% svg 'megaphone' %}{% endif %}
                 </span>
                 <div style="color:#fff;">
                     <div style="font-size:10px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; opacity:0.85;">
@@ -703,7 +704,7 @@
                 <button id="aviso-entendido"
                         style="background:#16a34a; color:#fff; border:none; border-radius:6px;
                                padding:10px 24px; font-size:14px; font-weight:700; cursor:pointer;">
-                    ✔ Entendido, ya lo leí
+                    {% svg 'check' %} Entendido, ya lo leí
                 </button>
             </div>
         </div>
@@ -768,13 +769,13 @@
             ].join(';');
 
             toast.innerHTML = '<div style="display:flex;align-items:flex-start;gap:10px;">' +
-                '<span style="font-size:20px;flex-shrink:0;">✅</span>' +
+                '<span style="font-size:20px;flex-shrink:0;">{% svg 'check-circle' %}</span>' +
                 '<div>' +
                 '<div style="font-weight:700;margin-bottom:2px;">Solicitud de Conciliación Enviada</div>' +
                 '<div style="font-size:12px;opacity:0.9;">Folio: <strong>' + folio + '</strong></div>' +
                 (tiempo ? '<div style="font-size:11px;opacity:0.75;margin-top:2px;">⏱ ' + tiempo + '</div>' : '') +
                 '</div>' +
-                '<button onclick="this.parentElement.parentElement.remove()" style="background:none;border:none;color:rgba(255,255,255,0.7);cursor:pointer;font-size:16px;padding:0 2px;flex-shrink:0;">✕</button>' +
+                '<button onclick="this.parentElement.parentElement.remove()" style="background:none;border:none;color:rgba(255,255,255,0.7);cursor:pointer;font-size:16px;padding:0 2px;flex-shrink:0;">{% svg 'close' %}</button>' +
                 '</div>';
 
             document.body.appendChild(toast);

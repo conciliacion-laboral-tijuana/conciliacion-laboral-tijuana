@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load static custom_filters %}
+{% load static custom_filters svg_tags %}
 {% block title %}Importar CLT - Conciliacion Laboral Tijuana{% endblock %}
 
 {% block content %}
@@ -7,7 +7,7 @@
     <div class="flex items-center justify-between">
         <h1 class="text-base font-bold text-gray-800 flex items-center gap-2">
             <img src="{% static 'svg/file-excel-outline.svg' %}" class="w-5 h-5 icon-darkblue">
-            <span>📥 Importar Citas CLT</span>
+            <span>{% svg 'download' %} Importar Citas CLT</span>
         </h1>
         <a href="{% url 'calendario_audiencias' %}" class="text-xs text-gray-600 hover:text-gray-900 flex items-center gap-1">
             <i class="fas fa-calendar-alt"></i> Ver calendario
@@ -26,7 +26,7 @@
                 {% csrf_token %}
                 <label class="flex flex-col items-center justify-center w-full border-2 border-dashed border-gray-300 rounded-lg p-10 cursor-pointer hover:border-blue-400 hover:bg-blue-50/40 transition-colors" id="drop-zone">
                     <input type="file" name="archivo" accept=".xlsx" class="hidden" id="archivo-input">
-                    <div class="text-4xl mb-3 text-gray-400" id="drop-icon">📄</div>
+                    <div class="text-4xl mb-3 text-gray-400" id="drop-icon">{% svg 'file-document' %}</div>
                     <div class="text-sm font-medium text-gray-700" id="drop-text">Arrastra el archivo CLT.xlsx aquí o haz clic para seleccionarlo</div>
                     <div class="text-xs text-gray-400 mt-1">Formato esperado: trabajador | empresa | fecha | hora | salario | honorario | asesor | ubicación CLT</div>
                     <div class="text-xs text-gray-500 mt-3 bg-gray-100 px-3 py-1.5 rounded hidden" id="file-name"></div>
@@ -133,7 +133,7 @@
     <div class="bg-white rounded shadow-sm border border-gray-200">
         <div class="px-4 py-2.5 border-b border-gray-200">
             <h2 class="text-sm font-semibold text-gray-800 flex items-center gap-2">
-                <span class="text-green-600">✅</span> Importación completada
+                <span class="text-green-600">{% svg 'check-circle' %}</span> Importación completada
             </h2>
         </div>
 
@@ -229,7 +229,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function actualizarNombre() {
         if (input.files.length) {
             const f = input.files[0];
-            dropIcon.textContent = '📊';
+            dropIcon.textContent = '{% svg 'chart' %}';
             dropText.textContent = f.name;
             fileName.textContent = f.size > 0 ? (f.size / 1024).toFixed(1) + ' KB' : '';
             fileName.classList.remove('hidden');

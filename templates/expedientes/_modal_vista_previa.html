@@ -1,3 +1,4 @@
+{% load svg_tags %}
 {# ─── Modal compartido: Vista Previa de documento (demanda / machote) ───── #}
 {# Uso: {% include 'expedientes/_modal_vista_previa.html' %}                 #}
 {#      Opcional: with titulo_preview='...' para personalizar el título.     #}
@@ -7,7 +8,7 @@
 <div id="previewModal" class="fixed inset-0 bg-black/50 z-50 hidden items-center justify-center p-4 print-hidden">
   <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
     <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-      <h3 class="font-semibold text-gray-800">📄 {{ titulo_preview|default:'Vista Previa' }}</h3>
+      <h3 class="font-semibold text-gray-800">{% svg 'file-document' %} {{ titulo_preview|default:'Vista Previa' }}</h3>
       <button onclick="cerrarPreview()" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
     </div>
     <div class="p-6 overflow-y-auto flex-1" id="previewContent"></div>

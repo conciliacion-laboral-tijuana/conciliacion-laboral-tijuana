@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load static custom_filters %}
+{% load static custom_filters svg_tags %}
 {% block title %}Calendario de Audiencias - Conciliacion Laboral Tijuana{% endblock %}
 
 {% block content %}
@@ -40,7 +40,7 @@
                     <option value="lista" {% if vista_actual == 'lista' %}selected{% endif %}>Vista Lista</option>
                     <option value="mes" {% if vista_actual == 'mes' %}selected{% endif %}>Vista Mensual</option>
                     <option value="semana" {% if vista_actual == 'semana' %}selected{% endif %}>Vista Semanal</option>
-                    <option value="planner" {% if vista_actual == 'planner' %}selected{% endif %}>📋 Planner</option>
+                    <option value="planner" {% if vista_actual == 'planner' %}selected{% endif %}>{% svg 'clipboard-text' %} Planner</option>
                 </select>
             </div>
             <div>

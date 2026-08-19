@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load svg_tags %}
 {% block title %}{% if object %}Editar{% else %}Nuevo{% endif %} Expediente - Conciliacion Laboral Tijuana{% endblock %}
 
 {% block content %}
@@ -6,7 +7,7 @@
     {% if cliente_preseleccionado %}
     <div class="bg-amber-50 border border-amber-300 rounded p-4 mb-6">
         <div class="flex items-start space-x-3">
-            <span class="text-2xl">👤</span>
+            <span class="text-2xl">{% svg 'account' %}</span>
             <div class="flex-1">
                 <h3 class="font-bold text-amber-800 text-lg">Cliente registrado: {{ cliente_preseleccionado.nombre }}</h3>
                 <p class="text-amber-700 text-sm mt-1">
@@ -14,12 +15,12 @@
                     <strong>programa la audiencia</strong> como siguiente paso.
                 </p>
                 <div class="flex items-center space-x-4 mt-3 text-sm">
-                    <span class="text-amber-600">📞 {{ cliente_preseleccionado.telefono }}</span>
+                    <span class="text-amber-600">{% svg 'phone' %} {{ cliente_preseleccionado.telefono }}</span>
                     {% if cliente_preseleccionado.curp %}
-                    <span class="text-amber-600">🪪 {{ cliente_preseleccionado.curp }}</span>
+                    <span class="text-amber-600">{% svg 'file-document' %} {{ cliente_preseleccionado.curp }}</span>
                     {% endif %}
                     {% if cliente_preseleccionado.empresa %}
-                    <span class="text-amber-600">🏢 {{ cliente_preseleccionado.empresa }}</span>
+                    <span class="text-amber-600">{% svg 'office-building' %} {{ cliente_preseleccionado.empresa }}</span>
                     {% endif %}
                 </div>
             </div>
@@ -30,7 +31,7 @@
     <div class="bg-white rounded shadow-sm border border-gray-200">
         <div class="px-5 py-3 border-b border-gray-200">
             <h1 class="text-base font-bold text-gray-800">
-                {% if object %}✏️ Editar Expediente {{ object.numero }}{% else %}📋 Nuevo Expediente{% endif %}
+                {% if object %}{% svg 'edit' %} Editar Expediente {{ object.numero }}{% else %}{% svg 'clipboard-text' %} Nuevo Expediente{% endif %}
             </h1>
         </div>
         <form method="post" class="p-5 space-y-5">
@@ -118,7 +119,7 @@
 
             <!-- Fechas y Seguimiento (Audiencia) -->
             <div class="border border-yellow-200 rounded p-4 bg-yellow-50/50">
-                <h2 class="text-sm font-semibold text-gray-800 mb-1">⚖️ Programar Audiencia</h2>
+                <h2 class="text-sm font-semibold text-gray-800 mb-1">{% svg 'scale' %} Programar Audiencia</h2>
                 <p class="text-xs text-gray-500 mb-3">Define la fecha de audiencia y la próxima acción para dar seguimiento al caso.</p>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
@@ -147,7 +148,7 @@
                 {% if cliente_preseleccionado and not object %}
                 <button type="submit" name="action" value="crear_y_conciliar"
                         class="px-5 py-1.5 text-sm bg-indigo-700 text-white rounded hover:bg-indigo-600 transition-colors font-semibold flex items-center gap-1.5">
-                    🚀 Crear y Enviar a Conciliación
+                    {% svg 'send' %} Crear y Enviar a Conciliación
                 </button>
                 {% endif %}
                 <button type="submit"

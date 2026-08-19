@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load svg_tags %}
 {% load static %}
 {% block title %}Distribución de Utilidades - Finanzas{% endblock %}
 
@@ -6,9 +7,9 @@
 <div class="space-y-4">
     <!-- Header -->
     <div class="flex items-center justify-between flex-wrap gap-3">
-        <h1 class="text-2xl font-bold text-gray-800">📊 Distribución de Utilidades</h1>
+        <h1 class="text-2xl font-bold text-gray-800">{% svg 'chart' %} Distribución de Utilidades</h1>
         <a href="{% url 'profitdistribution_create' %}" class="btn" style="background:#1a6b3c;color:white;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:600;">
-            ➕ Nueva Distribución
+            {% svg 'plus' %} Nueva Distribución
         </a>
     </div>
 
@@ -78,21 +79,21 @@
                         <td class="px-4 py-3 text-right font-mono font-bold text-green-700">${{ d.utilidad_neta|floatformat:2 }}</td>
                         <td class="px-4 py-3 text-center">
                             {% if d.estado == 'confirmada' %}
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">✅ Confirmada</span>
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">{% svg 'check-circle' %} Confirmada</span>
                             {% elif d.estado == 'distribuida' %}
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">📊 Distribuida</span>
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">{% svg 'chart' %} Distribuida</span>
                             {% elif d.estado == 'cancelada' %}
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">❌ Cancelada</span>
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">{% svg 'close-circle' %} Cancelada</span>
                             {% else %}
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">📝 Borrador</span>
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">{% svg 'file-edit' %} Borrador</span>
                             {% endif %}
                         </td>
                         <td class="px-4 py-3 text-center">
                             <div class="flex items-center justify-center gap-2">
-                                <a href="{% url 'profitdistribution_detail' d.pk %}" class="text-blue-600 hover:text-blue-800 font-medium text-xs" title="Ver detalle">👁️</a>
+                                <a href="{% url 'profitdistribution_detail' d.pk %}" class="text-blue-600 hover:text-blue-800 font-medium text-xs" title="Ver detalle">{% svg 'eye' %}</a>
                                 {% if d.estado == 'borrador' %}
-                                <a href="{% url 'profitdistribution_update' d.pk %}" class="text-amber-600 hover:text-amber-800 font-medium text-xs" title="Editar">✏️</a>
-                                <a href="{% url 'profitdistribution_confirmar' d.pk %}" class="text-green-600 hover:text-green-800 font-medium text-xs" title="Confirmar">✅</a>
+                                <a href="{% url 'profitdistribution_update' d.pk %}" class="text-amber-600 hover:text-amber-800 font-medium text-xs" title="Editar">{% svg 'edit' %}</a>
+                                <a href="{% url 'profitdistribution_confirmar' d.pk %}" class="text-green-600 hover:text-green-800 font-medium text-xs" title="Confirmar">{% svg 'check-circle' %}</a>
                                 {% endif %}
                             </div>
                         </td>
@@ -100,7 +101,7 @@
                     {% empty %}
                     <tr>
                         <td colspan="9" class="px-4 py-8 text-center text-gray-500">
-                            <div class="text-3xl mb-2">📊</div>
+                            <div class="text-3xl mb-2">{% svg 'chart' %}</div>
                             <p>No hay distribuciones de utilidades aún.</p>
                             <a href="{% url 'profitdistribution_create' %}" class="text-blue-600 hover:underline font-medium mt-2 inline-block">Crear la primera distribución →</a>
                         </td>

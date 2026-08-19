@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load static custom_filters %}
+{% load static custom_filters svg_tags %}
 {% block title %}{{ expediente.numero }} - Conciliacion Laboral Tijuana{% endblock %}
 
 {% block content %}
@@ -13,7 +13,7 @@
                     {{ expediente.get_estado_display }}
                 </span>
                 {% if expediente.prioridad == 'alta' %}
-                <span class="badge" style="background:#8b3a3a; color:white;">🔴 Alta prioridad</span>
+                <span class="badge" style="background:#8b3a3a; color:white;">{% svg 'circle-red' %} Alta prioridad</span>
                 {% elif expediente.prioridad == 'baja' %}
                 <span class="badge" style="background:#6b7280; color:white;">Baja prioridad</span>
                 {% endif %}
@@ -23,25 +23,25 @@
                 <a href="{% url 'whatsapp_enviar' expediente.pk %}" class="btn btn-success"><img src="{% static 'svg/whatsapp.svg' %}" class="w-3.5 h-3.5" style="filter: brightness(0) invert(1);"> WhatsApp</a>
                 <a href="{% url 'solicitud_conciliacion' expediente.pk %}" class="btn" style="background:#47505e; color:white; border-color:#36404f;"><img src="{% static 'svg/file-document-multiple-outline.svg' %}" class="w-3.5 h-3.5" style="filter: brightness(0) invert(1);"> Solicitud</a>
                 <div class="relative inline-block">
-                    <button onclick="this.nextElementSibling.classList.toggle('hidden')" class="btn" style="background:#1a6b3c; color:white; border-color:#145530;">🌐 Conciliación ▾</button>
+                    <button onclick="this.nextElementSibling.classList.toggle('hidden')" class="btn" style="background:#1a6b3c; color:white; border-color:#145530;">{% svg 'globe' %} Conciliación ▾</button>
                     <div class="hidden absolute right-0 top-full mt-1 bg-white rounded-xl shadow-lg border border-gray-200 z-50 min-w-[250px] py-1" style="box-shadow: 0 10px 25px rgba(0,0,0,0.15);">
                         <a href="{% url 'enviar_conciliacion_automation' expediente.pk %}" class="block px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition flex items-center gap-2">
-                            🤖 Envío Automático
+                            {% svg 'robot' %} Envío Automático
                             <span class="text-[10px] text-gray-400 ml-auto">(Playwright)</span>
                         </a>
                         <a href="{% url 'descargar_conciliacion_pdf' expediente.pk %}" class="block px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition flex items-center gap-2">
-                            📥 Descargar Formulario
+                            {% svg 'download' %} Descargar Formulario
                             <span class="text-[10px] text-gray-400 ml-auto">(PDF prellenado)</span>
                         </a>
                         <div class="border-t border-gray-100 my-1"></div>
                         <div class="px-4 py-2.5">
                             <form method="post" action="{% url 'subir_conciliacion_pdf' expediente.pk %}" enctype="multipart/form-data" class="space-y-2">
                                 {% csrf_token %}
-                                <label class="block text-xs font-medium text-gray-600">📄 Subir PDF Manual</label>
+                                <label class="block text-xs font-medium text-gray-600">{% svg 'file-document' %} Subir PDF Manual</label>
                                 <input type="file" name="pdf" accept=".pdf" required
                                        class="w-full text-xs px-2 py-1.5 border border-gray-300 rounded-lg file:mr-2 file:py-1 file:px-3 file:rounded-lg file:border-0 file:bg-blue-50 file:text-blue-700 file:text-xs hover:file:bg-blue-100">
                                 <button type="submit" class="w-full px-3 py-1.5 bg-blue-700 text-white rounded-lg text-xs font-semibold hover:bg-blue-800 transition">
-                                    📥 Subir Acuse y Extraer Datos
+                                    {% svg 'download' %} Subir Acuse y Extraer Datos
                                 </button>
                                 <p class="text-[10px] text-gray-400 leading-tight">Sube el acuse del portal para extraer folio, solicitante, empresa y fechas — revisa y confirma antes de guardar.</p>
                             </form>
@@ -76,7 +76,7 @@
             </div>
             <div>
                 <span class="text-[10px] text-gray-500 uppercase tracking-wider">Oficina</span>
-                <p class="text-sm font-medium mt-0.5">🏢 {{ expediente.cliente.get_oficina_display }}</p>
+                <p class="text-sm font-medium mt-0.5">{% svg 'office-building' %} {{ expediente.cliente.get_oficina_display }}</p>
             </div>
             <div>
                 <span class="text-[10px] text-gray-500 uppercase tracking-wider">Creado</span>
@@ -152,7 +152,7 @@
         {% if tareas_conciliacion %}
         <div class="card" style="border-color: #1a6b3c;">
             <div class="card-header" style="background: #1a6b3c; color: white; border-bottom: none;">
-                <span>🌐 Envíos al Portal de Conciliación</span>
+                <span>{% svg 'globe' %} Envíos al Portal de Conciliación</span>
             </div>
             <div class="card-body space-y-2">
                 {% for tarea in tareas_conciliacion %}
@@ -160,22 +160,22 @@
                     <div class="flex items-center justify-between">
                         <div class="flex items-center space-x-2">
                             {% if tarea.estado == 'completado' %}
-                            <span class="text-sm">✅</span>
+                            <span class="text-sm">{% svg 'check-circle' %}</span>
                             {% elif tarea.estado == 'fallido' %}
-                            <span class="text-sm">❌</span>
+                            <span class="text-sm">{% svg 'close-circle' %}</span>
                             {% elif tarea.estado == 'ejecutando' %}
-                            <span class="text-sm">🤖</span>
+                            <span class="text-sm">{% svg 'robot' %}</span>
                             {% else %}
                             <span class="text-sm">⏳</span>
                             {% endif %}
                             <div>
                                 <p class="text-xs font-medium text-gray-800">
                                     {% if tarea.estado == 'completado' %}
-                                    ✅ Envío exitoso — Folio: <strong>{{ tarea.folio|default:'N/A' }}</strong>
+                                    {% svg 'check-circle' %} Envío exitoso — Folio: <strong>{{ tarea.folio|default:'N/A' }}</strong>
                                     {% elif tarea.estado == 'fallido' %}
-                                    ❌ Error: {{ tarea.error|truncatechars:60 }}
+                                    {% svg 'close-circle' %} Error: {{ tarea.error|truncatechars:60 }}
                                     {% elif tarea.estado == 'ejecutando' %}
-                                    🤖 En progreso...
+                                    {% svg 'robot' %} En progreso...
                                     {% else %}
                                     ⏳ Pendiente
                                     {% endif %}
@@ -196,11 +196,11 @@
                             {% if tarea.estado == 'fallido' %}
                             <a href="{% url 'reintentar_conciliacion' tarea.pk %}"
                                class="btn btn-sm" style="background:#dc2626; color:white; padding: 2px 8px; font-size: 11px;">
-                                🔄 Reintentar
+                                {% svg 'refresh' %} Reintentar
                             </a>
                             {% endif %}
                             {% if tarea.estado == 'completado' and tarea.detalle %}
-                            <span class="text-[10px] text-gray-400" title="{{ tarea.detalle }}">📄</span>
+                            <span class="text-[10px] text-gray-400" title="{{ tarea.detalle }}">{% svg 'file-document' %}</span>
                             {% endif %}
                         </div>
                     </div>
@@ -211,7 +211,7 @@
                 {% endfor %}
                 <div class="text-center pt-2">
                     <a href="{% url 'enviar_conciliacion_automation' expediente.pk %}" class="btn btn-sm" style="background:#1a6b3c; color:white;">
-                        🌐 Nuevo envío al portal
+                        {% svg 'globe' %} Nuevo envío al portal
                     </a>
                 </div>
             </div>
@@ -257,25 +257,25 @@
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                 <button type="submit" name="resultado" value="no_notificado"
                         class="p-4 rounded-lg border-2 border-red-200 bg-red-50 hover:bg-red-100 hover:border-red-400 transition-all text-center">
-                    <span class="block text-2xl mb-1">❌</span>
+                    <span class="block text-2xl mb-1">{% svg 'close-circle' %}</span>
                     <span class="font-medium text-red-700">No notificado</span>
                     <span class="block text-xs text-red-500">Generar nueva audiencia</span>
                 </button>
                 <button type="submit" name="resultado" value="convenio"
                         class="p-4 rounded-lg border-2 border-green-200 bg-green-50 hover:bg-green-100 hover:border-green-400 transition-all text-center">
-                    <span class="block text-2xl mb-1">🤝</span>
+                    <span class="block text-2xl mb-1">{% svg 'handshake' %}</span>
                     <span class="font-medium text-green-700">Convenio</span>
                     <span class="block text-xs text-green-500">Registrar monto y cerrar</span>
                 </button>
                 <button type="submit" name="resultado" value="sin_conciliacion"
                         class="p-4 rounded-lg border-2 border-gray-200 bg-gray-50 hover:bg-gray-100 hover:border-gray-400 transition-all text-center">
-                    <span class="block text-2xl mb-1">🚫</span>
+                    <span class="block text-2xl mb-1">{% svg 'close-circle' %}</span>
                     <span class="font-medium text-gray-700">Sin conciliación</span>
                     <span class="block text-xs text-gray-500">Preparar demanda</span>
                 </button>
                 <button type="submit" name="resultado" value="reprogramada"
                         class="p-4 rounded-lg border-2 border-amber-200 bg-amber-50 hover:bg-amber-100 hover:border-amber-400 transition-all text-center">
-                    <span class="block text-2xl mb-1">🔄</span>
+                    <span class="block text-2xl mb-1">{% svg 'refresh' %}</span>
                     <span class="font-medium text-amber-700">Reprogramar</span>
                     <span class="block text-xs text-amber-500">Nueva fecha</span>
                 </button>
@@ -327,7 +327,7 @@
                 <div class="flex items-center justify-between px-3 py-2" style="background: #f5f6f7; border: 1px solid #e8eaed;">
                     <div class="flex items-center space-x-2">
                         <span class="text-base">
-                            {% if doc.tipo == 'ine' %}🪪{% elif doc.tipo == 'contrato' %}📄{% elif doc.tipo == 'evidencia' %}🔍{% elif doc.tipo == 'screenshot' %}📸{% elif doc.tipo == 'citatorio' %}📬{% else %}📎{% endif %}
+                            {% if doc.tipo == 'ine' %}{% svg 'file-document' %}{% elif doc.tipo == 'contrato' %}{% svg 'file-document' %}{% elif doc.tipo == 'evidencia' %}{% svg 'search' %}{% elif doc.tipo == 'screenshot' %}{% svg 'eye' %}{% elif doc.tipo == 'citatorio' %}{% svg 'email' %}{% else %}{% svg 'paperclip' %}{% endif %}
                         </span>
                         <div>
                             <p class="text-sm font-medium">
@@ -361,11 +361,11 @@
                 <div class="flex items-center justify-between">
                     <div class="flex items-center space-x-2">
                         {% if t.estado == 'aprobada' %}
-                        <span class="text-sm">✅</span>
+                        <span class="text-sm">{% svg 'check-circle' %}</span>
                         {% elif t.estado == 'rechazada' %}
-                        <span class="text-sm">❌</span>
+                        <span class="text-sm">{% svg 'close-circle' %}</span>
                         {% elif t.estado == 'cancelada' %}
-                        <span class="text-sm">🔙</span>
+                        <span class="text-sm">{% svg 'arrow-back' %}</span>
                         {% else %}
                         <span class="text-sm">⏳</span>
                         {% endif %}
@@ -394,7 +394,7 @@
                             </p>
                             {% endif %}
                             {% if t.comentario_admin %}
-                            <p class="text-[10px] text-blue-600 mt-0.5">💬 {{ t.comentario_admin }}</p>
+                            <p class="text-[10px] text-blue-600 mt-0.5">{% svg 'chat' %} {{ t.comentario_admin }}</p>
                             {% endif %}
                         </div>
                     </div>
@@ -465,17 +465,17 @@
                         if (details) {
                             const active = JSON.parse(event.detail.xhr.responseText).notificar_whatsapp_auto;
                             details.innerHTML = active
-                                ? '<span class=\"badge bg-green-100 text-green-700 text-[10px]\">🤖 Activo</span>'
-                                : '<span class=\"badge bg-gray-100 text-gray-500 text-[10px]\">🤖 Inactivo</span>';
+                                ? '<span class=\"badge bg-green-100 text-green-700 text-[10px]\">{% svg 'robot' %} Activo</span>'
+                                : '<span class=\"badge bg-gray-100 text-gray-500 text-[10px]\">{% svg 'robot' %} Inactivo</span>';
                         }
                       ">
                     {% csrf_token %}
                     <label class="flex items-center gap-1.5 cursor-pointer select-none text-xs text-gray-600 hover:text-gray-800 transition-colors">
                         <span data-whatsapp-indicator>
                             {% if expediente.notificar_whatsapp_auto %}
-                            <span class="badge bg-green-100 text-green-700 text-[10px]">🤖 Activo</span>
+                            <span class="badge bg-green-100 text-green-700 text-[10px]">{% svg 'robot' %} Activo</span>
                             {% else %}
-                            <span class="badge bg-gray-100 text-gray-500 text-[10px]">🤖 Inactivo</span>
+                            <span class="badge bg-gray-100 text-gray-500 text-[10px]">{% svg 'robot' %} Inactivo</span>
                             {% endif %}
                         </span>
                     <input type="checkbox"
@@ -494,7 +494,7 @@
         <div class="card-body">
             {% if expediente.cliente.whatsapp or expediente.cliente.telefono %}
             <div class="flex items-center space-x-3 mb-3" style="background: #f3f7f4; padding: 8px 10px;">
-                <span class="text-green-700">📞</span>
+                <span class="text-green-700">{% svg 'phone' %}</span>
                 <div class="flex-1">
                     <p class="text-xs font-medium text-gray-800">Contacto WhatsApp disponible</p>
                     <p class="text-[10px] text-gray-600">
@@ -588,7 +588,7 @@
                                     {% elif mov.accion == 'nota_agregada' %}bg-purple-500 text-white
                                     {% elif mov.accion == 'resultado_audiencia' %}bg-amber-500 text-white
                                     {% else %}bg-gray-400 text-white{% endif %}">
-                                    {% if mov.accion == 'creacion' %}✓{% elif mov.accion == 'cambio_estado' %}⟳{% elif mov.accion == 'actualizacion' %}✎{% elif mov.accion == 'subida_documento' %}📎{% elif mov.accion == 'nota_agregada' %}💬{% elif mov.accion == 'resultado_audiencia' %}★{% else %}●{% endif %}
+                                    {% if mov.accion == 'creacion' %}{% svg 'check' %}{% elif mov.accion == 'cambio_estado' %}⟳{% elif mov.accion == 'actualizacion' %}{% svg 'edit' %}{% elif mov.accion == 'subida_documento' %}{% svg 'paperclip' %}{% elif mov.accion == 'nota_agregada' %}{% svg 'chat' %}{% elif mov.accion == 'resultado_audiencia' %}{% svg 'star' %}{% else %}●{% endif %}
                                 </div>
                             </div>
 
@@ -602,7 +602,7 @@
                                     {% elif mov.accion == 'nota_agregada' %}bg-purple-100
                                     {% elif mov.accion == 'resultado_audiencia' %}bg-amber-100
                                     {% else %}bg-gray-100{% endif %}">
-                                    {% if mov.accion == 'creacion' %}✨{% elif mov.accion == 'cambio_estado' %}🔄{% elif mov.accion == 'actualizacion' %}📝{% elif mov.accion == 'subida_documento' %}📎{% elif mov.accion == 'nota_agregada' %}💬{% elif mov.accion == 'resultado_audiencia' %}🎯{% else %}●{% endif %}
+                                    {% if mov.accion == 'creacion' %}{% svg 'sparkle' %}{% elif mov.accion == 'cambio_estado' %}{% svg 'refresh' %}{% elif mov.accion == 'actualizacion' %}{% svg 'file-edit' %}{% elif mov.accion == 'subida_documento' %}{% svg 'paperclip' %}{% elif mov.accion == 'nota_agregada' %}{% svg 'chat' %}{% elif mov.accion == 'resultado_audiencia' %}{% svg 'chart' %}{% else %}●{% endif %}
                                 </div>
                             </div>
 
@@ -639,7 +639,7 @@
             </div>
             {% else %}
             <div class="text-center py-8">
-                <div class="text-4xl mb-3">📭</div>
+                <div class="text-4xl mb-3">{% svg 'email' %}</div>
                 <p class="text-gray-500">Aún no hay actividad registrada en este expediente.</p>
                 <p class="text-sm text-gray-400 mt-1">Los movimientos aparecerán aquí automáticamente.</p>
             </div>

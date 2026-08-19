@@ -1,12 +1,12 @@
 {% extends 'base.html' %}
-{% load custom_filters %}
+{% load custom_filters svg_tags %}
 {% block title %}Movimientos de Caja - Conciliacion Laboral Tijuana{% endblock %}
 
 {% block content %}
 <div class="space-y-3">
     <!-- Encabezado -->
     <div class="flex items-center justify-between">
-        <h1 class="text-lg font-bold text-gray-800">💵 Movimientos de Caja</h1>
+        <h1 class="text-lg font-bold text-gray-800">{% svg 'cash' %} Movimientos de Caja</h1>
         <a href="{% url 'cashmovement_create' %}" class="btn btn-success">
             + Nuevo movimiento
         </a>
@@ -14,15 +14,15 @@
 
     <!-- Filtros -->
     <div class="card">
-        <div class="card-header">🔍 Filtros</div>
+        <div class="card-header">{% svg 'search' %} Filtros</div>
         <div class="card-body">
             <form method="get" class="flex flex-wrap items-end gap-2">
                 <div>
                     <label class="text-[10px] text-gray-500 uppercase block mb-0.5">Tipo</label>
                     <select name="tipo" class="text-xs px-2 py-1 border border-gray-300" style="border-radius: 3px;">
                         <option value="">Todos</option>
-                        <option value="ingreso" {% if filtros.tipo == 'ingreso' %}selected{% endif %}>💰 Ingresos</option>
-                        <option value="egreso" {% if filtros.tipo == 'egreso' %}selected{% endif %}>💸 Egresos</option>
+                        <option value="ingreso" {% if filtros.tipo == 'ingreso' %}selected{% endif %}>{% svg 'cash' %} Ingresos</option>
+                        <option value="egreso" {% if filtros.tipo == 'egreso' %}selected{% endif %}>{% svg 'cash-refund' %} Egresos</option>
                     </select>
                 </div>
                 <div>
@@ -65,7 +65,7 @@
                 <div class="flex items-center gap-1 pb-0.5">
                     <button type="submit" class="btn btn-primary btn-sm">Filtrar</button>
                     {% if filtros %}
-                    <a href="{% url 'cashmovement_list' %}" class="btn btn-sm">✕ Limpiar</a>
+                    <a href="{% url 'cashmovement_list' %}" class="btn btn-sm">{% svg 'close' %} Limpiar</a>
                     {% endif %}
                 </div>
             </form>
@@ -75,15 +75,15 @@
     <!-- Totales del filtro actual -->
     <div class="grid grid-cols-3 gap-2">
         <div class="card p-3" style="border-left: 3px solid #3d6b4d;">
-            <div class="text-[10px] text-gray-500 uppercase tracking-wider">💰 Ingresos</div>
+            <div class="text-[10px] text-gray-500 uppercase tracking-wider">{% svg 'cash' %} Ingresos</div>
             <div class="text-lg font-bold text-green-700">${{ total_ingresos_filtro|floatformat:0|intcomma }}</div>
         </div>
         <div class="card p-3" style="border-left: 3px solid #8b3a3a;">
-            <div class="text-[10px] text-gray-500 uppercase tracking-wider">💸 Egresos</div>
+            <div class="text-[10px] text-gray-500 uppercase tracking-wider">{% svg 'cash-refund' %} Egresos</div>
             <div class="text-lg font-bold text-red-700">${{ total_egresos_filtro|floatformat:0|intcomma }}</div>
         </div>
         <div class="card p-3" style="border-left: 3px solid #47505e;">
-            <div class="text-[10px] text-gray-500 uppercase tracking-wider">📊 Movimientos</div>
+            <div class="text-[10px] text-gray-500 uppercase tracking-wider">{% svg 'chart' %} Movimientos</div>
             <div class="text-lg font-bold text-gray-800">{{ total_movimientos }}</div>
         </div>
     </div>
@@ -91,7 +91,7 @@
     <!-- Tabla de movimientos -->
     <div class="card">
         <div class="card-header flex items-center justify-between">
-            <span>📋 Registros</span>
+            <span>{% svg 'clipboard-text' %} Registros</span>
             <span class="text-[10px] text-gray-400">{% if page_obj %}{{ page_obj.start_index }}–{{ page_obj.end_index }} de {{ page_obj.paginator.count }}{% endif %}</span>
         </div>
         <div class="excel-scroll">
@@ -127,14 +127,14 @@
                         <td class="text-gray-400 text-xs">{{ m.referencia|default:"—" }}</td>
                         <td class="text-gray-500 text-xs">{{ m.registrado_por.get_full_name|default:m.registrado_por.username }}</td>
                         <td class="text-center whitespace-nowrap">
-                            <a href="{% url 'cashmovement_update' m.pk %}" class="btn btn-sm" title="Editar">✏️</a>
-                            <a href="{% url 'cashmovement_delete' m.pk %}" class="btn btn-sm btn-danger" title="Eliminar">🗑️</a>
+                            <a href="{% url 'cashmovement_update' m.pk %}" class="btn btn-sm" title="Editar">{% svg 'edit' %}</a>
+                            <a href="{% url 'cashmovement_delete' m.pk %}" class="btn btn-sm btn-danger" title="Eliminar">{% svg 'delete' %}</a>
                         </td>
                     </tr>
                     {% empty %}
                     <tr>
                         <td colspan="9" class="text-center text-gray-400 py-8">
-                            <div class="text-3xl mb-2">📭</div>
+                            <div class="text-3xl mb-2">{% svg 'email' %}</div>
                             No hay movimientos registrados.
                             <a href="{% url 'cashmovement_create' %}" class="text-blue-600 hover:text-blue-800 font-medium">Crear el primero</a>
                         </td>

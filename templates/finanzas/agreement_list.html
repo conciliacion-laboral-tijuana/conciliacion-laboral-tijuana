@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load svg_tags %}
 {% load static %}
 {% block title %}Convenios - Finanzas{% endblock %}
 
@@ -6,9 +7,9 @@
 <div class="space-y-4">
     <!-- Header -->
     <div class="flex items-center justify-between flex-wrap gap-3">
-        <h1 class="text-2xl font-bold text-gray-800">📋 Convenios</h1>
+        <h1 class="text-2xl font-bold text-gray-800">{% svg 'clipboard-text' %} Convenios</h1>
         <a href="{% url 'agreement_create' %}" class="btn" style="background:#1a6b3c;color:white;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:600;">
-            ➕ Nuevo Convenio
+            {% svg 'plus' %} Nuevo Convenio
         </a>
     </div>
 
@@ -88,13 +89,13 @@
                         <td class="px-4 py-3 text-right font-mono text-blue-700">${{ a.honorarios|floatformat:2 }}</td>
                         <td class="px-4 py-3 text-center">
                             {% if a.estado == 'pagado' %}
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">✅ Pagado</span>
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">{% svg 'check-circle' %} Pagado</span>
                             {% elif a.estado == 'firmado' %}
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">📝 Firmado</span>
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">{% svg 'file-edit' %} Firmado</span>
                             {% elif a.estado == 'parcial' %}
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">🔄 Parcial</span>
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">{% svg 'refresh' %} Parcial</span>
                             {% elif a.estado == 'cancelado' %}
-                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">❌ Cancelado</span>
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">{% svg 'close-circle' %} Cancelado</span>
                             {% else %}
                                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">⏳ Pendiente</span>
                             {% endif %}
@@ -102,15 +103,15 @@
                         <td class="px-4 py-3">{{ a.oficina.nombre }}</td>
                         <td class="px-4 py-3 text-center">
                             <div class="flex items-center justify-center gap-2">
-                                <a href="{% url 'agreement_detail' a.pk %}" class="text-blue-600 hover:text-blue-800 font-medium text-xs" title="Ver detalle">👁️</a>
-                                <a href="{% url 'agreement_update' a.pk %}" class="text-amber-600 hover:text-amber-800 font-medium text-xs" title="Editar">✏️</a>
+                                <a href="{% url 'agreement_detail' a.pk %}" class="text-blue-600 hover:text-blue-800 font-medium text-xs" title="Ver detalle">{% svg 'eye' %}</a>
+                                <a href="{% url 'agreement_update' a.pk %}" class="text-amber-600 hover:text-amber-800 font-medium text-xs" title="Editar">{% svg 'edit' %}</a>
                             </div>
                         </td>
                     </tr>
                     {% empty %}
                     <tr>
                         <td colspan="8" class="px-4 py-8 text-center text-gray-500">
-                            <div class="text-3xl mb-2">📋</div>
+                            <div class="text-3xl mb-2">{% svg 'clipboard-text' %}</div>
                             <p>No hay convenios registrados aún.</p>
                             <a href="{% url 'agreement_create' %}" class="text-blue-600 hover:underline font-medium mt-2 inline-block">Crear el primer convenio →</a>
                         </td>
