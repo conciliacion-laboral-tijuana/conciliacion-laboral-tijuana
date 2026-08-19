@@ -2022,6 +2022,7 @@ def cancelar_transferencia(request, pk):
 
 # ─── Notificaciones ──────────────────────────────────────────────────
 
+@login_required
 @require_POST
 def marcar_notificacion_leida(request, pk):
     """Marca una notificación como leída."""
@@ -2031,11 +2032,12 @@ def marcar_notificacion_leida(request, pk):
     return JsonResponse({'success': True})
 
 
+@login_required
 @require_POST
 def marcar_todas_leidas(request):
     """Marca todas las notificaciones del usuario como leídas."""
-    Notificacion.objects.filter(usuario=request.user, leida=False).update(leida=True)
-    return JsonResponse({'success': True, 'count': 0})
+    count = Notificacion.objects.filter(usuario=request.user, leida=False).update(leida=True)
+    return JsonResponse({'success': True, 'count': count})
 
 
 def _crear_notificacion(usuario, titulo, mensaje='', tipo='sistema', link=''):

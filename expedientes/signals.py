@@ -206,14 +206,15 @@ def notificar_conciliacion_por_email(sender, instance, **kwargs):
     }
 
     # Construir URL del expediente (absoluta si es posible)
+    ruta = reverse('expediente_detail', kwargs={'pk': expediente.pk})
     try:
         from django.contrib.sites.models import Site
         dominio = Site.objects.get_current().domain
-        ruta = reverse('expediente_detail', kwargs={'pk': expediente.pk})
         contexto['expediente_url'] = f'https://{dominio}{ruta}'
     except Exception:
-        ruta = reverse('expediente_detail', kwargs={'pk': expediente.pk})
-        contexto['expediente_url'] = f'https://despacho-laboral-production.up.railway.app{ruta}'
+        import os
+        dominio = os.environ.get('RAILWAY_PUBLIC_DOMAIN') or 'localhost:8000'
+        contexto['expediente_url'] = f'https://{dominio}{ruta}'
 
     # Asunto del correo
     asunto = (

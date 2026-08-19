@@ -311,7 +311,7 @@ class CashMovementListView(LoginRequiredMixin, AdminOrSuperOnlyMixin, ListView):
         if fecha_hasta:
             qs = qs.filter(fecha__lte=fecha_hasta)
         if q:
-            qs = qs.filter(descripcion__icontains=q) | qs.filter(referencia__icontains=q)
+            qs = qs.filter(Q(descripcion__icontains=q) | Q(referencia__icontains=q))
 
         return qs
 

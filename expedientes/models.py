@@ -325,15 +325,29 @@ class Expediente(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.numero:
-            year = timezone.now().year
-            last = Expediente.objects.filter(numero__startswith=f"{year}").order_by('-numero').first()
-            if last and '-' in last.numero:
-                last_num = int(last.numero.split('-')[1])
-                self.numero = f"{year}-{last_num + 1:04d}"
-            else:
-                self.numero = f"{year}-0001"
+            self.numero = self._asignar_numero_expediente()
         self.full_clean()
         super().save(*args, **kwargs)
+
+    @classmethod
+    def _asignar_numero_expediente(cls):
+        """Genera el siguiente número de expediente de forma segura.
+
+        Usa select_for_update dentro de una transacción atómica para
+        evitar race conditions cuando dos requests crean expedientes
+        simultáneamente (ambos leerían el mismo último número).
+        """
+        from django.db import transaction
+        year = timezone.now().year
+        prefix = f'{year}-'
+        with transaction.atomic():
+            last = cls.objects.select_for_update().filter(
+                numero__startswith=prefix
+            ).order_by('-numero').first()
+            if last and '-' in last.numero:
+                last_num = int(last.numero.split('-')[1])
+                return f'{year}-{last_num + 1:04d}'
+            return f'{year}-0001'
 
     def get_estado_color(self):
         colors = {

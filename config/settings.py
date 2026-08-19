@@ -42,15 +42,16 @@ if _RAILWAY_DOMAIN:
     if _railway_origin not in CSRF_TRUSTED_ORIGINS:
         CSRF_TRUSTED_ORIGINS.append(_railway_origin)
 
-# ─── Red de seguridad en Railway ────────────────────
-# En producción dentro de Railway, si el usuario no configuró ALLOWED_HOSTS
-# de forma explícita, aceptar cualquier host de la plataforma. Evita el
-# error 400 "Bad Request" cuando RAILWAY_PUBLIC_DOMAIN no se inyecta.
-if os.environ.get('RAILWAY_ENVIRONMENT') and not DEBUG and not os.environ.get('ALLOWED_HOSTS'):
-    if '*' not in ALLOWED_HOSTS:
-        ALLOWED_HOSTS.append('*')
+# ─── CSRF en Railway (siempre incluir el wildcard) ──────────────────
+# El wildcard de CSRF se agrega INDEPENDIENTEMENTE de ALLOWED_HOSTS
+# porque CSRF_TRUSTED_ORIGINS controla qué Origin/Referer acepta
+# Django en POST. Sin esto, el login falla con 403 CSRF.
+if os.environ.get('RAILWAY_ENVIRONMENT') and not DEBUG:
     if 'https://*.up.railway.app' not in CSRF_TRUSTED_ORIGINS:
         CSRF_TRUSTED_ORIGINS.append('https://*.up.railway.app')
+    # ALLOWED_HOSTS wildcard solo si no se configuró explícitamente
+    if not os.environ.get('ALLOWED_HOSTS') and '*' not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append('*')
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -150,10 +151,18 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 # Seguridad en producción
+# Detectar entorno cloud: solo aplicar cookies seguras si estamos en
+# una plataforma de despliegue (Railway, Render, etc.). En local sin
+# DEBUG=True, cookies seguras rompen el CSRF porque el navegador no
+# envía cookies "Secure" por HTTP.
+_CLOUD_ENV = bool(os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('RENDER') or os.environ.get('RENDER_SERVICE'))
+SSL_REQUIRED = _CLOUD_ENV and not DEBUG
+
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-SECURE_SSL_REDIRECT = not DEBUG
-SESSION_COOKIE_SECURE = not DEBUG
-CSRF_COOKIE_SECURE = not DEBUG
+SECURE_SSL_REDIRECT = SSL_REQUIRED
+SESSION_COOKIE_SECURE = SSL_REQUIRED
+CSRF_COOKIE_SECURE = SSL_REQUIRED
+CSRF_COOKIE_SAMESITE = 'Lax'
 
 # Login/Logout redirects
 LOGIN_URL = 'login'
