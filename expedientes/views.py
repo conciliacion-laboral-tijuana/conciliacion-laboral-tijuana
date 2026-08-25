@@ -75,6 +75,20 @@ class StaffRequiredMixin(UserPassesTestMixin):
         return self.request.user.is_authenticated
 
 
+# Mapeo slug de OFICINA_CHOICES → nombre legible del catálogo Office
+# Usado para filtrar Agreement/Commission por oficina cuando el filtro
+# viene del select del reporte (slug) pero el modelo Office usa nombre.
+OFICINA_SLUG_A_NOMBRE = dict(Cliente.OFICINA_CHOICES)
+
+
+def _filtro_oficina_office(qs, oficina_filtro):
+    """Filtra un queryset de finanzas que usa ForeignKey a Office, usando el slug de OFICINA_CHOICES."""
+    if not oficina_filtro:
+        return qs
+    nombre = OFICINA_SLUG_A_NOMBRE.get(oficina_filtro, oficina_filtro)
+    return qs.filter(oficina__nombre__iexact=nombre)
+
+
 # ─── Helpers ───────────────────────────────────────────────────────────────
 
 def get_expedientes_queryset(user):
@@ -985,8 +999,7 @@ def exportar_excel(request):
             _write_headers(ws_convenios, headers_conv)
 
             ag_qs = Agreement.objects.select_related('cliente', 'oficina', 'responsable').order_by('-fecha')
-            if oficina_filtro:
-                ag_qs = ag_qs.filter(oficina__nombre__icontains=oficina_filtro.replace('_', ' '))
+            ag_qs = _filtro_oficina_office(ag_qs, oficina_filtro)
             if fecha_desde:
                 ag_qs = ag_qs.filter(fecha__gte=fecha_desde)
             if fecha_hasta:
@@ -1017,8 +1030,7 @@ def exportar_excel(request):
             _write_headers(ws_comisiones, headers_com)
 
             com_qs = Commission.objects.select_related('asesor', 'oficina', 'expediente').order_by('-fecha')
-            if oficina_filtro:
-                com_qs = com_qs.filter(oficina__nombre__icontains=oficina_filtro.replace('_', ' '))
+            com_qs = _filtro_oficina_office(com_qs, oficina_filtro)
             if asesor_filtro:
                 com_qs = com_qs.filter(asesor_id=asesor_filtro)
             if fecha_desde:
@@ -2421,8 +2433,7 @@ def reportes_admin(request):
     try:
         from finanzas.models import Agreement, Commission
         ag_qs = Agreement.objects.select_related('cliente', 'oficina', 'responsable').order_by('-fecha')
-        if oficina_filtro:
-            ag_qs = ag_qs.filter(oficina__nombre__icontains=oficina_filtro.replace('_', ' '))
+        ag_qs = _filtro_oficina_office(ag_qs, oficina_filtro)
         if fecha_desde:
             ag_qs = ag_qs.filter(fecha__gte=fecha_desde)
         if fecha_hasta:
@@ -2440,8 +2451,7 @@ def reportes_admin(request):
     try:
         from finanzas.models import Commission
         com_qs = Commission.objects.select_related('asesor', 'oficina', 'expediente').order_by('-fecha')
-        if oficina_filtro:
-            com_qs = com_qs.filter(oficina__nombre__icontains=oficina_filtro.replace('_', ' '))
+        com_qs = _filtro_oficina_office(com_qs, oficina_filtro)
         if asesor_filtro:
             com_qs = com_qs.filter(asesor_id=asesor_filtro)
         if fecha_desde:
