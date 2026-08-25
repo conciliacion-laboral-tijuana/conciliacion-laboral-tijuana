@@ -902,57 +902,151 @@ def calendario_audiencias(request):
 
 @login_required
 def exportar_excel(request):
-    """Exporta expedientes a Excel."""
+    """Exporta expedientes a Excel con filtros opcionales.
+
+    Soporta los mismos filtros que reportes_admin:
+      oficina, estado, asesor, fecha_desde, fecha_hasta
+    Exporta 3 hojas: Expedientes, Convenios, Comisiones.
+    """
     try:
         import openpyxl
         from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
-        wb = openpyxl.Workbook()
-        ws = wb.active
-        ws.title = 'Expedientes'
+        # ── Filtros (mismos que reportes_admin) ──────────────────────
+        oficina_filtro = request.GET.get('oficina', '')
+        estado_filtro = request.GET.get('estado', '')
+        asesor_filtro = request.GET.get('asesor', '')
+        fecha_desde = request.GET.get('fecha_desde', '')
+        fecha_hasta = request.GET.get('fecha_hasta', '')
 
-        headers = ['N° Exp', 'Cliente', 'CURP', 'Empresa', 'Asesor', 'Estado', 'Monto Reclamado',
-                    'Monto Convenio', 'Fecha Audiencia', 'Tipo Despido', 'Folio', 'Próxima Acción', 'Creado']
+        wb = openpyxl.Workbook()
+
         header_font = Font(bold=True, color='FFFFFF', size=11)
         header_fill = PatternFill(start_color='1F2937', end_color='1F2937', fill_type='solid')
         header_alignment = Alignment(horizontal='center', vertical='center')
         thin_border = Border(
-            left=Side(style='thin'),
-            right=Side(style='thin'),
-            top=Side(style='thin'),
-            bottom=Side(style='thin')
+            left=Side(style='thin'), right=Side(style='thin'),
+            top=Side(style='thin'), bottom=Side(style='thin'),
         )
 
-        for col, header in enumerate(headers, 1):
-            cell = ws.cell(row=1, column=col, value=header)
-            cell.font = header_font
-            cell.fill = header_fill
-            cell.alignment = header_alignment
-            cell.border = thin_border
+        def _write_headers(ws, headers):
+            for col, header in enumerate(headers, 1):
+                cell = ws.cell(row=1, column=col, value=header)
+                cell.font = header_font
+                cell.fill = header_fill
+                cell.alignment = header_alignment
+                cell.border = thin_border
 
-        qs = get_expedientes_queryset(request.user)
+        # ── Hoja 1: Expedientes ─────────────────────────────────────
+        ws = wb.active
+        ws.title = 'Expedientes'
+        headers_exp = ['N° Exp', 'Cliente', 'CURP', 'Empresa', 'Asesor', 'Oficina',
+                        'Estado', 'Monto Reclamado', 'Monto Convenio', 'Fecha Audiencia',
+                        'Tipo Despido', 'Folio', 'Próxima Acción', 'Creado']
+        _write_headers(ws, headers_exp)
+
+        qs = get_expedientes_queryset(request.user).select_related('cliente', 'asesor')
+        if oficina_filtro:
+            qs = qs.filter(cliente__oficina=oficina_filtro)
+        if estado_filtro:
+            qs = qs.filter(estado=estado_filtro)
+        if asesor_filtro:
+            qs = qs.filter(asesor_id=asesor_filtro)
+        if fecha_desde:
+            qs = qs.filter(created_at__date__gte=fecha_desde)
+        if fecha_hasta:
+            qs = qs.filter(created_at__date__lte=fecha_hasta)
+
         for i, exp in enumerate(qs, 2):
             ws.cell(row=i, column=1, value=exp.numero).border = thin_border
             ws.cell(row=i, column=2, value=exp.cliente.nombre).border = thin_border
             ws.cell(row=i, column=3, value=exp.cliente.curp).border = thin_border
             ws.cell(row=i, column=4, value=exp.cliente.empresa).border = thin_border
             ws.cell(row=i, column=5, value=exp.asesor.get_full_name() or exp.asesor.username).border = thin_border
-            ws.cell(row=i, column=6, value=exp.get_estado_display()).border = thin_border
-            ws.cell(row=i, column=7, value=float(exp.monto_reclamado or 0)).border = thin_border
-            ws.cell(row=i, column=8, value=float(exp.monto_convenio or 0)).border = thin_border
-            ws.cell(row=i, column=9, value=exp.fecha_audiencia.strftime('%d/%m/%Y %H:%M') if exp.fecha_audiencia else '').border = thin_border
-            ws.cell(row=i, column=10, value=exp.get_tipo_despido_display() if exp.tipo_despido else '').border = thin_border
-            ws.cell(row=i, column=11, value=exp.folio or '').border = thin_border
-            ws.cell(row=i, column=12, value=exp.proxima_accion.strftime('%d/%m/%Y') if exp.proxima_accion else '').border = thin_border
-            ws.cell(row=i, column=13, value=exp.created_at.strftime('%d/%m/%Y')).border = thin_border
+            ws.cell(row=i, column=6, value=exp.cliente.get_oficina_display()).border = thin_border
+            ws.cell(row=i, column=7, value=exp.get_estado_display()).border = thin_border
+            ws.cell(row=i, column=8, value=float(exp.monto_reclamado or 0)).border = thin_border
+            ws.cell(row=i, column=9, value=float(exp.monto_convenio or 0)).border = thin_border
+            ws.cell(row=i, column=10, value=exp.fecha_audiencia.strftime('%d/%m/%Y %H:%M') if exp.fecha_audiencia else '').border = thin_border
+            ws.cell(row=i, column=11, value=exp.get_tipo_despido_display() if exp.tipo_despido else '').border = thin_border
+            ws.cell(row=i, column=12, value=exp.folio or '').border = thin_border
+            ws.cell(row=i, column=13, value=exp.proxima_accion.strftime('%d/%m/%Y') if exp.proxima_accion else '').border = thin_border
+            ws.cell(row=i, column=14, value=exp.created_at.strftime('%d/%m/%Y')).border = thin_border
 
-        for col in range(1, len(headers) + 1):
-            ws.column_dimensions[chr(64 + col)].width = 22
+        for col in range(1, len(headers_exp) + 1):
+            ws.column_dimensions[chr(64 + col)].width = 20
 
+        # ── Hoja 2: Convenios ──────────────────────────────────────
+        try:
+            from finanzas.models import Agreement
+            ws_convenios = wb.create_sheet('Convenios')
+            headers_conv = ['Fecha', 'Cliente', 'Empresa', 'Oficina', 'Monto Convenio',
+                            'Honorarios', 'Estado', 'Responsable', 'Notas']
+            _write_headers(ws_convenios, headers_conv)
+
+            ag_qs = Agreement.objects.select_related('cliente', 'oficina', 'responsable').order_by('-fecha')
+            if oficina_filtro:
+                ag_qs = ag_qs.filter(oficina__nombre__icontains=oficina_filtro.replace('_', ' '))
+            if fecha_desde:
+                ag_qs = ag_qs.filter(fecha__gte=fecha_desde)
+            if fecha_hasta:
+                ag_qs = ag_qs.filter(fecha__lte=fecha_hasta)
+
+            for i, ag in enumerate(ag_qs, 2):
+                ws_convenios.cell(row=i, column=1, value=ag.fecha.strftime('%d/%m/%Y')).border = thin_border
+                ws_convenios.cell(row=i, column=2, value=ag.cliente.nombre).border = thin_border
+                ws_convenios.cell(row=i, column=3, value=ag.empresa).border = thin_border
+                ws_convenios.cell(row=i, column=4, value=str(ag.oficina)).border = thin_border
+                ws_convenios.cell(row=i, column=5, value=float(ag.monto_convenio)).border = thin_border
+                ws_convenios.cell(row=i, column=6, value=float(ag.honorarios)).border = thin_border
+                ws_convenios.cell(row=i, column=7, value=ag.get_estado_display()).border = thin_border
+                ws_convenios.cell(row=i, column=8, value=ag.responsable.get_full_name() or ag.responsable.username).border = thin_border
+                ws_convenios.cell(row=i, column=9, value=ag.notas or '').border = thin_border
+
+            for col in range(1, len(headers_conv) + 1):
+                ws_convenios.column_dimensions[chr(64 + col)].width = 20
+        except Exception:
+            pass
+
+        # ── Hoja 3: Comisiones ─────────────────────────────────────
+        try:
+            from finanzas.models import Commission
+            ws_comisiones = wb.create_sheet('Comisiones')
+            headers_com = ['Fecha', 'Asesor', 'Expediente', 'Oficina', 'Monto Convenio',
+                           '% Comisión', 'Monto Comisión', 'Estado', 'Fecha Pago']
+            _write_headers(ws_comisiones, headers_com)
+
+            com_qs = Commission.objects.select_related('asesor', 'oficina', 'expediente').order_by('-fecha')
+            if oficina_filtro:
+                com_qs = com_qs.filter(oficina__nombre__icontains=oficina_filtro.replace('_', ' '))
+            if asesor_filtro:
+                com_qs = com_qs.filter(asesor_id=asesor_filtro)
+            if fecha_desde:
+                com_qs = com_qs.filter(fecha__gte=fecha_desde)
+            if fecha_hasta:
+                com_qs = com_qs.filter(fecha__lte=fecha_hasta)
+
+            for i, com in enumerate(com_qs, 2):
+                ws_comisiones.cell(row=i, column=1, value=com.fecha.strftime('%d/%m/%Y')).border = thin_border
+                ws_comisiones.cell(row=i, column=2, value=com.asesor.get_full_name() or com.asesor.username).border = thin_border
+                ws_comisiones.cell(row=i, column=3, value=com.expediente.numero).border = thin_border
+                ws_comisiones.cell(row=i, column=4, value=str(com.oficina)).border = thin_border
+                ws_comisiones.cell(row=i, column=5, value=float(com.monto_convenio)).border = thin_border
+                ws_comisiones.cell(row=i, column=6, value=float(com.porcentaje)).border = thin_border
+                ws_comisiones.cell(row=i, column=7, value=float(com.monto_comision)).border = thin_border
+                ws_comisiones.cell(row=i, column=8, value=com.get_estado_display()).border = thin_border
+                ws_comisiones.cell(row=i, column=9, value=com.fecha_pago.strftime('%d/%m/%Y') if com.fecha_pago else '').border = thin_border
+
+            for col in range(1, len(headers_com) + 1):
+                ws_comisiones.column_dimensions[chr(64 + col)].width = 20
+        except Exception:
+            pass
+
+        # ── Respuesta ──────────────────────────────────────────────
         response = HttpResponse(
             content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
-        response['Content-Disposition'] = f'attachment; filename=expedientes_{datetime.now().strftime("%Y%m%d")}.xlsx'
+        response['Content-Disposition'] = f'attachment; filename=reportes_{datetime.now().strftime("%Y%m%d")}.xlsx'
         wb.save(response)
         return response
 
