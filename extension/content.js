@@ -599,24 +599,9 @@
         await sleep(100);
       }
 
-      // Fecha de nacimiento y edad (si el portal los pide)
-      if (c.fecha_nacimiento) {
-        setValue(byName('solicitado[fecha_nacimiento]'), c.fecha_nacimiento);
-        await sleep(300);
-      }
-
-      // Edad (si hay fecha de nacimiento, calcularla)
-      if (c.fecha_nacimiento) {
-        const parts = c.fecha_nacimiento.split('/');
-        if (parts.length === 3) {
-          const nac = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
-          const hoy = new Date();
-          let edad = hoy.getFullYear() - nac.getFullYear();
-          if (hoy.getMonth() < nac.getMonth() || (hoy.getMonth() === nac.getMonth() && hoy.getDate() < nac.getDate())) edad--;
-          setValue(byName('solicitado[edad]'), String(edad));
-          await sleep(200);
-        }
-      }
+      // Nota: fecha_nacimiento y edad del citado NO se llenan porque
+      // el modelo Cliente no almacena la fecha del patrón. Se dejan vacíos
+      // para que el asesor los capture manualmente si el portal los pide.
 
       // RFC del citado (si hay)
       if (c.empresa_rfc) {
