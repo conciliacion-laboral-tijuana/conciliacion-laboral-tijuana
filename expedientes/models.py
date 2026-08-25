@@ -58,6 +58,8 @@ class Cliente(models.Model):
     empresa_referencias = models.TextField('Referencias del domicilio', blank=True)
     empresa_curp = models.CharField('CURP del patrón (persona física)', max_length=18, blank=True,
                                     help_text='Solo aplica si el patrón es persona física')
+    empresa_rfc = models.CharField('RFC del patrón', max_length=13, blank=True,
+                                   help_text='RFC de la empresa/patrón (no confundir con el RFC del trabajador)')
 
     # Tipo de persona del patrón (para conciliación)
     tipo_persona_citado = models.CharField('Tipo de persona del patrón', max_length=10,

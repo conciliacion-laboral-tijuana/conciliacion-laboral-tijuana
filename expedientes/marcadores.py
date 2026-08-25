@@ -204,7 +204,7 @@ def get_marcadores(expediente: Expediente, calculo: Dict[str, Any] | None = None
         'direccion_empresa': direccion_empresa,
         'empresa_actividad': cliente.empresa_actividad or '[ACTIVIDAD]',
         'empresa_telefono': cliente.empresa_telefono or '[TELÉFONO EMPRESA]',
-        'empresa_rfc': cliente.rfc or '[RFC EMPRESA]',
+        'empresa_rfc': cliente.empresa_rfc or cliente.rfc or '[RFC EMPRESA]',
         'nombre_representante': '[REPRESENTANTE LEGAL]',
         'cargo_representante': '[CARGO DEL REPRESENTANTE]',
 

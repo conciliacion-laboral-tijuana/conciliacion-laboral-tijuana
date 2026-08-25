@@ -142,6 +142,11 @@
                         <p class="text-xs text-gray-400 mt-0.5">Solo aplica si el patrón es persona física</p>
                     </div>
                     <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.empresa_rfc.label }}</label>
+                        {{ form.empresa_rfc }}
+                        {% if form.empresa_rfc.errors %}<p class="text-red-500 text-xs mt-1">{{ form.empresa_rfc.errors.0 }}</p>{% endif %}
+                    </div>
+                    <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.empresa_telefono.label }}</label>
                         {{ form.empresa_telefono }}
                         {% if form.empresa_telefono.errors %}<p class="text-red-500 text-xs mt-1">{{ form.empresa_telefono.errors.0 }}</p>{% endif %}

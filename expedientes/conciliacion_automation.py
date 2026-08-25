@@ -656,9 +656,10 @@ def _llenar_citado(page, cliente):
         # ─── Persona Moral: razón social, RFC, contacto, domicilio ──
         _fill_input(page, 'solicitado[razon_social]', empresa_nombre)
 
-        # RFC del citado
-        if cliente.rfc:
-            _fill_input(page, 'solicitado[rfc]', cliente.rfc)
+        # RFC del citado (empresa)
+        empresa_rfc = cliente.empresa_rfc or cliente.rfc or ''
+        if empresa_rfc:
+            _fill_input(page, 'solicitado[rfc]', empresa_rfc)
 
         # Teléfono de contacto
         _fill_input(page, 'contactos[1]', _limpiar_telefono(cliente.empresa_telefono or cliente.telefono))
@@ -687,9 +688,10 @@ def _llenar_citado(page, cliente):
         _select_option(page, 'solicitado[genero_id]', '1')             # MASCULINO
         _select_option(page, 'solicitado[nacionalidad_id]', '1')       # MEXICANA
 
-        # RFC del citado (si hay)
-        if cliente.rfc:
-            _fill_input(page, 'solicitado[rfc]', cliente.rfc)
+        # RFC del citado (empresa)
+        empresa_rfc = cliente.empresa_rfc or cliente.rfc or ''
+        if empresa_rfc:
+            _fill_input(page, 'solicitado[rfc]', empresa_rfc)
 
         # Teléfono y email
         _fill_input(page, 'contactos[1]', _limpiar_telefono(cliente.empresa_telefono or cliente.telefono))

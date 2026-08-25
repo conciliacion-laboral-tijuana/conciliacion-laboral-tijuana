@@ -1505,7 +1505,7 @@ class ExtensionChromeApiTests(TestCase):
         self.assertEqual(t['cliente']['fecha_salida'], '30/06/2025')
         # Persona Moral: razón social y datos del citado
         self.assertEqual(t['cliente']['empresa_nombre'], 'Mi Empresa SA de CV')
-        self.assertEqual(t['cliente']['empresa_rfc'], 'LOMA800101ABC')
+        self.assertEqual(t['cliente']['empresa_rfc'], 'LOMA800101ABC')  # fallback a rfc del trabajador
         self.assertEqual(t['cliente']['empresa_email'], 'juan.lopez@email.com')
         self.assertTrue(t['portal']['url_solicitud'].startswith('https://app.conciliacionbc'))
         self.assertIn('fui despedido', t['hechos'])

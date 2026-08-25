@@ -133,7 +133,7 @@ def _serializar_tarea(tarea):
             'empresa_numero': cliente.empresa_numero or cliente.direccion_numero or '',
             'empresa_cp': cliente.empresa_cp or cliente.direccion_cp or '',
             'empresa_telefono': cliente.empresa_telefono or cliente.telefono or '',
-            'empresa_rfc': cliente.rfc or '',
+            'empresa_rfc': cliente.empresa_rfc or cliente.rfc or '',
             'empresa_curp': (cliente.empresa_curp or '').strip().upper(),
             'empresa_email': cliente.email or '',
         },
