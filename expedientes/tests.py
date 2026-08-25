@@ -1443,7 +1443,9 @@ class ExtensionChromeApiTests(TestCase):
         cls.cliente = Cliente.objects.create(
             nombre='Juan Carlos López Moreno',
             curp='LOOM800101HTCPBN07',
+            rfc='LOMA800101ABC',
             telefono='6641234567',
+            email='juan.lopez@email.com',
             genero='masculino',
             fecha_nacimiento=date(1980, 1, 1),
             direccion_calle='Calle Uno',
@@ -1501,8 +1503,65 @@ class ExtensionChromeApiTests(TestCase):
         self.assertEqual(t['cliente']['periodicidad'], '2')          # mensual
         self.assertEqual(t['cliente']['fecha_ingreso'], '01/03/2022')
         self.assertEqual(t['cliente']['fecha_salida'], '30/06/2025')
+        # Persona Moral: razón social y datos del citado
+        self.assertEqual(t['cliente']['empresa_nombre'], 'Mi Empresa SA de CV')
+        self.assertEqual(t['cliente']['empresa_rfc'], 'LOMA800101ABC')
+        self.assertEqual(t['cliente']['empresa_email'], 'juan.lopez@email.com')
         self.assertTrue(t['portal']['url_solicitud'].startswith('https://app.conciliacionbc'))
         self.assertIn('fui despedido', t['hechos'])
+
+    def test_tareas_persona_fisica_campos_corresponden(self):
+        """Un cliente persona física debe enviar tipo_persona='1' y los campos del citado correctos."""
+        cliente_fisica = Cliente.objects.create(
+            nombre='Maria Elena Garcia Ruiz',
+            curp='GARR850310MTCRRL09',
+            rfc='GARR850310A99',
+            telefono='6649876543',
+            email='maria.garcia@email.com',
+            genero='femenino',
+            fecha_nacimiento=date(1985, 3, 10),
+            direccion_calle='Av. Constitucion',
+            direccion_numero='456',
+            direccion_cp='22000',
+            empresa='Juan Perez Lopez',
+            empresa_razon_social='Juan Perez Lopez',
+            tipo_persona_citado='fisica',
+            empresa_telefono='6645551234',
+            empresa_calle='Calle Falsa',
+            empresa_numero='789',
+            empresa_cp='22300',
+            puesto='Cajera',
+            salario=Decimal('8000.00'),
+            periodo_pago='semanal',
+            jornada='diurna',
+            fecha_ingreso=date(2023, 6, 1),
+            fecha_salida=date(2025, 7, 15),
+            oficina='otay',
+        )
+        exp_fisica = Expediente.objects.create(
+            cliente=cliente_fisica, asesor=self.asesor, estado='nuevo',
+        )
+        tarea_fisica = TareaConciliacion.objects.create(
+            expediente=exp_fisica, usuario=self.asesor,
+            estado='pendiente', modo='extension',
+        )
+
+        r = self.client.get(reverse('extension_api_tareas'), **self._auth())
+        self.assertEqual(r.status_code, 200)
+        tareas = r.json()['tareas']
+        t_fisica = next(t for t in tareas if t['id'] == tarea_fisica.pk)
+
+        # Persona Física: tipo_persona='1'
+        self.assertEqual(t_fisica['cliente']['tipo_persona'], '1')
+        self.assertEqual(t_fisica['cliente']['empresa_nombre'], 'Juan Perez Lopez')
+        self.assertEqual(t_fisica['cliente']['empresa_rfc'], 'GARR850310A99')
+        self.assertEqual(t_fisica['cliente']['empresa_email'], 'maria.garcia@email.com')
+        self.assertEqual(t_fisica['cliente']['empresa_telefono'], '6645551234')
+
+        # Limpiar
+        tarea_fisica.delete()
+        exp_fisica.delete()
+        cliente_fisica.delete()
 
     def test_tareas_no_incluye_expedientes_de_otro_asesor(self):
         r = self.client.get(reverse('extension_api_tareas'), **self._auth(self.otro.profile.api_token))

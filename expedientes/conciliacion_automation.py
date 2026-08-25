@@ -636,31 +636,71 @@ def _llenar_solicitante(page, cliente, fecha_nac_str, fecha_ing_str, fecha_sal_s
 
 
 def _llenar_citado(page, cliente):
-    """Llena los campos del citado (empresa/patrón)."""
+    """Llena los campos del citado (empresa/patrón).
+
+    Soporta tanto Persona Física como Moral. El portal muestra campos
+    diferentes según el tipo:
+      - Persona Física: CURP, nombre, apellidos, fecha nacimiento, edad,
+        RFC, género, nacionalidad, estado nacimiento, teléfono, email, domicilio
+      - Persona Moral: razón social, RFC, teléfono, email, domicilio
+    """
     empresa_nombre = cliente.empresa_razon_social or cliente.empresa or 'Empresa SA de CV'
-    nombre_parts = empresa_nombre.split()
+    es_moral = cliente.tipo_persona_citado == 'moral'
 
     # Tipo persona: desde el modelo (Física o Moral)
     tipo_persona_id = TIPO_PERSONA_PORTAL_IDS.get(cliente.tipo_persona_citado, '1')
     _click_radio(page, 'solicitado[tipo_persona_id]', tipo_persona_id)
-    page.wait_for_timeout(300)
+    page.wait_for_timeout(500)
 
-    # Datos del citado (truncados MUY agresivamente)
-    _fill_input(page, 'solicitado[nombre]', _truncar(nombre_parts[0] if nombre_parts else 'Empresa', 6))
-    _fill_input(page, 'solicitado[primer_apellido]', _truncar(nombre_parts[1] if len(nombre_parts) > 1 else 'SA', 6))
-    _fill_input(page, 'solicitado[segundo_apellido]',
-                _truncar('de CV' if len(nombre_parts) <= 2 else ' '.join(nombre_parts[2:]), 6))
-    _select_option(page, 'solicitado[genero_id]', '1')             # MASCULINO
-    _select_option(page, 'solicitado[nacionalidad_id]', '1')       # MEXICANA
+    if es_moral:
+        # ─── Persona Moral: razón social, RFC, contacto, domicilio ──
+        _fill_input(page, 'solicitado[razon_social]', empresa_nombre)
 
-    # Domicilio del citado con espera de AJAX para colonia/municipio
+        # RFC del citado
+        if cliente.rfc:
+            _fill_input(page, 'solicitado[rfc]', cliente.rfc)
+
+        # Teléfono de contacto
+        _fill_input(page, 'contactos[1]', _limpiar_telefono(cliente.empresa_telefono or cliente.telefono))
+        if cliente.email:
+            _fill_input(page, 'contactos_email', cliente.email)
+    else:
+        # ─── Persona Física: nombre, apellidos, CURP, RFC, etc. ────
+        nombre_parts = empresa_nombre.split()
+        _fill_input(page, 'solicitado[nombre]', _truncar(nombre_parts[0] if nombre_parts else 'Empresa', 6))
+        _fill_input(page, 'solicitado[primer_apellido]', _truncar(nombre_parts[1] if len(nombre_parts) > 1 else 'SA', 6))
+        _fill_input(page, 'solicitado[segundo_apellido]',
+                    _truncar('de CV' if len(nombre_parts) <= 2 else ' '.join(nombre_parts[2:]), 6))
+
+        # CURP del citado (si hay, tipear carácter por carácter)
+        empresa_curp = (cliente.empresa_curp or '').strip().upper()
+        if empresa_curp and len(empresa_curp) >= 15:
+            curp_el = page.query_selector('[name="solicitado[curp]"]')
+            if curp_el:
+                curp_el.click()
+                curp_el.fill('')
+                for ch in empresa_curp:
+                    curp_el.type(ch, delay=5)
+                page.wait_for_timeout(50)
+            page.wait_for_timeout(100)
+
+        _select_option(page, 'solicitado[genero_id]', '1')             # MASCULINO
+        _select_option(page, 'solicitado[nacionalidad_id]', '1')       # MEXICANA
+
+        # RFC del citado (si hay)
+        if cliente.rfc:
+            _fill_input(page, 'solicitado[rfc]', cliente.rfc)
+
+        # Teléfono y email
+        _fill_input(page, 'contactos[1]', _limpiar_telefono(cliente.empresa_telefono or cliente.telefono))
+        if cliente.email:
+            _fill_input(page, 'contactos_email', cliente.email)
+
+    # Domicilio del citado (común para ambos tipos)
     _llenar_domicilio(page,
                       vialidad=cliente.empresa_calle or cliente.direccion_calle,
                       num_ext=cliente.empresa_numero or cliente.direccion_numero,
                       cp=cliente.empresa_cp or cliente.direccion_cp)
-
-    # Teléfono de contacto
-    _fill_input(page, 'contactos[1]', _limpiar_telefono(cliente.empresa_telefono or cliente.telefono))
 
     page.wait_for_timeout(500)
 

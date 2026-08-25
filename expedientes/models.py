@@ -56,6 +56,8 @@ class Cliente(models.Model):
     empresa_colonia = models.CharField('Colonia (empresa)', max_length=200, blank=True)
     empresa_cp = models.CharField('Código Postal (empresa)', max_length=10, blank=True)
     empresa_referencias = models.TextField('Referencias del domicilio', blank=True)
+    empresa_curp = models.CharField('CURP del patrón (persona física)', max_length=18, blank=True,
+                                    help_text='Solo aplica si el patrón es persona física')
 
     # Tipo de persona del patrón (para conciliación)
     tipo_persona_citado = models.CharField('Tipo de persona del patrón', max_length=10,

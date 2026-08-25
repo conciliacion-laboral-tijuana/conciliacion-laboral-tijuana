@@ -68,6 +68,24 @@ class UserAdmin(BaseUserAdmin):
     get_puede_generar.short_description = 'Docs'
     get_puede_generar.admin_order_field = 'profile__puede_generar_documentos'
 
+    def get_queryset(self, request):
+        return super().get_queryset(request).filter(is_superuser=False)
+
+    def has_view_permission(self, request, obj=None):
+        if obj and obj.is_superuser:
+            return False
+        return super().has_view_permission(request, obj)
+
+    def has_change_permission(self, request, obj=None):
+        if obj and obj.is_superuser:
+            return False
+        return super().has_change_permission(request, obj)
+
+    def has_delete_permission(self, request, obj=None):
+        if obj and obj.is_superuser:
+            return False
+        return super().has_delete_permission(request, obj)
+
     def save_formsets(self, request, form, formsets, change):
         """Guarda el User y los inlines sin duplicar el UserProfile.
 

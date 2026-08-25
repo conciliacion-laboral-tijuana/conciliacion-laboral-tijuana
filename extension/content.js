@@ -1,24 +1,29 @@
 // ══════════════════════════════════════════════════════════════════════════
-//  Conciliación BC — Asistente · Content Script
+//  Conciliación BC — Asistente · Content Script (v2 — robust)
 //
 //  Se inyecta en app.conciliacionbc.gob.mx. Cuando hay una tarea activa
 //  (guardada por el background), llena el formulario del portal fase por fase
 //  y deja que EL ASESOR dé el clic final en "Enviar solicitud". Después
 //  detecta el folio, descarga el acuse PDF y reporta todo a la app.
 //
-//  Los selectores son los mismos que usa la automatización del servidor
-//  (expedientes/conciliacion_automation.py).
+//  v2 Mejoras:
+//  - clickValidarContinuar con timeout más largo (12s) e indicador visual
+//  - navigateTab con wait-retry (espera a que el tab aparezca)
+//  - closeModals después de cada fase crítica
+//  - CURP con simulación de teclas (pressSequentially) en vez de setValue
+//  - try/catch por fase para no quedarse atorado silenciosamente
+//  - Objeto: selección específica de solicitud[objeto_id]
 // ══════════════════════════════════════════════════════════════════════════
 
 (() => {
-  if (window.__conciliacionAsistenteActivo) return; // no duplicar
+  if (window.__conciliacionAsistenteActivo) return;
   window.__conciliacionAsistenteActivo = true;
 
   let tarea = null;
   let panel = null;
   let reportado = false;
 
-  // ─── Helpers DOM (portados de la automatización) ────────────────────────
+  // ─── Helpers DOM ────────────────────────────────────────────────────────
 
   const sleep = ms => new Promise(r => setTimeout(r, ms));
 
@@ -34,6 +39,17 @@
     el.dispatchEvent(new Event('change', { bubbles: true }));
     el.dispatchEvent(new Event('blur'));
     return true;
+  }
+
+  // Versión silenciosa de setValue — NO dispara eventos de input/change.
+  // Usada para CURP y campos donde la validación client-side del portal
+  // borra el valor si no pasa el checksum.
+  function setValueSilent(el, value) {
+    if (!el) return false;
+    if (el.readOnly) el.readOnly = false;
+    if (el.disabled) el.disabled = false;
+    el.value = value;
+    return el.value === value;
   }
 
   function selectOption(name, value) {
@@ -61,40 +77,81 @@
           const txt = (el.textContent || '').trim().toLowerCase();
           if (txt.includes(texto.toLowerCase()) && el.offsetParent !== null) {
             el.click();
+            el.dispatchEvent(new Event('click', { bubbles: true }));
             resolve(true);
             return;
           }
         }
-        if (Date.now() - start < timeoutMs) setTimeout(tryClick, 250);
+        if (Date.now() - start < timeoutMs) setTimeout(tryClick, 300);
         else resolve(false);
       };
       tryClick();
     });
   }
 
-  function navigateTab(texto) {
-    const els = document.querySelectorAll('.wizard-step a, .nav-link, .step-title, a[class*="step"]');
-    for (const el of els) {
-      const txt = (el.textContent || '').trim().toLowerCase();
-      if (txt.includes(texto.toLowerCase())) {
-        el.click();
-        return true;
-      }
-    }
-    return false;
+  // ─── navigateTab con wait-retry ─────────────────────────────────────────
+  // El server-side espera 800ms después de clic en tab. La extensión ahora
+  // reintenta hasta 8s buscando el tab en el DOM (puede tardar en renderizar
+  // después de un "Validar y Continuar" que cambia de fase).
+
+  function navigateTab(texto, timeoutMs = 8000) {
+    return new Promise(resolve => {
+      const start = Date.now();
+      const tryNav = () => {
+        // Buscar en selectores de tab del wizard
+        const selectors = [
+          '.wizard-step a',
+          '.nav-link',
+          '.step-title',
+          'a[class*="step"]',
+          '.nav-item a',
+          '.tab-link',
+          '.wizard a',
+          '[role="tab"]',
+        ];
+        const allEls = document.querySelectorAll(selectors.join(', '));
+        for (const el of allEls) {
+          const txt = (el.textContent || '').trim().toLowerCase();
+          if (txt.includes(texto.toLowerCase()) && el.offsetParent !== null) {
+            el.click();
+            el.dispatchEvent(new Event('click', { bubbles: true }));
+            resolve(true);
+            return;
+          }
+        }
+        // Fallback: buscar cualquier enlace con el texto
+        for (const el of document.querySelectorAll('a, button, span, div')) {
+          const txt = (el.textContent || '').trim().toLowerCase();
+          if (txt === texto.toLowerCase() && el.offsetParent !== null) {
+            el.click();
+            resolve(true);
+            return;
+          }
+        }
+        if (Date.now() - start < timeoutMs) {
+          setTimeout(tryNav, 400);
+        } else {
+          resolve(false);
+        }
+      };
+      tryNav();
+    });
   }
 
   function closeModals() {
     // Cerrar SweetAlert
-    const overlay = document.querySelector('.swal-overlay');
+    const overlay = document.querySelector('.swal-overlay--show-modal, .swal-overlay');
     if (overlay && overlay.offsetParent !== null) {
       const ok = overlay.querySelector('.swal-button--confirm, .swal-button:not(.swal-button--cancel)')
         || overlay.querySelector('.swal-button, button');
       if (ok) ok.click();
       overlay.style.display = 'none';
     }
+    document.querySelectorAll('.swal-overlay, .swal-modal').forEach(el => {
+      el.style.display = 'none';
+    });
     // Cerrar modales Bootstrap
-    document.querySelectorAll('.modal.show, [role="dialog"]').forEach(container => {
+    document.querySelectorAll('.modal.show, .modal.fade.show, [role="dialog"]').forEach(container => {
       for (const btn of container.querySelectorAll('button, a')) {
         const txt = (btn.textContent || '').trim().toLowerCase();
         if (['entendido', 'cerrar', 'close', 'aceptar', 'ok', 'confirmar', 'dismiss'].includes(txt)
@@ -108,9 +165,15 @@
     });
     document.querySelectorAll('.modal-backdrop').forEach(b => b.remove());
     document.body.classList.remove('modal-open');
+    document.body.style.paddingRight = '';
   }
 
-  function clickValidarContinuar(timeoutMs = 6000) {
+  // ─── clickValidarContinuar (v2 — robusto) ──────────────────────────────
+  // Timeout ampliado a 12s (el server usa 10s). Reintenta cada 300ms.
+  // Ahora también dispara el evento click con bubbles: true para frameworks
+  // que lo requieran.
+
+  function clickValidarContinuar(timeoutMs = 12000) {
     return new Promise(resolve => {
       const start = Date.now();
       const tryClick = () => {
@@ -119,11 +182,12 @@
           const t = (btn.textContent || '').trim().toLowerCase();
           if (t.includes('validar') && t.includes('continuar') && btn.offsetParent !== null) {
             btn.click();
+            btn.dispatchEvent(new Event('click', { bubbles: true }));
             resolve(true);
             return;
           }
         }
-        if (Date.now() - start < timeoutMs) setTimeout(tryClick, 250);
+        if (Date.now() - start < timeoutMs) setTimeout(tryClick, 300);
         else resolve(false);
       };
       tryClick();
@@ -159,6 +223,7 @@
     }
     await sleep(3000); // AJAX de colonia/municipio según CP
 
+    // Seleccionar municipio (el portal lo carga vía AJAX según CP)
     const municipio = document.querySelector('select[name="municipio"]');
     if (municipio && municipio.options.length > 1 && !municipio.value) {
       municipio.selectedIndex = 1;
@@ -166,6 +231,7 @@
     }
     await sleep(500);
 
+    // Seleccionar asentamiento/colonia
     const asentamiento = document.querySelector(`select[name="${prefix}[asentamiento]"]`);
     if (asentamiento && asentamiento.options.length > 1) {
       asentamiento.selectedIndex = 1;
@@ -257,7 +323,6 @@
   // ─── Descarga del acuse PDF → base64 ────────────────────────────────────
 
   async function descargarAcuse() {
-    // Buscar enlaces de descarga del acuse
     const keywords = ['getFile', 'acuse', 'documento', 'folio', '.pdf', 'descargar', 'generaDocumento', 'firma'];
     const links = document.querySelectorAll('a');
     for (const a of links) {
@@ -308,13 +373,14 @@
     let pasoActual = 0;
     setPasos(PASOS, pasoActual);
 
+    try {
     // ── FASE 1: Aviso de privacidad ──────────────────────────────────
     setEstado('Aceptando aviso de privacidad…');
     await sleep(1500);
     clickRadio('radioAviso', '1');
-    await sleep(300);
+    await sleep(400);
     await clickButton('Aceptar');
-    await sleep(600);
+    await sleep(800);
     closeModals();
     await sleep(500);
     pasoActual = 1; setPasos(PASOS, pasoActual);
@@ -322,35 +388,93 @@
     // ── FASE 2: Industria ────────────────────────────────────────────
     setEstado('Seleccionando industria…');
     clickRadio('industria', '28'); // "Ninguna de las anteriores"
-    await sleep(600);
+    await sleep(800);
     closeModals();
     await sleep(300);
-    await clickValidarContinuar();
-    await sleep(1200);
+    const ok2 = await clickValidarContinuar();
+    await sleep(1500);
     closeModals();
-    await sleep(500);
+    await sleep(600);
+    if (!ok2) {
+      setEstado('⚠️ No se pudo hacer clic en "Validar y Continuar" (Industria). Reintentando…', 'warn');
+      await sleep(1000);
+      await clickValidarContinuar(8000);
+      await sleep(1200);
+      closeModals();
+      await sleep(500);
+    }
     pasoActual = 2; setPasos(PASOS, pasoActual);
 
     // ── FASE 3: Fecha de conflicto y objeto ──────────────────────────
     setEstado('Llenando fecha de conflicto y objeto…');
-    setValue(byName('solicitud[fecha_conflicto]'), tarea.cliente.fecha_conflicto);
-    await sleep(500);
-    const objetoSel = document.querySelector('select[name*="objeto"], select');
-    if (objetoSel && objetoSel.options.length > 1) {
-      objetoSel.selectedIndex = 1;
-      objetoSel.dispatchEvent(new Event('change', { bubbles: true }));
-    }
+    const fechaConflicto = tarea.cliente.fecha_conflicto || '';
+    setValue(byName('solicitud[fecha_conflicto]'), fechaConflicto);
+    await sleep(600);
+    // Cerrar datepicker si se abre
+    try { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })); } catch (_) {}
+    await sleep(300);
+
+    // Seleccionar objeto: intentar primero solicitud[objeto_id], luego fallback
+    const okObjeto = await new Promise(resolve => {
+      // Buscar select específico de objeto
+      const objSel = byName('solicitud[objeto_id]');
+      if (objSel && objSel.tagName === 'SELECT' && objSel.options.length > 1) {
+        objSel.selectedIndex = 1;
+        objSel.dispatchEvent(new Event('change', { bubbles: true }));
+        resolve(true);
+        return;
+      }
+      // Fallback: buscar cualquier select cuyo nombre contenga "objeto"
+      const allSels = document.querySelectorAll('select');
+      for (const s of allSels) {
+        if (s.name && s.name.toLowerCase().includes('objeto') && s.options.length > 1) {
+          s.selectedIndex = 1;
+          s.dispatchEvent(new Event('change', { bubbles: true }));
+          resolve(true);
+          return;
+        }
+      }
+      // Último fallback: primer select visible
+      for (const s of allSels) {
+        if (s.options.length > 1 && !s.value && s.offsetParent !== null) {
+          s.selectedIndex = 1;
+          s.dispatchEvent(new Event('change', { bubbles: true }));
+          resolve(true);
+          return;
+        }
+      }
+      resolve(false);
+    });
     await sleep(400);
-    await clickValidarContinuar();
-    await sleep(1200);
+
+    const ok3 = await clickValidarContinuar();
+    await sleep(1500);
+    closeModals();
+    await sleep(600);
+    if (!ok3) {
+      setEstado('⚠️ "Validar y Continuar" (Fecha/objeto) no encontrado. Reintentando…', 'warn');
+      await sleep(1500);
+      await clickValidarContinuar(8000);
+      await sleep(1200);
+      closeModals();
+      await sleep(500);
+    }
     pasoActual = 3; setPasos(PASOS, pasoActual);
 
     // ── FASE 4: Solicitante (trabajador) ─────────────────────────────
     setEstado('Llenando datos del solicitante…');
-    navigateTab('solicitante');
-    await sleep(1000);
+    const navSol = await navigateTab('solicitante');
+    await sleep(1200);
+    if (!navSol) {
+      setEstado('⚠️ No se pudo navegar a tab "Solicitante". Reintentando…', 'warn');
+      await sleep(2000);
+      await navigateTab('solicitante', 6000);
+      await sleep(1500);
+    }
     await clickButton('agregar solicitante');
-    await sleep(1500);
+    await sleep(2000);
+    closeModals();
+    await sleep(500);
 
     const c = tarea.cliente;
     const [nombre, ap1, ap2] = separarNombre(c.nombre);
@@ -371,52 +495,186 @@
     setValue(byName('dato_laboral[fecha_salida]'), c.fecha_salida);
     selectOption('dato_laboral[jornada_id]', c.jornada);
 
-    // CURP: llenar JUSTO antes de Guardar (igual que la automatización)
+    // CURP: estrategia del server — tipear caracteres uno por uno con delay
+    // para que React procese cada input sin borrar el valor.
+    // Si pressSequentially no está disponible (content script), usar setValueSilent.
     if (c.curp && c.curp.length >= 15) {
-      setValue(byName('solicitante[curp]'), c.curp);
+      const curpEl = byName('solicitante[curp]');
+      if (curpEl) {
+        // Intentar con input nativo (simula teclas)
+        curpEl.focus();
+        curpEl.value = '';  // limpiar primero
+        for (const ch of c.curp) {
+          curpEl.value += ch;
+          curpEl.dispatchEvent(new Event('input', { bubbles: true }));
+          await sleep(5);  // delay entre teclas como el server
+        }
+        await sleep(20); // yield para que React procese el último input
+      }
       await sleep(100);
     }
+
+    // Click Guardar — inmediato después de CURP
     await clickButton('Guardar', 6000);
-    await sleep(1200);
+    await sleep(1500); // Esperar a que el portal guarde (server espera 1000ms)
+    closeModals();
+    await sleep(500);
     pasoActual = 4; setPasos(PASOS, pasoActual);
 
     setEstado('Validando solicitante…');
-    await clickValidarContinuar();
-    await sleep(1200);
+    const ok4 = await clickValidarContinuar();
+    await sleep(1500);
+    closeModals();
+    await sleep(600);
+    if (!ok4) {
+      setEstado('⚠️ "Validar y Continuar" (Solicitante) no encontrado. Reintentando…', 'warn');
+      await sleep(2000);
+      await clickValidarContinuar(8000);
+      await sleep(1500);
+      closeModals();
+      await sleep(500);
+    }
     pasoActual = 5; setPasos(PASOS, pasoActual);
 
     // ── FASE 5: Citado (empresa/patrón) ──────────────────────────────
     setEstado('Llenando datos del citado (empresa)…');
-    navigateTab('citado');
-    await sleep(1000);
+    const navCit = await navigateTab('citado');
+    await sleep(1200);
+    if (!navCit) {
+      setEstado('⚠️ No se pudo navegar a tab "Citado". Reintentando…', 'warn');
+      await sleep(2000);
+      await navigateTab('citado', 6000);
+      await sleep(1500);
+    }
     await clickButton('agregar citado');
-    await sleep(1500);
+    await sleep(2000);
+    closeModals();
+    await sleep(500);
 
-    const empresaParts = (c.empresa_nombre || 'Empresa SA de CV').split(/\s+/);
+    const esMoral = c.tipo_persona === '2'; // '1' = Física, '2' = Moral
     clickRadio('solicitado[tipo_persona_id]', c.tipo_persona);
-    await sleep(400);
-    setValue(byName('solicitado[nombre]'), truncar(empresaParts[0] || 'Empresa', 6));
-    setValue(byName('solicitado[primer_apellido]'), truncar(empresaParts[1] || 'SA', 6));
-    setValue(byName('solicitado[segundo_apellido]'),
-             truncar(empresaParts.length <= 2 ? 'de CV' : empresaParts.slice(2).join(' '), 6));
-    selectOption('solicitado[genero_id]', '1');       // MASCULINO
-    selectOption('solicitado[nacionalidad_id]', '1'); // MEXICANA
-    await llenarDomicilio('domicilio', c.empresa_calle, c.empresa_numero, c.empresa_cp);
-    setValue(byName('contactos[1]'), limpiarTelefono(c.empresa_telefono));
     await sleep(600);
+    closeModals();
+    await sleep(300);
+
+    if (esMoral) {
+      // ─── Persona Moral: razón social, RFC, contacto, domicilio ────
+      setValue(byName('solicitado[razon_social]'), c.empresa_nombre || 'Empresa SA de CV');
+      await sleep(300);
+
+      // RFC del citado (si hay)
+      if (c.empresa_rfc) {
+        setValue(byName('solicitado[rfc]'), c.empresa_rfc);
+        await sleep(200);
+      }
+
+      // Contacto
+      setValue(byName('contactos[1]'), limpiarTelefono(c.empresa_telefono));
+      if (c.empresa_email) {
+        setValue(byName('contactos_email'), c.empresa_email);
+        await sleep(200);
+      }
+    } else {
+      // ─── Persona Física: CURP, nombre, apellidos, RFC, etc. ──────
+      const empresaParts = (c.empresa_nombre || 'Empresa SA de CV').split(/\s+/);
+      setValue(byName('solicitado[nombre]'), truncar(empresaParts[0] || 'Empresa', 6));
+      setValue(byName('solicitado[primer_apellido]'), truncar(empresaParts[1] || 'SA', 6));
+      setValue(byName('solicitado[segundo_apellido]'),
+               truncar(empresaParts.length <= 2 ? 'de CV' : empresaParts.slice(2).join(' '), 6));
+      await sleep(300);
+
+      // CURP del citado — mismo approach que solicitante: tipear tecla por tecla
+      if (c.empresa_curp && c.empresa_curp.length >= 15) {
+        const curpEl = byName('solicitado[curp]');
+        if (curpEl) {
+          curpEl.focus();
+          curpEl.value = '';
+          for (const ch of c.empresa_curp) {
+            curpEl.value += ch;
+            curpEl.dispatchEvent(new Event('input', { bubbles: true }));
+            await sleep(5);
+          }
+          await sleep(20);
+        }
+        await sleep(100);
+      }
+
+      // Fecha de nacimiento y edad (si el portal los pide)
+      if (c.fecha_nacimiento) {
+        setValue(byName('solicitado[fecha_nacimiento]'), c.fecha_nacimiento);
+        await sleep(300);
+      }
+
+      // Edad (si hay fecha de nacimiento, calcularla)
+      if (c.fecha_nacimiento) {
+        const parts = c.fecha_nacimiento.split('/');
+        if (parts.length === 3) {
+          const nac = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+          const hoy = new Date();
+          let edad = hoy.getFullYear() - nac.getFullYear();
+          if (hoy.getMonth() < nac.getMonth() || (hoy.getMonth() === nac.getMonth() && hoy.getDate() < nac.getDate())) edad--;
+          setValue(byName('solicitado[edad]'), String(edad));
+          await sleep(200);
+        }
+      }
+
+      // RFC del citado (si hay)
+      if (c.empresa_rfc) {
+        setValue(byName('solicitado[rfc]'), c.empresa_rfc);
+        await sleep(200);
+      }
+
+      // Género y nacionalidad
+      selectOption('solicitado[genero_id]', '1');       // MASCULINO
+      selectOption('solicitado[nacionalidad_id]', '1'); // MEXICANA
+      await sleep(300);
+
+      // Contacto
+      setValue(byName('contactos[1]'), limpiarTelefono(c.empresa_telefono));
+      if (c.empresa_email) {
+        setValue(byName('contactos_email'), c.empresa_email);
+        await sleep(200);
+      }
+    }
+
+    // Domicilio del citado (común para ambos tipos)
+    await llenarDomicilio('domicilio', c.empresa_calle, c.empresa_numero, c.empresa_cp);
+    await sleep(500);
+
     await clickButton('Guardar', 6000);
-    await sleep(1000);
+    await sleep(1500);
+    closeModals();
+    await sleep(500);
     pasoActual = 6; setPasos(PASOS, pasoActual);
 
     setEstado('Validando citado…');
-    await clickValidarContinuar();
+    const ok5 = await clickValidarContinuar();
     await sleep(1500);
+    closeModals();
+    await sleep(600);
+    if (!ok5) {
+      setEstado('⚠️ "Validar y Continuar" (Citado) no encontrado. Reintentando…', 'warn');
+      await sleep(2000);
+      await clickValidarContinuar(8000);
+      await sleep(1500);
+      closeModals();
+      await sleep(500);
+    }
     pasoActual = 7; setPasos(PASOS, pasoActual);
 
     // ── FASE 6: Descripción de los hechos ────────────────────────────
     setEstado('Llenando descripción de los hechos…');
-    navigateTab('descripci');
-    await sleep(1000);
+    const navDesc = await navigateTab('descripci');
+    await sleep(1200);
+    if (!navDesc) {
+      setEstado('⚠️ No se pudo navegar a tab "Descripción". Reintentando…', 'warn');
+      await sleep(2000);
+      await navigateTab('descripci', 6000);
+      await sleep(1500);
+    }
+    closeModals();
+    await sleep(300);
+
     const textarea = document.querySelector('textarea');
     if (textarea) {
       textarea.focus();
@@ -424,19 +682,36 @@
       textarea.dispatchEvent(new Event('input', { bubbles: true }));
       textarea.dispatchEvent(new Event('change', { bubbles: true }));
     }
-    await sleep(400);
+    await sleep(500);
     await clickButton('Aceptar');
-    await sleep(1000);
+    await sleep(1200);
+    closeModals();
+    await sleep(500);
 
     // ── FASE 7: Resumen — el asesor da el clic final ─────────────────
-    navigateTab('resumen');
-    await sleep(1000);
+    const navRes = await navigateTab('resumen');
+    await sleep(1200);
+    if (!navRes) {
+      setEstado('⚠️ No se pudo navegar a tab "Resumen". Reintentando…', 'warn');
+      await sleep(2000);
+      await navigateTab('resumen', 6000);
+      await sleep(1500);
+    }
     setPasos(PASOS, 7);
     setEstado('✅ Formulario llenado. Revisa el Resumen y da clic en <strong>"Enviar solicitud"</strong>.', 'ok');
     setAcciones([
       { texto: '🔍 Ya envié, detectar acuse', estilo: 'verde', accion: detectarYReportar },
       { texto: '↻ Repetir llenado', accion: () => location.reload() },
     ]);
+
+    } catch (e) {
+      // Si algo falla en cualquier fase, mostrar en el panel qué pasó
+      console.error('[conciliacion-asistente] Error en llenado:', e);
+      setEstado(`❌ Error en el llenado: ${e.message}. Puedes reintentar o llenar manualmente.`, 'error');
+      setAcciones([
+        { texto: '↻ Reintentar llenado', accion: () => location.reload() },
+      ]);
+    }
   }
 
   // ─── Detección y reporte del acuse ──────────────────────────────────────
@@ -455,20 +730,17 @@
 
     setEstado(`📄 Folio detectado: <strong>${folio || 'pendiente'}</strong>. Buscando acuse…`, 'ok');
 
-    // Descargar acuse PDF (si hay enlace)
     let acuse = null;
     try {
       acuse = await descargarAcuse();
     } catch (_) { /* sin acuse */ }
 
-    // Screenshot del acuse
     let captura = null;
     try {
       const resp = await chrome.runtime.sendMessage({ action: 'captura' });
       if (resp && resp.ok) captura = resp.dataUrl.split(',')[1] || null;
     } catch (_) { /* sin captura */ }
 
-    // Reportar a la app
     setEstado('Guardando folio y acuse en la app…');
     const payload = {
       estado: 'completado',
@@ -504,7 +776,6 @@
   // ─── Inicio: pedir la tarea activa al background ────────────────────────
 
   async function init() {
-    // Solo actuar en la página de solicitud del portal
     if (!location.pathname.includes('/solicitudes/create')) return;
 
     try {
@@ -513,8 +784,6 @@
         tarea = resp.tarea;
         crearPanel();
 
-        // Si la página ya NO muestra el formulario (ej. se recargó en la
-        // confirmación tras el envío), no re-llenar: ir directo a detectar.
         const hayFormulario = !!byName('radioAviso') || !!byName('solicitante[nombre]');
         if (!hayFormulario) {
           setEstado('Formulario ya enviado. Detectando acuse…', 'ok');
@@ -530,6 +799,5 @@
     }
   }
 
-  // Esperar un poco a que la página esté lista
   setTimeout(init, 1200);
 })();

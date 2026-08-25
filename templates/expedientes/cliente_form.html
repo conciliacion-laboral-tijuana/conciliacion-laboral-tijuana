@@ -135,6 +135,12 @@
                         {% if form.tipo_persona_citado.errors %}<p class="text-red-500 text-xs mt-1">{{ form.tipo_persona_citado.errors.0 }}</p>{% endif %}
                         <p class="text-xs text-gray-400 mt-0.5">¿El patrón es persona física (dueño) o moral (empresa constituida)?</p>
                     </div>
+                    <div id="campo-empresa-curp" style="{% if form.tipo_persona_citado.value != 'fisica' %}display:none;{% endif %}">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.empresa_curp.label }}</label>
+                        {{ form.empresa_curp }}
+                        {% if form.empresa_curp.errors %}<p class="text-red-500 text-xs mt-1">{{ form.empresa_curp.errors.0 }}</p>{% endif %}
+                        <p class="text-xs text-gray-400 mt-0.5">Solo aplica si el patrón es persona física</p>
+                    </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.empresa_telefono.label }}</label>
                         {{ form.empresa_telefono }}
@@ -253,4 +259,17 @@
 {% endblock %}
 
 {% block extra_scripts %}
+<script>
+(function() {
+  const tipoSelect = document.getElementById('id_tipo_persona_citado');
+  const curpField = document.getElementById('campo-empresa-curp');
+  if (tipoSelect && curpField) {
+    function toggleCurp() {
+      curpField.style.display = tipoSelect.value === 'fisica' ? '' : 'none';
+    }
+    toggleCurp();
+    tipoSelect.addEventListener('change', toggleCurp);
+  }
+})();
+</script>
 {% endblock %}
