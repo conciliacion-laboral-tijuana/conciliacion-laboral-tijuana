@@ -74,6 +74,10 @@
     setCampo('id_empresa_numero', e.numero);
     setCampo('id_empresa_colonia', e.colonia);
     setCampo('id_empresa_cp', e.cp);
+    // Referencias: usar el domicilio completo como referencia
+    if (e.domicilio) {
+      setCampo('id_empresa_referencias', e.domicilio);
+    }
     const tipo = document.getElementById('id_tipo_persona_citado');
     if (tipo && e.tipo_persona) {
       const coincide = Array.from(tipo.options).some(o => o.value === e.tipo_persona);

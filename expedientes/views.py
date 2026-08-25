@@ -734,6 +734,7 @@ def buscar_empresas_catalogo(request):
                 'domicilio': e.domicilio,
                 'telefono': e.telefono,
                 'tipo_persona': e.tipo_persona,
+                'abogado': e.abogado or '',
                 'calle': e.domicilio_calle,
                 'numero': e.domicilio_numero,
                 'colonia': e.domicilio_colonia,
@@ -2260,40 +2261,139 @@ def machotes_descargar(request, pk, machote_id):
 
 @login_required
 def reportes_admin(request):
-    """Vista de reportes administrativos con estadísticas detalladas."""
+    """Vista de reportes administrativos con filtros y estadísticas detalladas."""
     if not hasattr(request.user, 'profile') or request.user.profile.rol not in ['admin', 'superadmin']:
         return redirect('dashboard_asesor')
 
-    qs = Expediente.objects.all()
+    # ── Filtros ──────────────────────────────────────────────────────
+    filtros = {}
+    oficina_filtro = request.GET.get('oficina', '')
+    estado_filtro = request.GET.get('estado', '')
+    asesor_filtro = request.GET.get('asesor', '')
+    fecha_desde = request.GET.get('fecha_desde', '')
+    fecha_hasta = request.GET.get('fecha_hasta', '')
 
-    # Reporte: casos por asesor
-    asesores = User.objects.filter(profile__rol='asesor').annotate(
-        total_casos=Count('expediente'),
-        casos_activos=Count('expediente', filter=~Q(expediente__estado='cerrado')),
-        casos_cerrados=Count('expediente', filter=Q(expediente__estado='cerrado')),
-        convenios=Count('expediente', filter=Q(expediente__estado='convenio')),
-        demandas=Count('expediente', filter=Q(expediente__estado='demanda')),
+    qs = Expediente.objects.select_related('cliente', 'asesor').all()
+
+    if oficina_filtro:
+        qs = qs.filter(cliente__oficina=oficina_filtro)
+        filtros['oficina'] = oficina_filtro
+    if estado_filtro:
+        qs = qs.filter(estado=estado_filtro)
+        filtros['estado'] = estado_filtro
+    if asesor_filtro:
+        qs = qs.filter(asesor_id=asesor_filtro)
+        filtros['asesor'] = asesor_filtro
+    if fecha_desde:
+        qs = qs.filter(created_at__date__gte=fecha_desde)
+        filtros['fecha_desde'] = fecha_desde
+    if fecha_hasta:
+        qs = qs.filter(created_at__date__lte=fecha_hasta)
+        filtros['fecha_hasta'] = fecha_hasta
+
+    # ── Estadísticas generales (con filtros aplicados) ────────────────
+    total_casos = qs.count()
+    total_cerrados = qs.filter(estado='cerrado').count()
+    total_convenios = qs.filter(estado='convenio').count()
+    total_demandas = qs.filter(estado='demanda').count()
+    total_monto_reclamado = qs.aggregate(total=Sum('monto_reclamado'))['total'] or 0
+    total_monto_convenio = qs.filter(estado='convenio').aggregate(total=Sum('monto_convenio'))['total'] or 0
+
+    # ── Casos por asesor ─────────────────────────────────────────────
+    asesor_qs = User.objects.filter(profile__rol='asesor')
+    if asesor_filtro:
+        asesor_qs = asesor_qs.filter(pk=asesor_filtro)
+    asesores = asesor_qs.annotate(
+        total_casos=Count('expediente', filter=Q(expediente__in=qs)),
+        casos_activos=Count('expediente', filter=Q(expediente__in=qs) & ~Q(expediente__estado='cerrado')),
+        casos_cerrados=Count('expediente', filter=Q(expediente__in=qs) & Q(expediente__estado='cerrado')),
+        convenios=Count('expediente', filter=Q(expediente__in=qs) & Q(expediente__estado='convenio')),
+        demandas=Count('expediente', filter=Q(expediente__in=qs) & Q(expediente__estado='demanda')),
     ).order_by('-total_casos')
 
-    # Audiencias semanales
+    # ── Audiencias semanales ─────────────────────────────────────────
     hoy = timezone.now()
     inicio_semana = hoy - timezone.timedelta(days=hoy.weekday())
     fin_semana = inicio_semana + timezone.timedelta(days=6)
-    audiencias_semanales = qs.filter(
+    audiencias_qs = qs.filter(
         fecha_audiencia__date__gte=inicio_semana.date(),
         fecha_audiencia__date__lte=fin_semana.date(),
     ).order_by('fecha_audiencia')
 
+    # ── Convenios (desde finanzas) ───────────────────────────────────
+    convenios_data = []
+    total_monto_agreements = 0
+    total_honorarios = 0
+    try:
+        from finanzas.models import Agreement, Commission
+        ag_qs = Agreement.objects.select_related('cliente', 'oficina', 'responsable').order_by('-fecha')
+        if oficina_filtro:
+            ag_qs = ag_qs.filter(oficina__nombre__icontains=oficina_filtro.replace('_', ' '))
+        if fecha_desde:
+            ag_qs = ag_qs.filter(fecha__gte=fecha_desde)
+        if fecha_hasta:
+            ag_qs = ag_qs.filter(fecha__lte=fecha_hasta)
+        convenios_data = ag_qs[:20]
+        total_monto_agreements = ag_qs.aggregate(total=Sum('monto_convenio'))['total'] or 0
+        total_honorarios = ag_qs.aggregate(total=Sum('honorarios'))['total'] or 0
+    except Exception:
+        pass
+
+    # ── Comisiones (desde finanzas) ──────────────────────────────────
+    comisiones_data = []
+    total_monto_comisiones = 0
+    comisiones_pendientes = 0
+    try:
+        from finanzas.models import Commission
+        com_qs = Commission.objects.select_related('asesor', 'oficina', 'expediente').order_by('-fecha')
+        if oficina_filtro:
+            com_qs = com_qs.filter(oficina__nombre__icontains=oficina_filtro.replace('_', ' '))
+        if asesor_filtro:
+            com_qs = com_qs.filter(asesor_id=asesor_filtro)
+        if fecha_desde:
+            com_qs = com_qs.filter(fecha__gte=fecha_desde)
+        if fecha_hasta:
+            com_qs = com_qs.filter(fecha__lte=fecha_hasta)
+        comisiones_data = com_qs[:20]
+        total_monto_comisiones = com_qs.filter(estado='pagada').aggregate(total=Sum('monto_comision'))['total'] or 0
+        comisiones_pendientes = com_qs.filter(estado='pendiente').aggregate(total=Sum('monto_comision'))['total'] or 0
+    except Exception:
+        pass
+
+    # ── Oficinas disponibles ─────────────────────────────────────────
+    oficinas = Cliente.OFICINA_CHOICES
+    asesores_list = User.objects.filter(profile__rol='asesor').order_by('first_name', 'username')
+    estados = Expediente.ESTADO_CHOICES
+
     context = {
         'asesores': asesores,
-        'audiencias_semanales': audiencias_semanales,
-        'total_casos': qs.count(),
-        'total_cerrados': qs.filter(estado='cerrado').count(),
-        'total_convenios': qs.filter(estado='convenio').count(),
-        'total_demandas': qs.filter(estado='demanda').count(),
+        'audiencias_semanales': audiencias_qs,
+        'total_casos': total_casos,
+        'total_cerrados': total_cerrados,
+        'total_convenios': total_convenios,
+        'total_demandas': total_demandas,
+        'total_monto_reclamado': total_monto_reclamado,
+        'total_monto_convenio': total_monto_convenio,
         'inicio_semana': inicio_semana,
         'fin_semana': fin_semana,
         'ESTADO_COLORS': ESTADO_COLORS,
+        # Filtros
+        'oficinas': oficinas,
+        'asesores_list': asesores_list,
+        'estados': estados,
+        'filtros': filtros,
+        'oficina_filtro': oficina_filtro,
+        'estado_filtro': estado_filtro,
+        'asesor_filtro': asesor_filtro,
+        'fecha_desde': fecha_desde,
+        'fecha_hasta': fecha_hasta,
+        # Convenios y comisiones
+        'convenios_data': convenios_data,
+        'total_monto_agreements': total_monto_agreements,
+        'total_honorarios': total_honorarios,
+        'comisiones_data': comisiones_data,
+        'total_monto_comisiones': total_monto_comisiones,
+        'comisiones_pendientes': comisiones_pendientes,
     }
 
     return render(request, 'expedientes/reportes_admin.html', context)

@@ -9,23 +9,78 @@
         Reportes Administrativos
     </h1>
 
+    <!-- Filtros -->
+    <div class="bg-white rounded shadow-sm border border-gray-200 p-4">
+        <form method="get" class="flex flex-wrap items-end gap-3">
+            <div>
+                <label class="block text-xs font-semibold text-gray-600 mb-1">Oficina</label>
+                <select name="oficina" class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">Todas</option>
+                    {% for valor, etiqueta in oficinas %}
+                    <option value="{{ valor }}" {% if oficina_filtro == valor %}selected{% endif %}>{{ etiqueta }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-gray-600 mb-1">Estado</label>
+                <select name="estado" class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">Todos</option>
+                    {% for valor, etiqueta in estados %}
+                    <option value="{{ valor }}" {% if estado_filtro == valor %}selected{% endif %}>{{ etiqueta }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-gray-600 mb-1">Asesor</label>
+                <select name="asesor" class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">Todos</option>
+                    {% for a in asesores_list %}
+                    <option value="{{ a.pk }}" {% if asesor_filtro == a.pk|stringformat:"d" %}selected{% endif %}>{{ a.get_full_name|default:a.username }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-gray-600 mb-1">Desde</label>
+                <input type="date" name="fecha_desde" value="{{ fecha_desde }}" class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-gray-600 mb-1">Hasta</label>
+                <input type="date" name="fecha_hasta" value="{{ fecha_hasta }}" class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            <button type="submit" class="px-4 py-1.5 bg-gray-800 text-white rounded-lg text-sm font-medium hover:bg-gray-700 transition-colors">
+                Filtrar
+            </button>
+            {% if filtros %}
+            <a href="{% url 'reportes_admin' %}" class="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 underline">Limpiar filtros</a>
+            {% endif %}
+        </form>
+    </div>
+
     <!-- Stats Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         <div class="bg-white rounded shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow">
-            <div class="text-sm text-gray-500 mb-1">Total Casos</div>
+            <div class="text-xs text-gray-500 mb-1">Total Casos</div>
             <div class="text-lg font-bold text-gray-800">{{ total_casos }}</div>
         </div>
         <div class="bg-white rounded shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow">
-            <div class="text-sm text-gray-500 mb-1">Casos Cerrados</div>
+            <div class="text-xs text-gray-500 mb-1">Cerrados</div>
             <div class="text-lg font-bold text-green-700">{{ total_cerrados }}</div>
         </div>
         <div class="bg-white rounded shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow">
-            <div class="text-sm text-gray-500 mb-1">Convenios</div>
+            <div class="text-xs text-gray-500 mb-1">Convenios</div>
             <div class="text-lg font-bold text-emerald-700">{{ total_convenios }}</div>
         </div>
         <div class="bg-white rounded shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow">
-            <div class="text-sm text-gray-500 mb-1">Demandas</div>
+            <div class="text-xs text-gray-500 mb-1">Demandas</div>
             <div class="text-lg font-bold text-red-700">{{ total_demandas }}</div>
+        </div>
+        <div class="bg-white rounded shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow">
+            <div class="text-xs text-gray-500 mb-1">Monto Reclamado</div>
+            <div class="text-lg font-bold text-amber-700">${{ total_monto_reclamado|floatformat:0|intcomma }}</div>
+        </div>
+        <div class="bg-white rounded shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow">
+            <div class="text-xs text-gray-500 mb-1">Monto Convenios</div>
+            <div class="text-lg font-bold text-green-700">${{ total_monto_convenio|floatformat:0|intcomma }}</div>
         </div>
     </div>
 
@@ -106,9 +161,110 @@
         </div>
     </div>
 
+    <!-- Convenios y Comisiones -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Convenios Recientes -->
+        <div class="bg-white rounded shadow-sm border border-gray-200">
+            <div class="px-4 py-2.5 border-b border-gray-200 flex items-center justify-between">
+                <h2 class="text-sm font-semibold text-gray-800 flex items-center gap-1.5">
+                    <img src="{% static 'svg/convenio.svg' %}" class="w-4 h-4 icon-darkblue"> Convenios
+                </h2>
+                <div class="flex gap-3 text-xs">
+                    <span class="text-gray-500">Monto: <strong class="text-green-700">${{ total_monto_agreements|floatformat:0|intcomma }}</strong></span>
+                    <span class="text-gray-500">Honorarios: <strong class="text-blue-700">${{ total_honorarios|floatformat:0|intcomma }}</strong></span>
+                </div>
+            </div>
+            <div class="overflow-x-auto max-h-80 overflow-y-auto">
+                <table class="w-full">
+                    <thead class="bg-gray-50 sticky top-0">
+                        <tr>
+                            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
+                            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Cliente</th>
+                            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Oficina</th>
+                            <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Monto</th>
+                            <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200">
+                        {% for conv in convenios_data %}
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-3 py-2 text-xs">{{ conv.fecha|date:"d/m/Y" }}</td>
+                            <td class="px-3 py-2 text-xs font-medium">{{ conv.cliente.nombre }}</td>
+                            <td class="px-3 py-2 text-xs">{{ conv.oficina }}</td>
+                            <td class="px-3 py-2 text-xs text-right font-medium text-green-700">${{ conv.monto_convenio|floatformat:0|intcomma }}</td>
+                            <td class="px-3 py-2 text-xs text-center">
+                                <span class="px-2 py-0.5 rounded-full text-xs
+                                    {% if conv.estado == 'firmado' %}bg-green-100 text-green-700
+                                    {% elif conv.estado == 'pagado' %}bg-blue-100 text-blue-700
+                                    {% elif conv.estado == 'parcial' %}bg-amber-100 text-amber-700
+                                    {% elif conv.estado == 'cancelado' %}bg-red-100 text-red-700
+                                    {% else %}bg-gray-100 text-gray-600{% endif %}">
+                                    {{ conv.get_estado_display }}
+                                </span>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="px-3 py-6 text-center text-xs text-gray-500">No hay convenios registrados.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Comisiones -->
+        <div class="bg-white rounded shadow-sm border border-gray-200">
+            <div class="px-4 py-2.5 border-b border-gray-200 flex items-center justify-between">
+                <h2 class="text-sm font-semibold text-gray-800 flex items-center gap-1.5">
+                    <img src="{% static 'svg/account-cash.svg' %}" class="w-4 h-4 icon-darkblue"> Comisiones
+                </h2>
+                <div class="flex gap-3 text-xs">
+                    <span class="text-gray-500">Pagadas: <strong class="text-green-700">${{ total_monto_comisiones|floatformat:0|intcomma }}</strong></span>
+                    <span class="text-gray-500">Pendientes: <strong class="text-amber-700">${{ comisiones_pendientes|floatformat:0|intcomma }}</strong></span>
+                </div>
+            </div>
+            <div class="overflow-x-auto max-h-80 overflow-y-auto">
+                <table class="w-full">
+                    <thead class="bg-gray-50 sticky top-0">
+                        <tr>
+                            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
+                            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Asesor</th>
+                            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Expediente</th>
+                            <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Comisión</th>
+                            <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200">
+                        {% for com in comisiones_data %}
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-3 py-2 text-xs">{{ com.fecha|date:"d/m/Y" }}</td>
+                            <td class="px-3 py-2 text-xs font-medium">{{ com.asesor.get_full_name|default:com.asesor.username }}</td>
+                            <td class="px-3 py-2 text-xs">{{ com.expediente.numero }}</td>
+                            <td class="px-3 py-2 text-xs text-right font-medium text-purple-700">${{ com.monto_comision|floatformat:0|intcomma }}</td>
+                            <td class="px-3 py-2 text-xs text-center">
+                                <span class="px-2 py-0.5 rounded-full text-xs
+                                    {% if com.estado == 'pagada' %}bg-green-100 text-green-700
+                                    {% elif com.estado == 'pendiente' %}bg-amber-100 text-amber-700
+                                    {% else %}bg-red-100 text-red-700{% endif %}">
+                                    {{ com.get_estado_display }}
+                                </span>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="px-3 py-6 text-center text-xs text-gray-500">No hay comisiones registradas.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
     <!-- Export Actions -->
     <div class="flex space-x-4">
-        <a href="{% url 'exportar_excel' %}"
+        <a href="{% url 'exportar_excel' %}{% if filtros %}?{% for k, v in filtros.items %}{{ k }}={{ v }}{% if not forloop.last %}&{% endif %}{% endfor %}{% endif %}"
            class="bg-gray-800 text-white px-4 py-2 rounded hover:bg-gray-700 transition-colors text-sm font-medium">
             <img src="{% static 'svg/arrow-down-bold-box-outline.svg' %}" class="w-3.5 h-3.5" style="filter: brightness(0) invert(1);"> Exportar a Excel
         </a>
