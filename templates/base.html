@@ -760,7 +760,7 @@
             var folio = esc(params.get('folio') || 'N/A');
             var tiempo = esc(params.get('tiempo') || '');
 
-            // Obtener SVGs desde elementos ocultos (evita {% %} dentro de JS)
+            // Obtener SVGs desde elementos ocultos (evita tag template dentro de JS)
             var svgCheck = document.getElementById('svg-toast-check').innerHTML;
             var svgClose = document.getElementById('svg-toast-close').innerHTML;
 
