@@ -18,12 +18,12 @@
                 <span class="badge" style="background:#6b7280; color:white;">Baja prioridad</span>
                 {% endif %}
             </div>
-            <div class="flex items-center space-x-1.5">
-                <a href="{% url 'calculo_laboral' expediente.pk %}" class="btn" style="background:#47505e; color:white; border-color:#36404f;"><img src="{% static 'svg/calculator.svg' %}" class="w-3.5 h-3.5" style="filter: brightness(0) invert(1);"> Cálculos</a>
-                <a href="{% url 'whatsapp_enviar' expediente.pk %}" class="btn btn-success"><img src="{% static 'svg/whatsapp.svg' %}" class="w-3.5 h-3.5" style="filter: brightness(0) invert(1);"> WhatsApp</a>
-                <a href="{% url 'solicitud_conciliacion' expediente.pk %}" class="btn" style="background:#47505e; color:white; border-color:#36404f;"><img src="{% static 'svg/file-document-multiple-outline.svg' %}" class="w-3.5 h-3.5" style="filter: brightness(0) invert(1);"> Solicitud</a>
+            <div class="flex items-center space-x-1.5 flex-wrap">
+                <a href="{% url 'calculo_laboral' expediente.pk %}" class="btn btn-dark"><img src="{% static 'svg/calculator.svg' %}" class="w-3.5 h-3.5" style="filter: brightness(0) invert(1);"> Cálculos</a>
+                <a href="{% url 'whatsapp_enviar' expediente.pk %}" class="btn btn-dark"><img src="{% static 'svg/whatsapp.svg' %}" class="w-3.5 h-3.5" style="filter: brightness(0) invert(1);"> WhatsApp</a>
+                <a href="{% url 'solicitud_conciliacion' expediente.pk %}" class="btn btn-dark"><img src="{% static 'svg/file-document-multiple-outline.svg' %}" class="w-3.5 h-3.5" style="filter: brightness(0) invert(1);"> Solicitud</a>
                 <div class="relative inline-block">
-                    <button onclick="this.nextElementSibling.classList.toggle('hidden')" class="btn" style="background:#1a6b3c; color:white; border-color:#145530;">{% svg 'globe' %} Conciliación ▾</button>
+                    <button onclick="this.nextElementSibling.classList.toggle('hidden')" class="btn btn-dark">{% svg 'globe' %} Conciliación ▾</button>
                     <div class="hidden absolute right-0 top-full mt-1 bg-white rounded-xl shadow-lg border border-gray-200 z-50 min-w-[250px] py-1" style="box-shadow: 0 10px 25px rgba(0,0,0,0.15);">
                         <a href="{% url 'enviar_conciliacion_automation' expediente.pk %}" class="block px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition flex items-center gap-2">
                             {% svg 'robot' %} Envío Automático
@@ -49,14 +49,14 @@
                     </div>
                 </div>
                 {% if user.profile.rol == 'admin' or user.profile.rol == 'superadmin' or user.profile.puede_generar_documentos %}
-                <a href="{% url 'machotes_listar' expediente.pk %}" class="btn btn-success"><img src="{% static 'svg/file-document-multiple-outline.svg' %}" class="w-3.5 h-3.5" style="filter: brightness(0) invert(1);"> Documentos</a>
-                <a href="{% url 'demanda_editor' expediente.pk %}" class="btn" style="background:#47505e; color:white; border-color:#36404f;"><img src="{% static 'svg/file-edit-outline.svg' %}" class="w-3.5 h-3.5" style="filter: brightness(0) invert(1);"> Demanda</a>
-                <a href="{% url 'demanda_asistente' expediente.pk %}" class="btn" style="background:#1D4ED8; color:white; border-color:#1e40af;"><i class="fas fa-list-check"></i> Asistente de Demanda</a>
+                <a href="{% url 'machotes_listar' expediente.pk %}" class="btn btn-dark"><img src="{% static 'svg/file-document-multiple-outline.svg' %}" class="w-3.5 h-3.5" style="filter: brightness(0) invert(1);"> Documentos</a>
+                <a href="{% url 'demanda_editor' expediente.pk %}" class="btn btn-dark"><img src="{% static 'svg/file-edit-outline.svg' %}" class="w-3.5 h-3.5" style="filter: brightness(0) invert(1);"> Demanda</a>
+                <a href="{% url 'demanda_asistente' expediente.pk %}" class="btn btn-dark"><i class="fas fa-list-check" style="filter: brightness(0) invert(1);"></i> Asistente de Demanda</a>
                 {% endif %}
-                <a href="{% url 'solicitar_transferencia' expediente.pk %}" class="btn" style="background:#8b3a3a; color:white; border-color:#6b2a2a;"><img src="{% static 'svg/file-edit-outline.svg' %}" class="w-3.5 h-3.5" style="filter: brightness(0) invert(1);"> Transferir</a>
-                <a href="{% url 'expediente_update' expediente.pk %}" class="btn btn-primary"><img src="{% static 'svg/application-edit-outline.svg' %}" class="w-3.5 h-3.5" style="filter: brightness(0) invert(1);"> Editar</a>
-                <a href="{% url 'cliente_update' expediente.cliente.pk %}" class="btn"><img src="{% static 'svg/account.svg' %}" class="w-3.5 h-3.5"> Editar Cliente</a>
-                <a href="{% url 'generar_pdf' expediente.pk %}" class="btn btn-danger"><img src="{% static 'svg/printer-outline.svg' %}" class="w-3.5 h-3.5" style="filter: brightness(0) invert(1);"> PDF</a>
+                <a href="{% url 'solicitar_transferencia' expediente.pk %}" class="btn btn-dark"><img src="{% static 'svg/file-edit-outline.svg' %}" class="w-3.5 h-3.5" style="filter: brightness(0) invert(1);"> Transferir</a>
+                <a href="{% url 'expediente_update' expediente.pk %}" class="btn btn-dark"><img src="{% static 'svg/application-edit-outline.svg' %}" class="w-3.5 h-3.5" style="filter: brightness(0) invert(1);"> Editar</a>
+                <a href="{% url 'cliente_update' expediente.cliente.pk %}" class="btn btn-dark"><img src="{% static 'svg/account.svg' %}" class="w-3.5 h-3.5" style="filter: brightness(0) invert(1);"> Editar Cliente</a>
+                <a href="{% url 'generar_pdf' expediente.pk %}" class="btn btn-dark"><img src="{% static 'svg/printer-outline.svg' %}" class="w-3.5 h-3.5" style="filter: brightness(0) invert(1);"> PDF</a>
             </div>
         </div>
 

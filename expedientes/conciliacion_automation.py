@@ -709,11 +709,11 @@ def _llenar_solicitante(page, cliente, fecha_nac_str, fecha_ing_str, fecha_sal_s
     try:
         loc = page.locator('[name="solicitante[curp]"]')
         if loc.count():
-            loc.pressSequentially(curp, delay=5)
+            loc.press_sequentially(curp, delay=5)
             page.wait_for_timeout(10)  # yield: React procese último input
-            logger.info('[4curp] CURP tipeado con pressSequentially, guardando...')
+            logger.info('[4curp] CURP tipeado con press_sequentially, guardando...')
     except Exception as e:
-        logger.warning('[4curp] pressSequentially error: %s', e)
+        logger.warning('[4curp] press_sequentially error: %s', e)
         _fill_input(page, 'solicitante[curp]', curp)
 
     # Click "Guardar" — inmediato, sin espera adicional
@@ -1173,7 +1173,7 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
             checkpoint('06_descripcion')
 
             # ════════════════════════════════════════════════════════════════
-            #  FASE 7: Resumen y Envío
+            #  FASE 7: Resumen, validación y Envío
             # ════════════════════════════════════════════════════════════════
             logger.info('[7] Navegando a resumen y enviando...')
 
@@ -1200,10 +1200,18 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
                 for err in errores[:3]:
                     logger.warning('  Error: %s (campo: %s)', err['msg'], err['name'])
 
-            # ════════════════════════════════════════════════════════════
-            #  FASE 7: Envío de la solicitud con manejo de navegación
-            # ════════════════════════════════════════════════════════════
-            logger.info('[7] Iniciando envío con expect_navigation...')
+            # ── Envío de la solicitud (robusto para Angular SPA) ────
+            #
+            # El portal de conciliación BC es un Angular SPA. Los clics
+            # en "Enviar solicitud" no siempre disparan navegación HTTP
+            # completa — el Angular Router maneja la transición client-side.
+            # Por eso NO dependemos de expect_navigation como único indicador.
+            # En su lugar:
+            #   1. Hacemos clic con JS directo (Angular event dispatch)
+            #   2. Esperamos SweetAlert y lo confirmamos
+            #   3. Monitoreamos cambio de URL, contenido, o descarga PDF
+            #   4. Reintentamos si el botón no respondió
+            logger.info('[7] Iniciando envío de solicitud...')
             navegacion_completa = False
             url_inicial = page.url
 
@@ -1218,7 +1226,7 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
                 curp_para_envio = _validar_curp(cliente.curp, corregir_checksum=False)
                 loc_curp = page.locator('[name="solicitante[curp]"]')
                 if loc_curp.count():
-                    loc_curp.pressSequentially(curp_para_envio, delay=10)
+                    loc_curp.press_sequentially(curp_para_envio, delay=10)
                     page.wait_for_timeout(50)
                     logger.info('[7curp] CURP re-tipeado en Resumen: %s', curp_para_envio[:12])
                 else:
@@ -1226,62 +1234,199 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
             except Exception as e:
                 logger.warning('[7curp] Error re-setting CURP: %s', e)
 
-            logger.info('[7a] Click en Enviar solicitud...')
-            _btn_click(page, 'enviar solicitud')
-
-            try:
-                page.wait_for_selector('.swal-overlay, .swal-modal, .modal.show', timeout=1500)
-                logger.info('[7a] SweetAlert detectado')
-                page.wait_for_timeout(300)
-            except Exception:
-                logger.info('[7a] Sin SweetAlert - navegación directa')
-
-            try:
-                with page.expect_navigation(timeout=45000):
-                    confirmed = False
-                    for sel in [
-                        '.swal-button--confirm',
-                        '.swal-button:not(.swal-button--cancel)',
-                        'button.swal-button',
-                    ]:
-                        try:
-                            btn = page.locator(sel).first
-                            if btn.count() > 0:
-                                btn.click(timeout=3000)
-                                logger.info('[7b] Confirmado con selector: %s', sel)
-                                confirmed = True
-                                break
-                        except Exception:
-                            continue
-                    if not confirmed:
-                        logger.info('[7b] Sin SweetAlert visible - navegación directa')
-
-                navegacion_completa = True
-                logger.info('[7] Navegación detectada! URL: %s → %s', url_inicial, page.url)
-            except Exception as nav_err:
-                logger.warning('[7] expect_navigation falló: %s', nav_err)
-                try:
-                    url_actual = page.url
-                    if url_actual and url_actual != url_inicial:
-                        logger.info('[7] Navegación detectada por cambio de URL: %s', url_actual)
-                        navegacion_completa = True
-                    else:
-                        logger.info('[7] URL sin cambios: %s', url_actual)
-                except Exception:
-                    logger.warning('[7] No se pudo obtener URL')
-
-            if not navegacion_completa:
-                logger.info('[7] Fallback: esperando carga de página...')
-                try:
-                    page.wait_for_load_state('networkidle', timeout=10000)
-                except Exception:
-                    page.wait_for_timeout(3000)
+            # ── Helper interno: detectar si la página cambió ──────
+            def _pagina_cambio():
+                """Retorna True si la URL o el contenido cambiaron post-submit."""
                 try:
                     if page.url != url_inicial:
-                        navegacion_completa = True
-                        logger.info('[7] Navegación confirmada en fallback: %s', page.url)
+                        return True
                 except Exception:
                     pass
+                # Verificar si apareció un folio o texto de éxito
+                try:
+                    txt = page.inner_text('body')[:3000].lower()
+                    if any(kw in txt for kw in [
+                        'folio', 'solicitud enviada', 'acuse', 'comprobante',
+                        'constancia', 'generadocumento', 'getFile',
+                        'se envió', 'registrada', 'éxito',
+                    ]):
+                        return True
+                except Exception:
+                    pass
+                # Verificar si apareció un link de descarga PDF
+                try:
+                    pdf_links = page.locator('a[href*=".pdf"], a[href*="getFile"], '
+                                            'a[href*="acuse"], a[href*="documento"]').count()
+                    if pdf_links > 0:
+                        return True
+                except Exception:
+                    pass
+                return False
+
+            # ── Helper interno: hacer clic en SweetAlert confirm ──
+            def _confirmar_sweet_alert():
+                """Intenta hacer clic en el botón de confirmación de SweetAlert.
+                Retorna True si hizo clic, False si no encontró SweetAlert."""
+                # Esperar a que aparezca (máx 3s)
+                try:
+                    page.wait_for_selector(
+                        '.swal-overlay--show-modal, .swal-overlay, '
+                        '.swal2-popup, .swal2-container, '
+                        '.modal.show, [role="dialog"]',
+                        timeout=3000
+                    )
+                    logger.info('[7a] Diálogo de confirmación detectado')
+                except Exception:
+                    logger.info('[7a] Sin diálogo de confirmación visible')
+                    return False
+
+                page.wait_for_timeout(500)
+
+                # Buscar y clickear botón de confirmación (SweetAlert 1 y 2)
+                confirm_selectors = [
+                    # SweetAlert 2 (probablemente lo que usa el portal)
+                    '.swal2-confirm', '.swal2-styled.swal2-confirm',
+                    '.swal2-actions button.swal2-confirm',
+                    # SweetAlert 1
+                    '.swal-button--confirm', '.swal-button:not(.swal-button--cancel)',
+                    'button.swal-button',
+                    # Genérico: cualquier botón "Sí" o "Confirmar" dentro del modal
+                    '.swal2-content button, .swal-modal button',
+                ]
+                for sel in confirm_selectors:
+                    try:
+                        btn = page.locator(sel).first
+                        if btn.count() > 0 and btn.is_visible(timeout=1000):
+                            btn.click(timeout=5000)
+                            logger.info('[7b] Confirmado con selector: %s', sel)
+                            return True
+                    except Exception:
+                        continue
+
+                # Fallback: buscar por texto en el modal
+                try:
+                    for texto in ['sí, enviar', 'si, enviar', 'aceptar', 'confirmar',
+                                  'enviar', 'ok', 'yes']:
+                        btn = page.locator('.swal2-popup button, .swal-modal button, '
+                                          '[role="dialog"] button').filter(
+                            has_text=re.compile(texto, re.IGNORECASE)
+                        ).first
+                        if btn.count() > 0:
+                            btn.click(timeout=3000)
+                            logger.info('[7b] Confirmado por texto: "%s"', texto)
+                            return True
+                except Exception:
+                    pass
+
+                logger.warning('[7b] No se encontró botón de confirmación en diálogo')
+                return False
+
+            # ── PASO 1: Clic en "Enviar solicitud" ──────────────────
+            logger.info('[7a] Click en Enviar solicitud...')
+            _btn_click(page, 'enviar solicitud')
+            page.wait_for_timeout(1000)
+
+            # Verificar si ya cambió la página (提交可能非常快)
+            if _pagina_cambio():
+                logger.info('[7a] Página cambió inmediatamente tras clic')
+                navegacion_completa = True
+
+            # ── PASO 2: Manejar diálogo de confirmación ────────────
+            if not navegacion_completa:
+                confirmado = _confirmar_sweet_alert()
+                if confirmado:
+                    # Esperar a que la navegación ocurra post-confirmación
+                    logger.info('[7b] Esperando navegación post-confirmación...')
+                    for wait_ms in [500, 1000, 2000, 3000, 5000]:
+                        page.wait_for_timeout(wait_ms)
+                        if _pagina_cambio():
+                            navegacion_completa = True
+                            logger.info('[7b] Navegación detectada tras %dms', sum(range(1, wait_ms + 1)))
+                            break
+
+                # ── PASO 2b: Si no hubo diálogo, intentar expect_navigation ──
+                if not navegacion_completa:
+                    logger.info('[7b] Sin diálogo - intentando expect_navigation...')
+                    try:
+                        with page.expect_navigation(timeout=15000):
+                            pass  # La navegación debería ocurrir por el clic anterior
+                        navegacion_completa = True
+                        logger.info('[7b] Navegación detectada via expect_navigation')
+                    except Exception:
+                        logger.info('[7b] expect_navigation no detectó nada')
+
+            # ── PASO 3: Verificar por URL, contenido, o downloads ──
+            if not navegacion_completa:
+                logger.info('[7c] Verificando cambio de URL/contenido...')
+                for wait_ms in [2000, 3000, 5000]:
+                    page.wait_for_timeout(wait_ms)
+                    if _pagina_cambio():
+                        navegacion_completa = True
+                        logger.info('[7c] Navegación detectada tras espera adicional')
+                        break
+
+            # ── PASO 4: Verificar si el botón no existía ───────────
+            if not navegacion_completa:
+                # Puede que el portal no esté en la pestaña Resumen,
+                # o el botón "Enviar solicitud" no esté en el DOM.
+                # Hacer diagnóstico completo.
+                logger.warning('[7d] No se detectó navegación tras enviar')
+                try:
+                    diag = page.evaluate("""() => {
+                        const url = window.location.href;
+                        const tabs = Array.from(document.querySelectorAll(
+                            '[role="tab"], .nav-link, .wizard-step a'
+                        )).map(t => ({
+                            text: t.textContent.trim().substring(0, 40),
+                            active: t.classList.contains('active') ||
+                                   t.getAttribute('aria-selected') === 'true',
+                            href: t.getAttribute('href') || ''
+                        }));
+                        const btns = Array.from(document.querySelectorAll('button')).map(
+                            b => b.textContent.trim().substring(0, 50)
+                        ).filter(t => t.length > 0);
+                        const swalVisible = !!document.querySelector(
+                            '.swal-overlay--show-modal, .swal2-popup'
+                        );
+                        const modalVisible = !!document.querySelector('.modal.show');
+                        return { url, tabs, btns, swalVisible, modalVisible };
+                    }""")
+                    logger.info('[7d] URL: %s', diag.get('url', ''))
+                    logger.info('[7d] Tabs activos: %s', [
+                        t for t in diag.get('tabs', []) if t.get('active')
+                    ])
+                    logger.info('[7d] Botones visibles: %s', diag.get('btns', [])[:15])
+                    logger.info('[7d] SweetAlert visible: %s', diag.get('swalVisible'))
+                    logger.info('[7d] Modal visible: %s', diag.get('modalVisible'))
+                except Exception as diag_err:
+                    logger.warning('[7d] Error en diagnóstico: %s', diag_err)
+
+                # Si hay un SweetAlert o modal que no pudimos confirmar,
+                # intentar una vez más con más agresividad
+                if diag.get('swalVisible') or diag.get('modalVisible'):
+                    logger.info('[7d] Reintentando confirmación de diálogo...')
+                    confirmado = _confirmar_sweet_alert()
+                    if confirmado:
+                        for wait_ms in [1000, 2000, 3000, 5000]:
+                            page.wait_for_timeout(wait_ms)
+                            if _pagina_cambio():
+                                navegacion_completa = True
+                                logger.info('[7d] Navegación detectada tras re-intento')
+                                break
+
+            # ── PASO 5: Retry completo si nada funcionó ────────────
+            if not navegacion_completa:
+                logger.info('[7e] Reintentando envío completo...')
+                page.wait_for_timeout(2000)
+                _btn_click(page, 'enviar solicitud')
+                page.wait_for_timeout(1000)
+                _confirmar_sweet_alert()
+                for wait_ms in [1000, 2000, 3000, 5000]:
+                    page.wait_for_timeout(wait_ms)
+                    if _pagina_cambio():
+                        navegacion_completa = True
+                        logger.info('[7e] Navegación detectada tras retry')
+                        break
 
             try:
                 page.wait_for_load_state('domcontentloaded', timeout=10000)
@@ -1314,10 +1459,34 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
                     except Exception:
                         pass
                     logger.warning('[7.5] Errores de validación detectados: %s', msgs)
-                    resultado.error = f'[DEPLOYED-ver4] El portal rechazó la solicitud. Errores: {msgs}{curp_diag}'
+                    resultado.error = f'[ver5] El portal rechazó la solicitud. Errores: {msgs}{curp_diag}'
                     resultado.detalle = f'URL={page.url} | ERRORES={msgs}{curp_diag}'
                     browser.close()
                     return resultado  # Salir temprano
+
+                # Si no hay errores de validación pero tampoco hubo navegación,
+                # significa que el botón "Enviar" no hizo nada — diagnóstico detallado
+                try:
+                    diag_texto = page.inner_text('body')[:1500]
+                    diag_url = page.url
+                    # Detectar si estamos en Resumen o en otra pestaña
+                    en_resumen = 'resumen' in diag_texto.lower() or 'resumen' in diag_url.lower()
+                    logger.warning('[7.5] Sin navegación ni errores. URL=%s, en_resumen=%s',
+                                   diag_url, en_resumen)
+                    logger.warning('[7.5] Texto (300c): %s', diag_texto[:300].replace('\n', ' | '))
+                    resultado.error = (
+                        f'[ver5] El botón "Enviar solicitud" no produjo resultado. '
+                        f'URL={diag_url} | en_resumen={en_resumen}'
+                    )
+                    resultado.detalle = (
+                        f'URL={diag_url} | '
+                        f'TEXTO={diag_texto[:800]}'
+                    )
+                    screenshot('07_5_boton_sin_respuesta')
+                    browser.close()
+                    return resultado
+                except Exception as diag_err:
+                    logger.warning('[7.5] Error en diagnóstico: %s', diag_err)
 
             # ════════════════════════════════════════════════════════════════
             #  FASE 8: Extraer folio + Descargar acuse PDF

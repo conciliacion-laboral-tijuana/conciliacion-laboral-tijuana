@@ -2808,6 +2808,23 @@ def extension_regenerar_token(request):
 
 
 @login_required
+@require_POST
+def extension_limpiar_tareas(request):
+    """Elimina todas las tareas de conciliación pendientes del usuario."""
+    tareas = TareaConciliacion.objects.filter(
+        expediente__in=get_expedientes_queryset(request.user),
+        estado='pendiente',
+    )
+    count = tareas.count()
+    tareas.delete()
+    if count:
+        messages.success(request, f'🗑️ {count} tarea{"s" if count != 1 else ""} pendiente{ "s" if count != 1 else ""} eliminada{ "s" if count != 1 else ""}.')
+    else:
+        messages.info(request, 'No había tareas pendientes que limpiar.')
+    return redirect('extension_config')
+
+
+@login_required
 def conciliacion_estado(request, task_pk):
     """
     API JSON: retorna el estado actual de una tarea de conciliación.

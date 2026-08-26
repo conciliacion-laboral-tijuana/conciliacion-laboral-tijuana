@@ -36,7 +36,19 @@
 
             <!-- Tareas pendientes -->
             <div class="bg-white border border-gray-200 rounded-lg p-4">
-                <h3 class="text-sm font-semibold text-gray-700 mb-2">{% svg 'clipboard-text' %} Tareas esperando a la extensión</h3>
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-sm font-semibold text-gray-700">{% svg 'clipboard-text' %} Tareas esperando a la extensión</h3>
+                    {% if tareas_pendientes %}
+                    <form method="post" action="{% url 'extension_limpiar_tareas' %}" class="inline"
+                          onsubmit="return confirm('¿Eliminar todas las tareas pendientes? La extensión no recibirá estas tareas.');">
+                        {% csrf_token %}
+                        <button type="submit"
+                                class="text-[10px] text-red-600 hover:text-red-800 hover:underline font-medium">
+                            🗑️ Limpiar todo
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
                 {% if tareas_pendientes %}
                 <ul class="space-y-2">
                     {% for t in tareas_pendientes %}

@@ -9,6 +9,7 @@ urlpatterns = [
     # Configuración de la extensión (token + instrucciones)
     path('extension/config/', views.extension_config, name='extension_config'),
     path('extension/regenerar-token/', views.extension_regenerar_token, name='extension_regenerar_token'),
+    path('extension/limpiar-tareas/', views.extension_limpiar_tareas, name='extension_limpiar_tareas'),
     # Descarga del paquete de la extensión (.zip)
     path('extension/descargar/', views.extension_descargar_paquete, name='extension_descargar'),
 
