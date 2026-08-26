@@ -73,21 +73,25 @@
     return new Promise(resolve => {
       const start = Date.now();
       const tryClick = () => {
-        // Prioridad: button > a > span/div/li con onclick > role=button
-        const selectors = [
-          'button', 'a', 'span[onclick]', 'div[onclick]', 'li[onclick]',
-          '[role="button"]', '[class*="btn"]', '[class*="button"]'
-        ];
-        for (const sel of selectors) {
-          for (const el of document.querySelectorAll(sel)) {
-            const txt = (el.textContent || '').trim().toLowerCase();
-            if (txt.includes(txtLower) && el.offsetParent !== null) {
-              el.click();
-              el.dispatchEvent(new Event('click', { bubbles: true }));
-              resolve(true);
-              return;
-            }
+        // Buscar en TODOS los elementos visibles del DOM
+        const all = document.querySelectorAll('*');
+        for (const el of all) {
+          const txt = (el.textContent || '').trim().toLowerCase();
+          if (!txt.includes(txtLower)) continue;
+          if (el.offsetParent === null && el.tagName !== 'BODY') continue;
+          const tag = el.tagName.toLowerCase();
+          const isBtn = tag === 'button' || tag === 'a' ||
+            el.getAttribute('role') === 'button' ||
+            (typeof el.className === 'string' &&
+             (el.className.includes('btn') || el.className.includes('button')));
+          if (!isBtn) {
+            const childBtn = el.querySelector('button, a, [role="button"]');
+            if (childBtn && (childBtn.textContent || '').trim().toLowerCase().includes(txtLower)) continue;
           }
+          el.click();
+          el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+          resolve(true);
+          return;
         }
         if (Date.now() - start < timeoutMs) setTimeout(tryClick, 300);
         else resolve(false);
@@ -485,20 +489,20 @@
       await sleep(1500);
     }
     let clickedSol = await clickButton('agregar solicitante', 6000);
-    await sleep(2500); // Esperar a que el formulario se expanda
+    await sleep(3500); // Esperar a que Angular renderice el formulario
     closeModals();
     await sleep(500);
 
     // Verificar que el formulario del solicitante se abrió
-    let formAbierto = !!byName('solicitante[nombre]') || !!byName('solicitante[curp]');
-    for (let retry = 0; retry < 3 && !formAbierto; retry++) {
+    let formAbierto = !!byName('solicitante[nombre]') || !!byName('solicitante[curp]') || !!byName('solicitante[primer_apellido]');
+    for (let retry = 0; retry < 5 && !formAbierto; retry++) {
       setEstado('⚠️ Formulario no visible, reintentando…', 'warn');
       await sleep(1000);
       await clickButton('agregar solicitante', 6000);
       await sleep(2500);
       closeModals();
       await sleep(500);
-      formAbierto = !!byName('solicitante[nombre]') || !!byName('solicitante[curp]');
+      formAbierto = !!byName('solicitante[nombre]') || !!byName('solicitante[curp]') || !!byName('solicitante[primer_apellido]');
     }
     if (!formAbierto) {
       setEstado('❌ No se pudo abrir el formulario del solicitante', 'error');

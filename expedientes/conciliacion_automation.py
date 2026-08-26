@@ -64,11 +64,21 @@ def _btn_click(page, texto_contiene, timeout=10000, retries=3):
     for attempt in range(retries):
         if attempt > 0:
             page.wait_for_timeout(800)
-        # ── Playwright locator (múltiples selectores) ────────────────
+        # ── Strategy 1: Playwright get_by_text (most reliable for Angular) ──
+        try:
+            btn = page.get_by_text(texto_contiene, exact=False).first
+            if btn.count() and btn.is_visible(timeout=2000):
+                btn.click(timeout=timeout)
+                logger.info('  _btn_click: clic en "%s" (intento %d, get_by_text)', texto_contiene, attempt + 1)
+                return True
+        except Exception:
+            pass
+        # ── Strategy 2: Playwright locator (múltiples selectores) ──────
         try:
             btn = page.locator(
                 'button, a, span[onclick], div[onclick], li[onclick], '
-                '[role="button"], [class*="btn"], [class*="button"]'
+                '[role="button"], [class*="btn"], [class*="button"], '
+                'fa-icon, mat-icon, i[class*="fa"]'
             ).filter(has_text=re.compile(re.escape(texto_contiene), re.IGNORECASE)).first
             if btn.count():
                 btn.click(timeout=timeout)
@@ -76,29 +86,43 @@ def _btn_click(page, texto_contiene, timeout=10000, retries=3):
                 return True
         except Exception:
             pass
-        # ── Fallback JS (más amplio: cualquier elemento clickeable) ──
+        # ── Strategy 3: JS con Angular-compatible event dispatch ──────
         try:
             result = page.evaluate(f"""(txt) => {{
                 const txtLower = txt.toLowerCase().trim();
-                // Prioridad: button > a > span/div/li con onclick > role=button
-                const selectors = [
-                    'button', 'a', 'span[onclick]', 'div[onclick]', 'li[onclick]',
-                    '[role="button"]', '[class*="btn"]', '[class*="button"]'
-                ];
-                for (const sel of selectors) {{
-                    for (const el of document.querySelectorAll(sel)) {{
-                        const t = el.textContent.trim().toLowerCase();
-                        if (t.includes(txtLower) && el.offsetParent !== null) {{
-                            el.click();
-                            el.dispatchEvent(new Event('click', {{bubbles: true}}));
-                            return true;
-                        }}
+                // Buscar en todos los elementos visibles
+                const all = document.querySelectorAll('*');
+                for (const el of all) {{
+                    const t = (el.textContent || '').trim().toLowerCase();
+                    if (!t.includes(txtLower)) continue;
+                    if (el.offsetParent === null && el.tagName !== 'BODY') continue;
+                    // Preferir elementos que sean botones o tengan role
+                    const tag = el.tagName.toLowerCase();
+                    const isBtn = tag === 'button' || tag === 'a' || 
+                        el.getAttribute('role') === 'button' ||
+                        (el.className && typeof el.className === 'string' && 
+                         (el.className.includes('btn') || el.className.includes('button')));
+                    // Solo clickear si es un botón o si es el elemento más específico
+                    if (!isBtn) {{
+                        // Verificar si tiene hijos que coinciden mejor
+                        const childBtn = el.querySelector('button, a, [role="button"]');
+                        if (childBtn && (childBtn.textContent || '').trim().toLowerCase().includes(txtLower)) continue;
                     }}
+                    el.click();
+                    el.dispatchEvent(new MouseEvent('click', {{bubbles: true, cancelable: true}}));
+                    // Para Angular: intentar disparar ngZone
+                    try {{
+                        const ngZone = window.ng && window.ng.getInjector && window.ng.getInjector(el);
+                        if (ngZone) {{
+                            ngZone.get(window.ng.coreTokens?.NgZone)?.run(() => {{}});
+                        }}
+                    }} catch(e) {{}}
+                    return true;
                 }}
                 return false;
             }}""", texto_contiene)
             if result:
-                logger.info('  _btn_click: clic en "%s" (intento %d, JS fallback)', texto_contiene, attempt + 1)
+                logger.info('  _btn_click: clic en "%s" (intento %d, JS/Angular)', texto_contiene, attempt + 1)
                 return True
         except Exception:
             pass
@@ -974,31 +998,54 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
 
             # ── 4b: Clic en "Agregar Solicitante" con reintentos ─────
             clicked = _btn_click(page, 'agregar solicitante', retries=5)
-            page.wait_for_timeout(2000)  # Esperar a que el formulario se expanda
+            page.wait_for_timeout(3000)  # Esperar a que Angular renderice el formulario
 
             # Verificar que el formulario se abrió (campos visibles)
             formulario_abierto = False
-            for _retry in range(3):
+            for _retry in range(5):
                 try:
                     formulario_abierto = page.evaluate("""() => {
-                        const el = document.querySelector('[name="solicitante[nombre]"]') ||
-                                   document.querySelector('[name="solicitante[curp]"]') ||
-                                   document.querySelector('[name="solicitante[primer_apellido]"]');
-                        return el !== null && el.offsetParent !== null;
+                        const names = ['solicitante[nombre]', 'solicitante[curp]',
+                                       'solicitante[primer_apellido]', 'solicitante[segundo_apellido]'];
+                        for (const n of names) {
+                            const el = document.querySelector(`[name="${n}"]`);
+                            if (el && el.offsetParent !== null) return true;
+                        }
+                        // Angular puede usar formControlName en lugar de name
+                        const fc = document.querySelector('[formcontrolname="nombre"]') ||
+                                   document.querySelector('[formcontrolname="curp"]') ||
+                                   document.querySelector('[formcontrolname="primerApellido"]');
+                        if (fc && fc.offsetParent !== null) return true;
+                        return false;
                     }""")
                 except Exception:
                     formulario_abierto = False
                 if formulario_abierto:
                     break
                 # Si no se abrió, intentar clic de nuevo con reintentos más agresivos
-                logger.warning('[4] Formulario no visible, reintentando clic (%d/3)...', _retry + 1)
-                page.wait_for_timeout(1000)
+                logger.warning('[4] Formulario no visible, reintentando clic (%d/5)...', _retry + 1)
+                page.wait_for_timeout(1500)
                 _btn_click(page, 'agregar solicitante', retries=5)
-                page.wait_for_timeout(2000)
+                page.wait_for_timeout(2500)
 
             if not formulario_abierto:
                 logger.warning('[4] Formulario del solicitante NO se pudo abrir tras reintentos')
-                # Tomar screenshot diagnóstico
+                # Tomar screenshot diagnóstico y listar elementos del wizard
+                try:
+                    diag = page.evaluate("""() => {
+                        const tabs = document.querySelectorAll('[role="tab"], .nav-link, .wizard-step a');
+                        const btns = document.querySelectorAll('button, [role="button"]');
+                        return {
+                            tabs: Array.from(tabs).map(t => t.textContent.trim().substring(0, 50)),
+                            buttons: Array.from(btns).map(b => b.textContent.trim().substring(0, 50)).filter(t => t.length > 0),
+                            url: window.location.href
+                        };
+                    }""")
+                    logger.info('[4diag] Wizard tabs: %s', diag.get('tabs', []))
+                    logger.info('[4diag] Buttons: %s', diag.get('buttons', []))
+                    logger.info('[4diag] URL: %s', diag.get('url', ''))
+                except Exception as diag_err:
+                    logger.warning('[4diag] Error reading page state: %s', diag_err)
                 checkpoint('04_solicitante_NO_ABIERTO')
             else:
                 logger.info('[4] Formulario del solicitante abierto correctamente')
