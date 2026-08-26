@@ -1,0 +1,126 @@
+{% extends "admin/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} | Conciliacion Laboral Tijuana{% endblock %}
+
+{% block branding %}
+<a href="{% url 'admin:index' %}" style="display:flex;align-items:center;gap:10px;text-decoration:none;">
+    <img src="{% static 'img/logo.png' %}" alt="Logo"
+         style="height:32px;width:auto;border-radius:4px;">
+    <span style="font-size:15px;font-weight:700;color:#fff;letter-spacing:0.02em;white-space:nowrap;">
+        Conciliacion Laboral Tijuana
+    </span>
+</a>
+{% endblock %}
+
+{% block extrastyle %}
+{{ block.super }}
+<style>
+    /* ─── Header branding ─────────────────────────────────────────── */
+    #header {
+        background: #1e2530 !important;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 6px 16px !important;
+        min-height: 44px;
+    }
+    #header a:link, #header a:visited {
+        color: #fff;
+    }
+    #branding {
+        display: flex;
+        align-items: center;
+    }
+    #branding h1 {
+        margin: 0;
+        padding: 0;
+        font-size: 0;
+    }
+    #header .login-info {
+        font-size: 11px;
+        color: #9ca3af;
+        margin-left: auto;
+    }
+
+    /* ─── Nav bar: match main app ─────────────────────────────────── */
+    #nav-bar {
+        background: #2a3340 !important;
+        border-bottom: none;
+        padding: 0 12px;
+        min-height: 32px;
+    }
+    #nav-bar a {
+        color: #d1d5db !important;
+        font-size: 11px;
+        font-weight: 500;
+        padding: 6px 10px;
+        text-decoration: none;
+        transition: color .15s;
+    }
+    #nav-bar a:hover {
+        color: #fff !important;
+    }
+    #nav-bar a:focus, #nav-bar a:active {
+        color: #fff !important;
+    }
+    #user-tools {
+        font-size: 11px;
+        margin: 0;
+    }
+    #user-tools a {
+        color: #9ca3af !important;
+    }
+    #user-tools a:hover {
+        color: #fff !important;
+    }
+
+    /* ─── Content area compact ─────────────────────────────────────── */
+    #content {
+        padding: 10px 16px !important;
+    }
+    #content-main {
+        min-width: 0;
+    }
+
+    /* ─── Footer ──────────────────────────────────────────────────── */
+    #footer {
+        background: #f5f6f7;
+        border-top: 1px solid #d4d6d9;
+        font-size: 10px;
+        color: #868d98;
+        padding: 8px 16px;
+    }
+
+    /* ─── Links: brand blue ───────────────────────────────────────── */
+    a:link, a:visited {
+        color: #36404f;
+    }
+    a:hover {
+        color: #1e2530;
+    }
+
+    /* ─── Breadcrumbs: clean ──────────────────────────────────────── */
+    .breadcrumbs {
+        background: #f5f6f7;
+        border-bottom: 1px solid #d4d6d9;
+        padding: 6px 12px;
+        font-size: 11px;
+    }
+    .breadcrumbs a {
+        color: #47505e;
+    }
+
+    /* ─── Module headers: match brand ─────────────────────────────── */
+    .module h2, .module caption {
+        background: #f0f2f5 !important;
+        color: #2a3340 !important;
+        border-bottom: 2px solid #d4d6d9 !important;
+        font-size: 11px !important;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+</style>
+{% endblock %}
+
+{% block nav-global %}{% endblock %}
