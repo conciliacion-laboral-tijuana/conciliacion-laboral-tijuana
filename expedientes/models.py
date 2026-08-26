@@ -298,6 +298,16 @@ class Expediente(models.Model):
                                   choices=[('baja', 'Baja'), ('media', 'Media'), ('alta', 'Alta')],
                                   default='media')
 
+    # Comprobantes para WhatsApp
+    comprobante_convenio = models.ImageField(
+        'Comprobante de convenio', upload_to='comprobantes/', blank=True, null=True,
+        help_text='Imagen del comprobante que indica fecha y monto del convenio'
+    )
+    comprobante_pago = models.ImageField(
+        'Comprobante de pago', upload_to='comprobantes/', blank=True, null=True,
+        help_text='Imagen del comprobante de pago enviado al admin de conciliación'
+    )
+
     # Automatización WhatsApp
     notificar_whatsapp_auto = models.BooleanField(
         'Notificaciones WhatsApp automáticas', default=True,

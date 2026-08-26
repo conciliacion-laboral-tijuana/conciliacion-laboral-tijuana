@@ -782,6 +782,34 @@ def subir_documento(request, pk):
 
 
 @login_required
+@require_POST
+def subir_comprobante(request, pk):
+    """Sube un comprobante (convenio o pago) a un expediente."""
+    expediente = get_object_or_404(get_expedientes_queryset(request.user), pk=pk)
+    tipo = request.POST.get('tipo', '')  # 'convenio' o 'pago'
+    archivo = request.FILES.get('archivo')
+
+    if not archivo or tipo not in ('convenio', 'pago'):
+        messages.error(request, 'Datos inválidos.')
+        return redirect('expediente_detail', pk=pk)
+
+    if tipo == 'convenio':
+        expediente.comprobante_convenio = archivo
+    else:
+        expediente.comprobante_pago = archivo
+    expediente.save()
+
+    registrar_movimiento(
+        expediente=expediente,
+        usuario=request.user,
+        accion='subida_documento',
+        detalle=f'Comprobante de {tipo} subido: {archivo.name}'
+    )
+    messages.success(request, f'Comprobante de {tipo} subido correctamente.')
+    return redirect('expediente_detail', pk=pk)
+
+
+@login_required
 def eliminar_documento(request, pk):
     doc = get_object_or_404(Documento, pk=pk)
     expediente = doc.expediente

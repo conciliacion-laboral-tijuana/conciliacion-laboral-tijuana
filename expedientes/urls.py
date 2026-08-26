@@ -47,6 +47,7 @@ urlpatterns = [
 
     # Documentos
     path('expedientes/<int:pk>/documentos/subir/', views.subir_documento, name='subir_documento'),
+    path('expedientes/<int:pk>/comprobante/subir/', views.subir_comprobante, name='subir_comprobante'),
     path('documentos/<int:pk>/eliminar/', views.eliminar_documento, name='eliminar_documento'),
 
     # Calendario
