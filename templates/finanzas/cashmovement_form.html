@@ -108,24 +108,24 @@ document.addEventListener('DOMContentLoaded', function() {
 
         var esIngreso = tipo.value === 'ingreso';
         var categoriasIngreso = [
-            ['convenio', '{% svg 'handshake' %} Pago de convenio'],
-            ['cliente', '{% svg 'account' %} Pago de cliente'],
-            ['anticipo', '{% svg 'clipboard-text' %} Anticipo'],
-            ['devolucion', '{% svg 'refresh' %} Devolución'],
-            ['otro_ingreso', '{% svg 'refresh' %} Otro ingreso'],
+            ['convenio', 'Pago de convenio'],
+            ['cliente', 'Pago de cliente'],
+            ['anticipo', 'Anticipo'],
+            ['devolucion', 'Devolucion'],
+            ['otro_ingreso', 'Otro ingreso'],
         ];
         var categoriasEgreso = [
-            ['papeleria', '{% svg 'paperclip' %} Papelería'],
-            ['gasolina', '{% svg 'gas-station' %} Gasolina'],
-            ['renta', '{% svg 'office-building' %} Renta'],
-            ['luz', '{% svg 'lightbulb' %} Luz'],
-            ['agua', '{% svg 'water' %} Agua'],
-            ['internet', '{% svg 'globe' %} Internet'],
-            ['telefono', '{% svg 'phone' %} Teléfono'],
-            ['viaticos', '{% svg 'car' %} Viáticos'],
-            ['comisiones', '{% svg 'account-group' %} Comisiones'],
-            ['honorarios', '{% svg 'scale' %} Honorarios'],
-            ['otro_egreso', '{% svg 'refresh' %} Otro egreso'],
+            ['papeleria', 'Papeleria'],
+            ['gasolina', 'Gasolina'],
+            ['renta', 'Renta'],
+            ['luz', 'Luz'],
+            ['agua', 'Agua'],
+            ['internet', 'Internet'],
+            ['telefono', 'Telefono'],
+            ['viaticos', 'Viaticos'],
+            ['comisiones', 'Comisiones'],
+            ['honorarios', 'Honorarios'],
+            ['otro_egreso', 'Otro egreso'],
         ];
 
         var opciones = esIngreso ? categoriasIngreso : categoriasEgreso;

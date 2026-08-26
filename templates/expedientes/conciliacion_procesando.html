@@ -220,6 +220,12 @@
 {% endblock %}
 
 {% block extra_scripts %}
+<!-- SVGs para JavaScript (referenciados por ID desde <script>) -->
+<span id="svg-pendiente" style="display:none;">{% svg 'clipboard-text' %}</span>
+<span id="svg-ejecutando" style="display:none;">{% svg 'robot' %}</span>
+<span id="svg-completado" style="display:none;">{% svg 'check-circle' %}</span>
+<span id="svg-fallido" style="display:none;">{% svg 'close-circle' %}</span>
+
 <script>
 (function() {
     const TASK_ID = {{ task.pk }};
@@ -267,13 +273,20 @@
     }
 
     function updateProgress(estado) {
+        const iconMap = {
+            'pendiente': document.getElementById('svg-pendiente').innerHTML,
+            'ejecutando': document.getElementById('svg-ejecutando').innerHTML,
+            'completado': document.getElementById('svg-completado').innerHTML,
+            'fallido': document.getElementById('svg-fallido').innerHTML,
+        };
         const steps = {
-            'pendiente': { width: '10%', text: 'Preparando...', step: '1/8', icon: '{% svg 'clipboard-text' %}' },
-            'ejecutando': { width: '30%', text: 'Enviando al portal...', step: '3/8', icon: '{% svg 'robot' %}' },
-            'completado': { width: '100%', text: '¡Completado!', step: '8/8', icon: '{% svg 'check-circle' %}' },
-            'fallido': { width: '60%', text: 'Error', step: '—', icon: '{% svg 'close-circle' %}' },
+            'pendiente': { width: '10%', text: 'Preparando...', step: '1/8' },
+            'ejecutando': { width: '30%', text: 'Enviando al portal...', step: '3/8' },
+            'completado': { width: '100%', text: '¡Completado!', step: '8/8' },
+            'fallido': { width: '60%', text: 'Error', step: '—' },
         };
         const s = steps[estado] || steps['pendiente'];
+        s.icon = iconMap[estado] || iconMap['pendiente'];
         progressBar.style.width = s.width;
         progressText.textContent = s.step;
         if (statusIcon) statusIcon.textContent = s.icon;

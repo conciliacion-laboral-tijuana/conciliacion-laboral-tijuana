@@ -329,7 +329,7 @@ function guardarBorrador() {
         }
     }
     localStorage.setItem('solicitudConciliacion_' + '{{ expediente.pk }}', JSON.stringify(obj));
-    alert('{% svg 'check-circle' %} Borrador guardado localmente.');
+    alert('\u2705 Borrador guardado localmente.');
 }
 
 // Auto-cargar borrador si existe

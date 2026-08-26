@@ -744,6 +744,10 @@
     </script>
     {% endif %}
 
+    <!-- SVGs para JavaScript (referenciados por ID desde <script>) -->
+    <span id="svg-toast-check" style="display:none;">{% svg 'check-circle' %}</span>
+    <span id="svg-toast-close" style="display:none;">{% svg 'close' %}</span>
+
     <script>
     // ─── Toast de conciliación exitosa ──────────────────────────────────
     // Detecta si venimos de una conciliación exitosa (query params) y muestra un toast
@@ -755,6 +759,10 @@
         if (params.get('conciliacion_ok') === '1') {
             var folio = esc(params.get('folio') || 'N/A');
             var tiempo = esc(params.get('tiempo') || '');
+
+            // Obtener SVGs desde elementos ocultos (evita {% %} dentro de JS)
+            var svgCheck = document.getElementById('svg-toast-check').innerHTML;
+            var svgClose = document.getElementById('svg-toast-close').innerHTML;
 
             // Crear el toast
             var toast = document.createElement('div');
@@ -778,13 +786,13 @@
             ].join(';');
 
             toast.innerHTML = '<div style="display:flex;align-items:flex-start;gap:10px;">' +
-                '<span style="font-size:20px;flex-shrink:0;">{% svg 'check-circle' %}</span>' +
+                '<span style="font-size:20px;flex-shrink:0;">' + svgCheck + '</span>' +
                 '<div>' +
                 '<div style="font-weight:700;margin-bottom:2px;">Solicitud de Conciliación Enviada</div>' +
                 '<div style="font-size:12px;opacity:0.9;">Folio: <strong>' + folio + '</strong></div>' +
                 (tiempo ? '<div style="font-size:11px;opacity:0.75;margin-top:2px;">⏱ ' + tiempo + '</div>' : '') +
                 '</div>' +
-                '<button onclick="this.parentElement.parentElement.remove()" style="background:none;border:none;color:rgba(255,255,255,0.7);cursor:pointer;font-size:16px;padding:0 2px;flex-shrink:0;">{% svg 'close' %}</button>' +
+                '<button onclick="this.parentElement.parentElement.remove()" style="background:none;border:none;color:rgba(255,255,255,0.7);cursor:pointer;font-size:16px;padding:0 2px;flex-shrink:0;">' + svgClose + '</button>' +
                 '</div>';
 
             document.body.appendChild(toast);
