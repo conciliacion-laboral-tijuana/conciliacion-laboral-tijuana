@@ -1,0 +1,198 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static %}
+
+{% block extrastyle %}{{ block.super }}
+<style>
+    body.login {
+        background: #1e2530;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+    }
+    #container {
+        background: transparent;
+        border: none;
+        box-shadow: none;
+        width: 100%;
+        max-width: 400px;
+        margin: 0 auto;
+        padding: 0;
+    }
+    #content {
+        background: #fff;
+        border-radius: 6px;
+        border: 1px solid #d4d6d9;
+        box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+        padding: 0 !important;
+        margin: 0;
+        overflow: hidden;
+    }
+    /* Logo banner above the form */
+    .login-logo-banner {
+        background: #1e2530;
+        padding: 28px 20px 22px;
+        text-align: center;
+        border-bottom: 3px solid #3d6b4d;
+    }
+    .login-logo-banner img {
+        height: 52px;
+        width: auto;
+        margin-bottom: 10px;
+        display: block;
+        margin-left: auto;
+        margin-right: auto;
+    }
+    .login-logo-banner h1 {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 700;
+        color: #ffffff;
+        letter-spacing: 0.02em;
+    }
+    .login-logo-banner p {
+        margin: 4px 0 0;
+        font-size: 11px;
+        color: #9ca3af;
+    }
+    /* Form area */
+    #content-main {
+        padding: 24px 28px 28px;
+    }
+    #content-main h1 {
+        display: none;
+    }
+    .form-row {
+        padding: 8px 0;
+        border-bottom: 1px solid #f0f2f5;
+    }
+    .form-row:last-of-type {
+        border-bottom: none;
+    }
+    .form-row label {
+        display: block;
+        font-size: 11px;
+        font-weight: 600;
+        color: #47505e;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        margin-bottom: 4px;
+    }
+    .form-row input[type="text"],
+    .form-row input[type="password"] {
+        width: 100%;
+        padding: 8px 10px;
+        font-size: 13px;
+        border: 1px solid #b0b5bd;
+        border-radius: 3px;
+        background: #f8f9fa;
+        box-sizing: border-box;
+    }
+    .form-row input:focus {
+        border-color: #47505e;
+        box-shadow: 0 0 0 1px #47505e;
+        outline: none;
+        background: #fff;
+    }
+    .submit-row {
+        padding: 16px 0 0;
+        text-align: center;
+    }
+    .submit-row input[type="submit"] {
+        width: 100%;
+        padding: 10px;
+        background: #1e2530;
+        color: #fff;
+        border: none;
+        border-radius: 4px;
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: background .15s;
+    }
+    .submit-row input[type="submit"]:hover {
+        background: #2a3340;
+    }
+    .errornote {
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        color: #991b1b;
+        border-radius: 4px;
+        padding: 10px 14px;
+        font-size: 12px;
+        margin-bottom: 16px;
+    }
+    /* Hide default header on login page */
+    #header {
+        display: none;
+    }
+    #nav-bar {
+        display: none;
+    }
+    #footer {
+        background: transparent;
+        border: none;
+        color: #6b7280;
+        text-align: center;
+        padding: 12px;
+        font-size: 10px;
+    }
+    #footer a {
+        color: #9ca3af;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+    <div class="login-logo-banner">
+        <img src="{% static 'img/logo.png' %}" alt="Conciliacion Laboral Tijuana">
+        <h1>Conciliacion Laboral Tijuana</h1>
+        <p>Panel de Administracion</p>
+    </div>
+
+    <div style="padding: 24px 28px 28px;">
+        {% if form.errors and not form.non_field_errors %}
+        <p class="errornote">
+            {% if form.errors.items|length == 1 %}{% translate "Please correct the error below." %}{% else %}{% translate "Please correct the errors below." %}{% endif %}
+        </p>
+        {% endif %}
+
+        {% if form.non_field_errors %}
+        {% for error in form.non_field_errors %}
+        <p class="errornote">
+            {% if forloop.first %}{% translate "Please correct the error below." %}{% else %}{% if forloop.last %}{% translate "Please correct the errors below." %}{% else %}{% endif %}{% endif %}
+            {{ error }}
+        </p>
+        {% endfor %}
+        {% endif %}
+
+        <form action="{{ app_path }}" method="post" id="login-form">
+            {% csrf_token %}
+            <div class="form-row">
+                <label for="id_username" class="required">Usuario</label>
+                <input type="text" name="username" autofocus autocapitalize="none"
+                       autocomplete="username" maxlength="150" required id="id_username"
+                       value="{{ form.username.value|default:'' }}">
+            </div>
+            <div class="form-row">
+                <label for="id_password" class="required">Contrasena</label>
+                <input type="password" name="password" autocomplete="current-password"
+                       required id="id_password">
+            </div>
+            <input type="hidden" name="next" value="{{ next }}">
+            <div class="submit-row">
+                <input type="submit" value="{% translate 'Log in' %}">
+            </div>
+        </form>
+
+        <p style="text-align:center;margin-top:16px;font-size:11px;">
+            <a href="{% url 'password_reset' %}" style="color:#47505e;">{% translate "Forgotten your username or password?" %}</a>
+        </p>
+    </div>
+</div>
+{% endblock %}
+
+{% block footer %}
+{{ block.super }}
+{% endblock %}
