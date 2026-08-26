@@ -53,29 +53,57 @@ URL_SOLICITUD = f'{URL_BASE}/solicitudes/create-public?solicitud=1'
 # ══════════════════════════════════════════════════════════════════════════
 
 
-def _btn_click(page, texto_contiene, timeout=10000):
-    """Busca un botón cuyo texto contenga el string dado y hace clic."""
-    try:
-        btn = page.locator('button, a').filter(has_text=re.compile(re.escape(texto_contiene), re.IGNORECASE)).first
-        if btn.count():
-            btn.click(timeout=timeout)
-            return True
-    except Exception:
-        pass
-    # Fallback JS
-    try:
-        return page.evaluate(f"""(txt) => {{
-            for (const el of document.querySelectorAll('button, a')) {{
-                if (el.textContent.trim().toLowerCase().includes(txt.toLowerCase()) && el.offsetParent !== null) {{
-                    el.click();
-                    el.dispatchEvent(new Event('click', {{bubbles: true}}));
-                    return true;
+def _btn_click(page, texto_contiene, timeout=10000, retries=3):
+    """Busca un botón cuyo texto contenga el string dado y hace clic.
+    
+    Busca en button, a, span, div, li (el portal BC usa varios tipos).
+    Reintenta `retries` veces con 800ms entre intentos.
+    Retorna True si hizo clic, False si no encontró nada.
+    """
+    txt_lower = texto_contiene.strip().lower()
+    for attempt in range(retries):
+        if attempt > 0:
+            page.wait_for_timeout(800)
+        # ── Playwright locator (múltiples selectores) ────────────────
+        try:
+            btn = page.locator(
+                'button, a, span[onclick], div[onclick], li[onclick], '
+                '[role="button"], [class*="btn"], [class*="button"]'
+            ).filter(has_text=re.compile(re.escape(texto_contiene), re.IGNORECASE)).first
+            if btn.count():
+                btn.click(timeout=timeout)
+                logger.info('  _btn_click: clic en "%s" (intento %d, locator)', texto_contiene, attempt + 1)
+                return True
+        except Exception:
+            pass
+        # ── Fallback JS (más amplio: cualquier elemento clickeable) ──
+        try:
+            result = page.evaluate(f"""(txt) => {{
+                const txtLower = txt.toLowerCase().trim();
+                // Prioridad: button > a > span/div/li con onclick > role=button
+                const selectors = [
+                    'button', 'a', 'span[onclick]', 'div[onclick]', 'li[onclick]',
+                    '[role="button"]', '[class*="btn"]', '[class*="button"]'
+                ];
+                for (const sel of selectors) {{
+                    for (const el of document.querySelectorAll(sel)) {{
+                        const t = el.textContent.trim().toLowerCase();
+                        if (t.includes(txtLower) && el.offsetParent !== null) {{
+                            el.click();
+                            el.dispatchEvent(new Event('click', {{bubbles: true}}));
+                            return true;
+                        }}
+                    }}
                 }}
-            }}
-            return false;
-        }}""", texto_contiene)
-    except Exception:
-        return False
+                return false;
+            }}""", texto_contiene)
+            if result:
+                logger.info('  _btn_click: clic en "%s" (intento %d, JS fallback)', texto_contiene, attempt + 1)
+                return True
+        except Exception:
+            pass
+    logger.warning('  _btn_click: NO se encontró "%s" tras %d intentos', texto_contiene, retries)
+    return False
 
 
 def _fill_input(page, name, valor):
@@ -176,32 +204,65 @@ def _click_radio(page, name, value):
         return False
 
 
-def _navigate_wizard_tab(page, texto_contiene):
-    """Navega a un tab del wizard por su texto."""
-    try:
-        locator = page.locator('.wizard-step a, .nav-link, .step-title').filter(
-            has_text=re.compile(re.escape(texto_contiene), re.IGNORECASE)
-        ).first
-        if locator.count():
-            locator.click()
+def _navigate_wizard_tab(page, texto_contiene, retries=3):
+    """Navega a un tab del wizard por su texto.
+    
+    Busca en múltiples selectores del wizard BC y reintenta si no lo encuentra.
+    Retorna True si navegó, False si no encontró el tab.
+    """
+    txt_lower = texto_contiene.strip().lower()
+    for attempt in range(retries):
+        if attempt > 0:
             page.wait_for_timeout(800)
-            return True
-    except Exception:
-        pass
-    try:
-        return page.evaluate(f"""(kw) => {{
-            for (const el of document.querySelectorAll('.wizard-step a, .nav-link, .step-title, a[class*="step"]')) {{
-                const txt = el.textContent.trim().toLowerCase();
-                if (txt.includes(kw.toLowerCase())) {{
-                    el.click();
-                    el.dispatchEvent(new Event('click', {{bubbles: true}}));
-                    return true;
+        # ── Playwright locator ───────────────────────────────────────
+        try:
+            selector = ', '.join([
+                '.wizard-step a', '.nav-link', '.step-title',
+                'a[class*="step"]', '.nav-item a', '.tab-link',
+                '.wizard a', '[role="tab"]', '.wizard-step',
+                'li a', '.nav-tabs a', '.nav-tabs li',
+            ])
+            locator = page.locator(selector).filter(
+                has_text=re.compile(re.escape(texto_contiene), re.IGNORECASE)
+            ).first
+            if locator.count():
+                locator.click()
+                page.wait_for_timeout(800)
+                logger.info('  _navigate_wizard_tab: clic en "%s" (locator)', texto_contiene)
+                return True
+        except Exception:
+            pass
+        # ── Fallback JS ──────────────────────────────────────────────
+        try:
+            result = page.evaluate(f"""(kw) => {{
+                const kwLower = kw.toLowerCase().trim();
+                const selectors = [
+                    '.wizard-step a', '.nav-link', '.step-title',
+                    'a[class*="step"]', '.nav-item a', '.tab-link',
+                    '.wizard a', '[role="tab"]', '.wizard-step',
+                    'li a', '.nav-tabs a', '.nav-tabs li',
+                    'a', 'li', 'span'
+                ];
+                for (const sel of selectors) {{
+                    for (const el of document.querySelectorAll(sel)) {{
+                        const txt = el.textContent.trim().toLowerCase();
+                        if (txt.includes(kwLower) && el.offsetParent !== null) {{
+                            el.click();
+                            el.dispatchEvent(new Event('click', {{bubbles: true}}));
+                            return true;
+                        }}
+                    }}
                 }}
-            }}
-            return false;
-        }}""", texto_contiene)
-    except Exception:
-        return False
+                return false;
+            }}""", texto_contiene)
+            if result:
+                page.wait_for_timeout(800)
+                logger.info('  _navigate_wizard_tab: clic en "%s" (JS fallback)', texto_contiene)
+                return True
+        except Exception:
+            pass
+    logger.warning('  _navigate_wizard_tab: NO se encontró tab "%s" tras %d intentos', texto_contiene, retries)
+    return False
 
 
 def _cerrar_modales(page):
@@ -903,19 +964,53 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
             # ════════════════════════════════════════════════════════════════
             logger.info('[4] Llenando datos del solicitante...')
 
-            _navigate_wizard_tab(page, 'solicitante')
-            page.wait_for_timeout(800)
+            # ── 4a: Navegar al tab Solicitante ───────────────────────
+            nav_ok = _navigate_wizard_tab(page, 'solicitante')
+            if not nav_ok:
+                logger.warning('[4] Tab solicitante no encontrado por locator, reintentando...')
+                page.wait_for_timeout(2000)
+                _navigate_wizard_tab(page, 'solicitante', retries=5)
+            page.wait_for_timeout(1000)
 
-            _btn_click(page, 'agregar solicitante')
-            page.wait_for_timeout(1500)
+            # ── 4b: Clic en "Agregar Solicitante" con reintentos ─────
+            clicked = _btn_click(page, 'agregar solicitante', retries=5)
+            page.wait_for_timeout(2000)  # Esperar a que el formulario se expanda
 
+            # Verificar que el formulario se abrió (campos visibles)
+            formulario_abierto = False
+            for _retry in range(3):
+                try:
+                    formulario_abierto = page.evaluate("""() => {
+                        const el = document.querySelector('[name="solicitante[nombre]"]') ||
+                                   document.querySelector('[name="solicitante[curp]"]') ||
+                                   document.querySelector('[name="solicitante[primer_apellido]"]');
+                        return el !== null && el.offsetParent !== null;
+                    }""")
+                except Exception:
+                    formulario_abierto = False
+                if formulario_abierto:
+                    break
+                # Si no se abrió, intentar clic de nuevo con reintentos más agresivos
+                logger.warning('[4] Formulario no visible, reintentando clic (%d/3)...', _retry + 1)
+                page.wait_for_timeout(1000)
+                _btn_click(page, 'agregar solicitante', retries=5)
+                page.wait_for_timeout(2000)
+
+            if not formulario_abierto:
+                logger.warning('[4] Formulario del solicitante NO se pudo abrir tras reintentos')
+                # Tomar screenshot diagnóstico
+                checkpoint('04_solicitante_NO_ABIERTO')
+            else:
+                logger.info('[4] Formulario del solicitante abierto correctamente')
+
+            # ── 4c: Llenar campos del solicitante ─────────────────────
             _llenar_solicitante(page, cliente,
                                 fmt_fecha(fecha_nac),
                                 fmt_fecha(fecha_ing),
                                 fmt_fecha(fecha_sal))
-            page.wait_for_timeout(1000)
+            page.wait_for_timeout(1500)
 
-            # Diagnostic: read solicitante field values from the DOM
+            # ── 4d: Verificar que los campos se llenaron ──────────────
             try:
                 diag = page.evaluate("""() => {
                     const names = ['solicitante[nombre]', 'solicitante[primer_apellido]',
@@ -934,15 +1029,34 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
 
             checkpoint('04_solicitante')
 
-            # Try also reading fields with Playwright native locator for confirmation
+            # ── 4e: Verificar que "Guardar" hizo efecto ─────────────
+            # Si el CURP está vacío después de Guardar, la validación React
+            # del portal lo borró — reintentar con presSequentially
             try:
-                pw_val = page.locator('[name="solicitante[nombre]"]').input_value(timeout=2000)
-                logger.info('[4diag2] Playwright native read: nombre=%s', pw_val)
-            except Exception as e:
-                logger.info('[4diag2] Playwright native read failed: %s', e)
+                curp_val = page.evaluate("""() => {
+                    const el = document.querySelector('[name="solicitante[curp]"]');
+                    return el ? el.value : '';
+                }""")
+                if not curp_val or len(curp_val) < 15:
+                    logger.warning('[4] CURP vacío/inválido post-guardar (%s), reintentando...', curp_val[:8] if curp_val else 'EMPTY')
+                    try:
+                        curp_clean = _validar_curp(cliente.curp, corregir_checksum=False)
+                        loc = page.locator('[name="solicitante[curp]"]')
+                        if loc.count():
+                            loc.click()
+                            loc.fill('')  # Limpiar primero
+                            page.wait_for_timeout(200)
+                            loc.press_sequentially(curp_clean, delay=15)
+                            page.wait_for_timeout(100)
+                            _btn_click(page, 'guardar', timeout=5000)
+                            page.wait_for_timeout(2000)
+                    except Exception as curp_err:
+                        logger.warning('[4] Reintento CURP falló: %s', curp_err)
+            except Exception as diag_err:
+                logger.warning('[4] No se pudo verificar CURP: %s', diag_err)
 
             _click_validar_continuar(page)
-            page.wait_for_timeout(1000)
+            page.wait_for_timeout(1500)
             checkpoint('04_solicitante_validado')
 
             # ════════════════════════════════════════════════════════════════

@@ -69,17 +69,24 @@
   }
 
   function clickButton(texto, timeoutMs = 4000) {
+    const txtLower = texto.toLowerCase().trim();
     return new Promise(resolve => {
       const start = Date.now();
       const tryClick = () => {
-        const btns = document.querySelectorAll('button, a');
-        for (const el of btns) {
-          const txt = (el.textContent || '').trim().toLowerCase();
-          if (txt.includes(texto.toLowerCase()) && el.offsetParent !== null) {
-            el.click();
-            el.dispatchEvent(new Event('click', { bubbles: true }));
-            resolve(true);
-            return;
+        // Prioridad: button > a > span/div/li con onclick > role=button
+        const selectors = [
+          'button', 'a', 'span[onclick]', 'div[onclick]', 'li[onclick]',
+          '[role="button"]', '[class*="btn"]', '[class*="button"]'
+        ];
+        for (const sel of selectors) {
+          for (const el of document.querySelectorAll(sel)) {
+            const txt = (el.textContent || '').trim().toLowerCase();
+            if (txt.includes(txtLower) && el.offsetParent !== null) {
+              el.click();
+              el.dispatchEvent(new Event('click', { bubbles: true }));
+              resolve(true);
+              return;
+            }
           }
         }
         if (Date.now() - start < timeoutMs) setTimeout(tryClick, 300);
@@ -95,10 +102,11 @@
   // después de un "Validar y Continuar" que cambia de fase).
 
   function navigateTab(texto, timeoutMs = 8000) {
+    const txtLower = texto.toLowerCase().trim();
     return new Promise(resolve => {
       const start = Date.now();
       const tryNav = () => {
-        // Buscar en selectores de tab del wizard
+        // Buscar en selectores de tab del wizard (más amplio)
         const selectors = [
           '.wizard-step a',
           '.nav-link',
@@ -108,22 +116,27 @@
           '.tab-link',
           '.wizard a',
           '[role="tab"]',
+          '.wizard-step',
+          'li a',
+          '.nav-tabs a',
+          '.nav-tabs li',
         ];
         const allEls = document.querySelectorAll(selectors.join(', '));
         for (const el of allEls) {
           const txt = (el.textContent || '').trim().toLowerCase();
-          if (txt.includes(texto.toLowerCase()) && el.offsetParent !== null) {
+          if (txt.includes(txtLower) && el.offsetParent !== null) {
             el.click();
             el.dispatchEvent(new Event('click', { bubbles: true }));
             resolve(true);
             return;
           }
         }
-        // Fallback: buscar cualquier enlace con el texto
-        for (const el of document.querySelectorAll('a, button, span, div')) {
+        // Fallback: buscar cualquier enlace/li/span con el texto exacto o que contenga
+        for (const el of document.querySelectorAll('a, button, span, div, li')) {
           const txt = (el.textContent || '').trim().toLowerCase();
-          if (txt === texto.toLowerCase() && el.offsetParent !== null) {
+          if ((txt === txtLower || txt.includes(txtLower)) && el.offsetParent !== null) {
             el.click();
+            el.dispatchEvent(new Event('click', { bubbles: true }));
             resolve(true);
             return;
           }
@@ -471,10 +484,25 @@
       await navigateTab('solicitante', 6000);
       await sleep(1500);
     }
-    await clickButton('agregar solicitante');
-    await sleep(2000);
+    let clickedSol = await clickButton('agregar solicitante', 6000);
+    await sleep(2500); // Esperar a que el formulario se expanda
     closeModals();
     await sleep(500);
+
+    // Verificar que el formulario del solicitante se abrió
+    let formAbierto = !!byName('solicitante[nombre]') || !!byName('solicitante[curp]');
+    for (let retry = 0; retry < 3 && !formAbierto; retry++) {
+      setEstado('⚠️ Formulario no visible, reintentando…', 'warn');
+      await sleep(1000);
+      await clickButton('agregar solicitante', 6000);
+      await sleep(2500);
+      closeModals();
+      await sleep(500);
+      formAbierto = !!byName('solicitante[nombre]') || !!byName('solicitante[curp]');
+    }
+    if (!formAbierto) {
+      setEstado('❌ No se pudo abrir el formulario del solicitante', 'error');
+    }
 
     const c = tarea.cliente;
     const [nombre, ap1, ap2] = separarNombre(c.nombre);
@@ -516,9 +544,29 @@
 
     // Click Guardar — inmediato después de CURP
     await clickButton('Guardar', 6000);
-    await sleep(1500); // Esperar a que el portal guarde (server espera 1000ms)
+    await sleep(2000); // Esperar a que el portal guarde y React procese
     closeModals();
     await sleep(500);
+
+    // Verificar CURP post-guardar: si React lo borró, reintentar
+    const curpPost = byName('solicitante[curp]');
+    if (curpPost && (!curpPost.value || curpPost.value.length < 15)) {
+      setEstado('⚠️ CURP no se guardó, reintentando…', 'warn');
+      if (c.curp && c.curp.length >= 15) {
+        curpPost.focus();
+        curpPost.value = '';
+        for (const ch of c.curp) {
+          curpPost.value += ch;
+          curpPost.dispatchEvent(new Event('input', { bubbles: true }));
+          await sleep(8);
+        }
+        await sleep(50);
+        await clickButton('Guardar', 6000);
+        await sleep(2000);
+        closeModals();
+        await sleep(500);
+      }
+    }
     pasoActual = 4; setPasos(PASOS, pasoActual);
 
     setEstado('Validando solicitante…');
