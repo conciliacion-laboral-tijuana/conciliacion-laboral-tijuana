@@ -308,11 +308,11 @@ MENSAJES_TEMPLATE = {
         "{asesor}"
     ),
     'convenio': (
-        "🤝 *SEGUIMIENTO DE CONVENIO*\n\n"
-        "Hola {cliente}, esperamos que te encuentres bien.\n\n"
-        "Te contactamos para dar seguimiento al convenio establecido "
-        "en tu caso. ¿Has recibido los pagos de acuerdo a lo acordado?\n\n"
-        "Quedamos atentos a cualquier comentario.\n\n"
+        "🤝 *CONVENIO DE CONCILIACIÓN*\n\n"
+        "Hola {cliente}, te informamos que se ha alcanzado un convenio "
+        "en tu caso ({numero}).\n\n"
+        "Te compartimos el comprobante con los detalles del acuerdo. "
+        "Favor de revisar y confirmar recibido.\n\n"
         "Saludos,\n"
         "{asesor}"
     ),
