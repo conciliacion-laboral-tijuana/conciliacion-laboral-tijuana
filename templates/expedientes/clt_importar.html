@@ -229,7 +229,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function actualizarNombre() {
         if (input.files.length) {
             const f = input.files[0];
-            dropIcon.textContent = '{% svg 'chart' %}';
+            dropIcon.textContent = '\u2728';
             dropText.textContent = f.name;
             fileName.textContent = f.size > 0 ? (f.size / 1024).toFixed(1) + ' KB' : '';
             fileName.classList.remove('hidden');

@@ -14,7 +14,7 @@ class ClienteForm(forms.ModelForm):
                    'empresa_calle', 'empresa_numero', 'empresa_colonia', 'empresa_cp', 'empresa_referencias',
                    'empresa_curp', 'empresa_rfc', 'tipo_persona_citado',
                    'puesto', 'salario', 'periodo_pago', 'horas_semanales', 'jornada',
-                   'fecha_ingreso', 'fecha_salida',
+                   'fecha_ingreso', 'fecha_salida', 'tipo_despido',
                    'como_supo', 'oficina',
                    'asesoria_gratuita_ofrecida', 'asesoria_gratuita_agendada', 'fecha_asesoria_gratuita']
         widgets = {
@@ -51,6 +51,7 @@ class ClienteForm(forms.ModelForm):
             'jornada': forms.Select(attrs={'class': 'input'}),
             'fecha_ingreso': forms.DateInput(attrs={'class': 'input', 'type': 'date'}),
             'fecha_salida': forms.DateInput(attrs={'class': 'input', 'type': 'date'}),
+            'tipo_despido': forms.Select(attrs={'class': 'input'}),
             'asesoria_gratuita_ofrecida': forms.CheckboxInput(attrs={'class': 'w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500'}),
             'asesoria_gratuita_agendada': forms.CheckboxInput(attrs={'class': 'w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500'}),
             'fecha_asesoria_gratuita': forms.DateInput(attrs={'class': 'input', 'type': 'date'}),

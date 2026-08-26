@@ -78,6 +78,20 @@ class Cliente(models.Model):
     fecha_ingreso = models.DateField('Fecha de ingreso', null=True, blank=True)
     fecha_salida = models.DateField('Fecha de salida/despido', null=True, blank=True)
 
+    # Tipo de despido
+    TIPO_DESPIDO_CHOICES = [
+        ('justificado', 'Despido justificado'),
+        ('injustificado', 'Despido injustificado'),
+        ('voluntario', 'Renuncia voluntaria'),
+        ('rescision', 'Rescisión'),
+        ('otro', 'Otro'),
+    ]
+    tipo_despido = models.CharField(
+        'Tipo de despido', max_length=20,
+        choices=TIPO_DESPIDO_CHOICES, blank=True,
+        help_text='Tipo de despido: justificado, injustificado, renuncia voluntaria, rescisión u otro'
+    )
+
     # Cómo se enteró del despacho
     COMO_SUPO_CHOICES = [
         ('facebook', 'Facebook / Instagram'),

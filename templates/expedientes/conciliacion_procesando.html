@@ -347,7 +347,7 @@
             statusMessage.textContent = 'La tarea está esperando para iniciar.';
             updateProgress('pendiente');
         } else if (data.estado === 'ejecutando') {
-            statusTitle.textContent = '{% svg 'robot' %} Ejecutando automatización...';
+            statusTitle.textContent = '\u{1F916} Ejecutando automatización...';
             statusMessage.textContent = 'Navegando el portal de conciliación paso a paso.';
             updateProgress('ejecutando');
             // Espejo en vivo durante la ejecución

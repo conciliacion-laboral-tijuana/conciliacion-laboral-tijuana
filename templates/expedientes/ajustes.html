@@ -121,7 +121,7 @@ function copiarToken() {
     navigator.clipboard.writeText(el.textContent.trim()).then(() => {
         const btn = event.target;
         const original = btn.textContent;
-        btn.textContent = '{% svg 'check-circle' %} Copiado';
+        btn.textContent = '\u2705 Copiado';
         setTimeout(() => btn.textContent = original, 1500);
     });
 }
