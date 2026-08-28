@@ -231,8 +231,8 @@
     <script>
     function enviarComprobante(tipo) {
         var url = tipo === 'convenio'
-            ? '{{ expediente.comprobante_convenio.url|default:"" }}'
-            : '{{ expediente.comprobante_pago.url|default:"" }}';
+            ? '{% if expediente.comprobante_convenio %}{{ expediente.comprobante_convenio.url }}{% endif %}'
+            : '{% if expediente.comprobante_pago %}{{ expediente.comprobante_pago.url }}{% endif %}';
         var telefono = '{{ expediente.cliente.whatsapp|default:expediente.cliente.telefono|cut:"+"|cut:" "|cut:"-" }}';
         var monto = '{{ expediente.monto_convenio|floatformat:0|default:"" }}';
         var cliente = '{{ expediente.cliente.nombre|truncatechars:30 }}';
