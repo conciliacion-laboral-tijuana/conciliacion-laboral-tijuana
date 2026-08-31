@@ -719,9 +719,25 @@ class ClienteCreateView(LoginRequiredMixin, CreateView):
 
         # Crear expediente automáticamente y redirigir a conciliación
         cliente = self.object
+
+        # Seleccionar asesor: si el usuario actual es asesor, usarlo;
+        # si no (admin/superadmin), buscar un asesor disponible.
+        asesor = self.request.user
+        if not (hasattr(asesor, 'profile') and asesor.profile.rol == 'asesor'):
+            asesor = User.objects.filter(profile__rol='asesor').first()
+        if not asesor:
+            # Si no hay ningún asesor disponible, guardar solo el cliente
+            # y redirigir al detalle sin crear expediente automático
+            messages.warning(
+                self.request,
+                f'✅ Cliente {cliente.nombre} registrado. '
+                f'No se pudo crear expediente porque no hay asesores disponibles.',
+            )
+            return redirect('cliente_list')
+
         expediente = Expediente.objects.create(
             cliente=cliente,
-            asesor=self.request.user,
+            asesor=asesor,
             estado='solicitud',
             notas=f'Expediente creado automáticamente desde registro de cliente {cliente.nombre}',
         )
