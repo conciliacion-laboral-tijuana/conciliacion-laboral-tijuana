@@ -715,10 +715,28 @@ class ClienteCreateView(LoginRequiredMixin, CreateView):
 
     def form_valid(self, form):
         form.instance.created_by = self.request.user
-        return super().form_valid(form)
+        response = super().form_valid(form)
+
+        # Crear expediente automáticamente y redirigir a conciliación
+        cliente = self.object
+        expediente = Expediente.objects.create(
+            cliente=cliente,
+            asesor=self.request.user,
+            estado='solicitud',
+            notas=f'Expediente creado automáticamente desde registro de cliente {cliente.nombre}',
+        )
+        registrar_movimiento(
+            expediente=expediente,
+            usuario=self.request.user,
+            accion='creacion',
+            detalle=f'Expediente creado automáticamente por {self.request.user.get_full_name() or self.request.user.username}'
+        )
+        messages.success(self.request, f'✅ Cliente {cliente.nombre} registrado. Expediente {expediente.numero} creado.')
+        return redirect('enviar_conciliacion_automation', pk=expediente.pk)
 
     def get_success_url(self):
-        return reverse_lazy('expediente_create') + f'?cliente={self.object.pk}'
+        # No se usa porque form_valid ya hace redirect
+        return reverse_lazy('cliente_list')
 
 
 class ClienteUpdateView(LoginRequiredMixin, UpdateView):
