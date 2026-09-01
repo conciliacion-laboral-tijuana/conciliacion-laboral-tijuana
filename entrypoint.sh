@@ -83,6 +83,14 @@ else
     echo ">>> BD con datos reales (${HAS_EXPEDIENTES} expedientes) — se omiten usuarios y datos de prueba"
 fi
 
+# 6b. Reset de contraseñas de asesores (solo si RESET_ASESOR_PASSWORDS=true)
+if [ "${RESET_ASESOR_PASSWORDS:-}" = "true" ]; then
+    echo ">>> [reset] Reseteando contraseñas de asesores..."
+    uv run python manage.py reset_asesor_passwords --password "${RESET_ASESOR_PASSWORD:-Asesor2026!}" 2>&1 || echo ">>> (Aviso: no se pudieron resetear contraseñas)"
+else
+    echo ">>> [reset] Contraseñas de asesores no modificadas (define RESET_ASESOR_PASSWORDS=true para resetear)"
+fi
+
 # ══════════════════════════════════════════════════════════════════════
 #  7. Iniciar SERVICIOS (Gunicorn + Celery Worker en el mismo contenedor)
 # ══════════════════════════════════════════════════════════════════════
