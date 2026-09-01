@@ -39,7 +39,8 @@ class Command(BaseCommand):
             proxima_accion__lte=fecha_limite,
         ).exclude(estado='cerrado')
 
-        for exp in proximas_acciones:        self.stdout.write(self.style.WARNING(f'Proxima accion: {exp.numero} - {exp.cliente.nombre} - Vence: {exp.proxima_accion}'))
+        for exp in proximas_acciones:
+            self.stdout.write(self.style.WARNING(f'Proxima accion: {exp.numero} - {exp.cliente.nombre} - Vence: {exp.proxima_accion}'))
             if not dry_run:
                 Movimiento.objects.create(
                     expediente=exp,
@@ -55,7 +56,8 @@ class Command(BaseCommand):
             fecha_audiencia__date__lte=fecha_limite,
         ).exclude(estado='cerrado')
 
-        for exp in proximas_audiencias:        self.stdout.write(self.style.WARNING(f'Audiencia proxima: {exp.numero} - {exp.cliente.nombre} - Fecha: {exp.fecha_audiencia.strftime("%d/%m/%Y %H:%M")}'))
+        for exp in proximas_audiencias:
+            self.stdout.write(self.style.WARNING(f'Audiencia proxima: {exp.numero} - {exp.cliente.nombre} - Fecha: {exp.fecha_audiencia.strftime("%d/%m/%Y %H:%M")}'))
             if not dry_run:
                 Movimiento.objects.create(
                     expediente=exp,
@@ -71,7 +73,8 @@ class Command(BaseCommand):
             updated_at__lte=hace_30_dias
         ).exclude(estado='cerrado')
 
-        for exp in casos_inactivos:        self.stdout.write(self.style.WARNING(f'Caso inactivo: {exp.numero} - {exp.cliente.nombre} - Ultima actualizacion: {exp.updated_at.strftime("%d/%m/%Y")}'))
+        for exp in casos_inactivos:
+            self.stdout.write(self.style.WARNING(f'Caso inactivo: {exp.numero} - {exp.cliente.nombre} - Ultima actualizacion: {exp.updated_at.strftime("%d/%m/%Y")}'))
             if not dry_run:
                 Movimiento.objects.create(
                     expediente=exp,

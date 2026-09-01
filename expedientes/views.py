@@ -748,7 +748,15 @@ class ClienteCreateView(LoginRequiredMixin, CreateView):
             detalle=f'Expediente creado automáticamente por {self.request.user.get_full_name() or self.request.user.username}'
         )
         messages.success(self.request, f'✅ Cliente {cliente.nombre} registrado. Expediente {expediente.numero} creado.')
-        return redirect('enviar_conciliacion_automation', pk=expediente.pk)
+
+        # Redirect directly to automatic conciliation submission (POST)
+        # This skips the confirmation page and starts the automation immediately
+        from django.test import RequestFactory
+        # Simulate a POST request to enviar_conciliacion_automation with modo=automatico
+        post_request = self.request.POST.copy()
+        post_request['modo'] = 'automatico'
+        self.request._post = post_request
+        return enviar_conciliacion_automation(self.request, pk=expediente.pk)
 
     def get_success_url(self):
         # No se usa porque form_valid ya hace redirect

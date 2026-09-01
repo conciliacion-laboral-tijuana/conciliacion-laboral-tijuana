@@ -69,30 +69,13 @@
             {% endif %}
 
             <div class="bg-gray-50 rounded-lg p-4">
-                <h3 class="text-sm font-semibold text-gray-700 mb-3">{% svg 'compass' %} Modo de envío</h3>
+                <h3 class="text-sm font-semibold text-gray-700 mb-3">{% svg 'compass' %} Envío Automático</h3>
                 <form method="post" action="{% url 'enviar_conciliacion_automation' expediente.pk %}" class="space-y-3">
                     {% csrf_token %}
-                    <label class="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-blue-50 transition-colors">
-                        <input type="radio" name="modo" value="automatico" checked class="mr-3">
-                        <div>
-                            <span class="font-medium text-gray-800">{% svg 'robot' %} Automático (Headless)</span>
-                            <p class="text-xs text-gray-500">El navegador se ejecuta en segundo plano. No verás nada pero es más rápido.</p>
-                        </div>
-                    </label>
-                    <label class="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-blue-50 transition-colors">
-                        <input type="radio" name="modo" value="debug" class="mr-3">
-                        <div>
-                            <span class="font-medium text-gray-800">{% svg 'eye' %} Visible (Debug)</span>
-                            <p class="text-xs text-gray-500">El navegador se abre visiblemente para que puedas ver el proceso.</p>
-                        </div>
-                    </label>
-                    <label class="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-green-50 transition-colors border-green-300">
-                        <input type="radio" name="modo" value="extension" class="mr-3">
-                        <div>
-                            <span class="font-medium text-gray-800">{% svg 'phone-cell' %} Desde mi navegador (Extensión de Chrome)</span>
-                            <p class="text-xs text-gray-500">La extensión llena el portal en TU navegador, tú das el clic final y el acuse se guarda solo. Ideal cuando la automatización se traba.</p>
-                        </div>
-                    </label>
+                    <input type="hidden" name="modo" value="automatico">
+                    <div class="flex items-center p-3 border border-blue-200 rounded-lg bg-blue-50">
+                        <span class="font-medium text-gray-800">{% svg 'robot' %} Envío automático al portal de conciliación</span>
+                    </div>
                     <div class="flex space-x-3 pt-2">
                         <button type="submit" class="btn btn-primary flex-1 justify-center">
                             {% svg 'send' %} Enviar al Portal de Conciliación

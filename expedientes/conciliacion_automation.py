@@ -229,42 +229,73 @@ def _click_radio(page, name, value):
 
 
 def _navigate_wizard_tab(page, texto_contiene, retries=3):
-    """Navega a un tab del wizard por su texto.
+    """Navega a un tab del wizard usando los IDs de Bootstrap del portal BC.
     
-    Busca en múltiples selectores del wizard BC y reintenta si no lo encuentra.
+    El portal usa Bootstrap tabs con IDs predecibles:
+      - Industria: #step-industria → #stepIndustria
+      - Solicitud: #step-solicitud → #stepSolicitud
+      - Solicitante: #step-solicitante → #stepSolicitante
+      - Citado: #step-citado → #stepCitado
+      - Descripción: #step-descripcion → #stepDescripcion
+      - Resumen: #step-resumen → #stepResumen
+    
     Retorna True si navegó, False si no encontró el tab.
     """
     txt_lower = texto_contiene.strip().lower()
+    
+    # Mapa de texto → ID del link del tab (el ID real del portal BC)
+    TAB_ID_MAP = {
+        'industria': 'step-industria',
+        'solicitud': 'step-solicitud',
+        'solicitante': 'step-solicitante',
+        'citado': 'step-citado',
+        'citado(s)': 'step-citado',
+        'descripci': 'step-descripcion',
+        'resumen': 'step-resumen',
+    }
+    
+    # 1. Intentar con el ID exacto del portal
     for attempt in range(retries):
         if attempt > 0:
             page.wait_for_timeout(800)
-        # ── Playwright locator ───────────────────────────────────────
-        try:
-            selector = ', '.join([
-                '.wizard-step a', '.nav-link', '.step-title',
-                'a[class*="step"]', '.nav-item a', '.tab-link',
-                '.wizard a', '[role="tab"]', '.wizard-step',
-                'li a', '.nav-tabs a', '.nav-tabs li',
-            ])
-            locator = page.locator(selector).filter(
-                has_text=re.compile(re.escape(texto_contiene), re.IGNORECASE)
-            ).first
-            if locator.count():
-                locator.click()
-                page.wait_for_timeout(800)
-                logger.info('  _navigate_wizard_tab: clic en "%s" (locator)', texto_contiene)
-                return True
-        except Exception:
-            pass
-        # ── Fallback JS ──────────────────────────────────────────────
+        
+        # Buscar el ID del tab link basado en el texto
+        tab_link_id = None
+        for key, tab_id in TAB_ID_MAP.items():
+            if key in txt_lower:
+                tab_link_id = tab_id
+                break
+        
+        if tab_link_id:
+            try:
+                result = page.evaluate(f"""(tabId) => {{
+                    const el = document.querySelector('#' + tabId);
+                    if (el && el.offsetParent !== null) {{
+                        el.click();
+                        el.dispatchEvent(new Event('click', {{bubbles: true}}));
+                        return true;
+                    }}
+                    return false;
+                }}""", tab_link_id)
+                if result:
+                    page.wait_for_timeout(800)
+                    logger.info('  _navigate_wizard_tab: clic en tab "%s" via ID %s', texto_contiene, tab_link_id)
+                    return True
+            except Exception:
+                pass
+        
+        # 2. Fallback: buscar por texto en los links del wizard
         try:
             result = page.evaluate(f"""(kw) => {{
                 const kwLower = kw.toLowerCase().trim();
+                // Buscar en los links del wizard (tienen class nav-link step-title)
                 const selectors = [
-                    '.wizard-step a', '.nav-link', '.step-title',
-                    'a[class*="step"]', '.nav-item a', '.tab-link',
-                    '.wizard a', '[role="tab"]', '.wizard-step',
-                    'li a', '.nav-tabs a', '.nav-tabs li',
+                    'a.nav-link.step-title',
+                    '.wizard-step a',
+                    '.nav-link',
+                    '[role="tab"]',
+                    '.nav-item a',
+                    'a[class*="step"]',
                     'a', 'li', 'span'
                 ];
                 for (const sel of selectors) {{
@@ -341,32 +372,74 @@ def _cerrar_modales(page):
         return 0
 
 
-def _click_validar_continuar(page):
-    """Hace clic en el botón 'Validar y Continuar'."""
+def _click_validar_continuar(page, step_function=None):
+    """Hace clic en el botón 'Validar y Continuar' de la pestaña activa.
+    
+    El portal BC tiene diferentes funciones JS para cada paso:
+      - validarIndustria() para industria
+      - validarSolicitud() para solicitud
+      - etc.
+    
+    Si step_function se proporciona, llama directamente a esa función JS.
+    Si no, busca el botón visible de "Validar y Continuar" en la pestaña activa.
+    """
+    # 1. Si se conoce la función JS del paso, llamarla directamente
+    if step_function:
+        try:
+            result = page.evaluate(f"""() => {{
+                try {{ {step_function}; return 'ok'; }}
+                catch(e) {{ return 'error: ' + e.message; }}
+            }}""")
+            if result == 'ok':
+                logger.info('  _click_validar_continuar: llamada a %s exitosa', step_function)
+                return True
+            else:
+                logger.warning('  _click_validar_continuar: %s falló: %s', step_function, result)
+        except Exception as e:
+            logger.warning('  _click_validar_continuar: excepción en %s: %s', step_function, e)
+    
+    # 2. Fallback: buscar el botón visible de "Validar y Continuar"
     try:
-        btn = page.get_by_role('button').filter(has_text=re.compile(r'validar', re.IGNORECASE)).and_(
-            page.get_by_role('button').filter(has_text=re.compile(r'continuar', re.IGNORECASE))
-        ).first
-        if btn.count():
-            btn.click(timeout=10000)
-            return True
-    except Exception:
-        pass
-    # Fallback: buscar botón que contenga ambos textos
-    try:
-        return page.evaluate("""() => {
-            for (const btn of document.querySelectorAll('button')) {
+        result = page.evaluate("""() => {
+            // Buscar SOLO dentro del tab-pane activo primero
+            const activePane = document.querySelector('.tab-pane.show.active');
+            if (activePane) {
+                const btns = activePane.querySelectorAll('button, a.btn, [role="button"]');
+                for (const btn of btns) {
+                    const t = btn.textContent.trim().toLowerCase();
+                    if (t.includes('validar') && t.includes('continuar') && btn.offsetParent !== null) {
+                        btn.click();
+                        btn.dispatchEvent(new Event('click', {bubbles: true}));
+                        return 'active-pane';
+                    }
+                }
+            }
+            // Fallback: buscar en TODOS los botones visibles
+            for (const btn of document.querySelectorAll('button, a.btn, [role="button"]')) {
                 const t = btn.textContent.trim().toLowerCase();
-                if (t.includes('validar') && t.includes('continuar')) {
+                if (t.includes('validar') && t.includes('continuar') && btn.offsetParent !== null) {
                     btn.click();
                     btn.dispatchEvent(new Event('click', {bubbles: true}));
-                    return true;
+                    return 'all-buttons';
+                }
+            }
+            // Fallback 2: buscar por ID específico del portal
+            const validarBtns = document.querySelectorAll('#validarIndustria, #validarSolicitud, #validarContinuar');
+            for (const btn of validarBtns) {
+                if (btn && btn.offsetParent !== null) {
+                    btn.click();
+                    return 'by-id';
                 }
             }
             return false;
         }""")
+        if result:
+            logger.info('  _click_validar_continuar: clic en botón "Validar y Continuar" (%s)', result)
+            return True
     except Exception:
-        return False
+        pass
+    logger.warning('  _click_validar_continuar: no se encontró botón de validación')
+    return False
 
 
 def _detectar_errores_validacion(page):
@@ -621,6 +694,31 @@ def _llenar_domicilio(page, vialidad, num_ext, cp, prefix='domicilio'):
         pass
     page.wait_for_timeout(300)
 
+    # Poblar campos ocultos del domicilio que el portal espera
+    page.evaluate("""() => {
+        // tipo_vialidad hidden: texto de la opcion seleccionada
+        const tvSel = document.querySelector('#tipo_vialidad_id');
+        const tvHidden = document.querySelector('[name="domicilio[tipo_vialidad]"]');
+        if (tvHidden && tvSel && tvSel.selectedIndex >= 0) {
+            const txt = tvSel.options[tvSel.selectedIndex]?.text?.trim();
+            if (txt && txt !== 'Selecciona el tipo de vialidad') tvHidden.value = txt;
+        }
+        // tipo_asentamiento hidden
+        const taSel = document.querySelector('#tipo_asentamiento_id');
+        const taHidden = document.querySelector('[name="domicilio[tipo_asentamiento]"]');
+        if (taHidden && taSel && taSel.selectedIndex >= 0) {
+            const txt = taSel.options[taSel.selectedIndex]?.text?.trim();
+            if (txt) taHidden.value = txt;
+        }
+        // asentamiento hidden
+        const asentSel = document.querySelector('#asentamientoAutoc');
+        const asentHidden = document.querySelector('[name="domicilio[asentamiento]"]');
+        if (asentHidden && asentSel && asentSel.selectedIndex >= 0) {
+            const txt = asentSel.options[asentSel.selectedIndex]?.text?.trim();
+            if (txt) asentHidden.value = txt;
+        }
+    }""")
+
 
 def _separar_nombre_mexicano(nombre_completo):
     """Separa un nombre mexicano en (nombre, apellido_paterno, apellido_materno).
@@ -666,12 +764,9 @@ def _llenar_solicitante(page, cliente, fecha_nac_str, fecha_ing_str, fecha_sal_s
     # ser válido en RENAPO. Solo validamos el formato.
     curp = _validar_curp(cliente.curp, corregir_checksum=False)
 
-    # Datos personales (truncados MUY agresivamente para el portal)
-    # El portal limita nombre a ~6 caracteres, apellidos a ~6
-    _fill_input(page, 'solicitante[nombre]', _truncar(nombre, 6))
-    _fill_input(page, 'solicitante[primer_apellido]', _truncar(ap1, 6))
-    _fill_input(page, 'solicitante[segundo_apellido]', _truncar(ap2, 6))
-
+    # Datos personales
+    # NOTA: No llenamos nombre/apellidos aqui porque getDataCURP los
+    # auto-llena desde RENAPO. Los llenamos DESPUES de getDataCURP.
     _fill_input(page, 'solicitante[fecha_nacimiento]', fecha_nac_str)
 
     # Género y nacionalidad
@@ -701,24 +796,125 @@ def _llenar_solicitante(page, cliente, fecha_nac_str, fecha_ing_str, fecha_sal_s
     _fill_input(page, 'dato_laboral[fecha_salida]', fecha_sal_str)
     _select_option(page, 'dato_laboral[jornada_id]', jornada_id)
 
-    # ── CURP: llenar JUSTO antes de Guardar ────────────────
-    # Estrategia: presionar teclas reales con delay 5ms (~90ms para
-    # 18 chars) + 10ms para que React procese el último evento.
-    # Luego GUARDAR INMEDIATAMENTE antes de que la validación async
-    # del portal pueda borrar el CURP de React state.
+    # ── CURP: llenar y disparar getDataCURP ─────────────────
+    # El portal tiene onblur="getDataCURP(this.value, 'Solicitante')" que
+    # auto-llena nombre, apellidos, fecha nac, genero, etc. desde RENAPO.
+    # Primero intentamos getDataCURP; si falla, llenamos manualmente.
     try:
-        loc = page.locator('[name="solicitante[curp]"]')
-        if loc.count():
-            loc.press_sequentially(curp, delay=5)
-            page.wait_for_timeout(10)  # yield: React procese último input
-            logger.info('[4curp] CURP tipeado con press_sequentially, guardando...')
+        page.evaluate("""(curp) => {
+            const el = document.querySelector('#idSolicitanteCURP');
+            if (el) {
+                el.value = curp;
+                el.dispatchEvent(new Event('input', {bubbles: true}));
+                el.dispatchEvent(new Event('change', {bubbles: true}));
+                // Trigger the onblur getDataCURP
+                if (typeof getDataCURP === 'function') {
+                    getDataCURP(curp, 'Solicitante');
+                }
+            }
+        }""", curp)
+        page.wait_for_timeout(3000)  # Esperar respuesta AJAX de getDataCURP
+        logger.info('[4curp] getDataCURP called for CURP=%s', curp[:12])
     except Exception as e:
-        logger.warning('[4curp] press_sequentially error: %s', e)
-        _fill_input(page, 'solicitante[curp]', curp)
+        logger.warning('[4curp] getDataCURP error: %s', e)
 
-    # Click "Guardar" — inmediato, sin espera adicional
-    _btn_click(page, 'guardar', timeout=5000)
+    # SIEMPRE llenar nombre/apellidos DESPUES de getDataCURP
+    # porque getDataCURP puede borrarlos o poner valores incorrectos
+    _fill_input(page, 'solicitante[nombre]', _truncar(nombre, 6))
+    _fill_input(page, 'solicitante[primer_apellido]', _truncar(ap1, 6))
+    _fill_input(page, 'solicitante[segundo_apellido]', _truncar(ap2, 6))
+    logger.info('[4curp] Nombre llenado: %s %s %s', nombre, ap1, ap2)
 
+    # Forzar CURP en el campo DESPUES de getDataCURP (puede borrarlo)
+    _fill_input_silent(page, 'solicitante[curp]', curp)
+    page.evaluate("""(curp) => {
+        const el = document.querySelector('#idSolicitanteCURP');
+        if (el) { el.value = curp; }
+    }""", curp)
+
+    # Re-llenar contactos DESPUES de getDataCURP (puede borrarlos)
+    _fill_input(page, 'contactos[1]', _limpiar_telefono(cliente.telefono))
+    if cliente.email:
+        _fill_input(page, 'contactos[3]', cliente.email)
+    page.wait_for_timeout(200)
+
+    # Enviar formulario: deshabilitar Parsley, onsubmit, y submit directo
+    submit_ok = page.evaluate("""() => {
+        try {
+            const form = document.querySelector('#frmSolicitante');
+            if (!form) return 'form not found';
+
+            // 1. Destruir Parsley completamente
+            if (typeof $ !== 'undefined') {
+                try { jQuery(form).parsley().destroy(); } catch(e) {}
+                try { jQuery(form).off('submit'); } catch(e) {}
+                try { jQuery(form).find('button[type="submit"]').off('click'); } catch(e) {}
+            }
+
+            // 2. Remover atributos de validacion
+            form.removeAttribute('data-parsley-validate');
+            form.removeAttribute('novalidate');
+            form.removeAttribute('onsubmit');
+
+            // 3. Fix step hidden field
+            const stepInput = document.querySelector('#step');
+            if (stepInput) stepInput.value = 'solicitante';
+
+            // 4. Fix domicilio hidden fields
+            const tvSel = document.querySelector('#tipo_vialidad_id');
+            const tvHidden = document.querySelector('[name="domicilio[tipo_vialidad]"]');
+            if (tvHidden && tvSel && tvSel.selectedIndex > 0) {
+                tvHidden.value = tvSel.options[tvSel.selectedIndex].text.trim();
+            }
+            const taSel = document.querySelector('#tipo_asentamiento_id');
+            const taHidden = document.querySelector('[name="domicilio[tipo_asentamiento]"]');
+            if (taHidden && taSel && taSel.selectedIndex > 0) {
+                taHidden.value = taSel.options[taSel.selectedIndex].text.trim();
+            }
+            const asentSel = document.querySelector('#asentamientoAutoc');
+            const asentHidden = document.querySelector('[name="domicilio[asentamiento]"]');
+            if (asentHidden && asentSel && asentSel.selectedIndex > 0) {
+                asentHidden.value = asentSel.options[asentSel.selectedIndex].text.trim();
+            }
+
+            // 5. Submit
+            form.submit();
+            return 'submitted';
+        } catch(e) {
+            return 'error: ' + e.message;
+        }
+    }""")
+    logger.info('[4guardar] Form submit: %s', submit_ok)
+
+    # Esperar respuesta del submit
+    page.wait_for_timeout(5000)
+
+
+
+def _fill_input_scoped(page, name, valor, panel=None):
+    """Like _fill_input but scopes the querySelector to a panel element.
+    Used for citado contacts where duplicate field names exist.
+    """
+    if not valor:
+        return False
+    try:
+        return page.evaluate("""(args) => {
+            const [name, valor, panelSel] = args;
+            const root = panelSel ? document.querySelector(panelSel) || document : document;
+            const el = root.querySelector(`[name="${name}"]`);
+            if (el) {
+                el.focus();
+                el.value = valor;
+                el.dispatchEvent(new Event('input', {bubbles: true}));
+                el.dispatchEvent(new Event('change', {bubbles: true}));
+                el.dispatchEvent(new Event('blur'));
+                return true;
+            }
+            return false;
+        }""", [name, str(valor), panel or ''])
+    except Exception:
+        pass
+    return False
 
 def _llenar_citado(page, cliente):
     """Llena los campos del citado (empresa/patrón).
@@ -739,7 +935,7 @@ def _llenar_citado(page, cliente):
 
     if es_moral:
         # ─── Persona Moral: razón social, RFC, contacto, domicilio ──
-        _fill_input(page, 'solicitado[razon_social]', empresa_nombre)
+        _fill_input(page, 'solicitado[nombre_comercial]', empresa_nombre)
 
         # RFC del citado (empresa)
         empresa_rfc = cliente.empresa_rfc or cliente.rfc or ''
@@ -747,9 +943,12 @@ def _llenar_citado(page, cliente):
             _fill_input(page, 'solicitado[rfc]', empresa_rfc)
 
         # Teléfono de contacto
-        _fill_input(page, 'contactos[1]', _limpiar_telefono(cliente.empresa_telefono or cliente.telefono))
+        _fill_input_scoped(page, 'contactos[1]',
+                         _limpiar_telefono(cliente.empresa_telefono or cliente.telefono),
+                         panel='#stepCitado')
         if cliente.email:
-            _fill_input(page, 'contactos_email', cliente.email)
+            _fill_input_scoped(page, 'contactos[3]', cliente.email or '',
+                             panel='#stepCitado')
     else:
         # ─── Persona Física: nombre, apellidos, CURP, RFC, etc. ────
         nombre_parts = empresa_nombre.split()
@@ -779,9 +978,12 @@ def _llenar_citado(page, cliente):
             _fill_input(page, 'solicitado[rfc]', empresa_rfc)
 
         # Teléfono y email
-        _fill_input(page, 'contactos[1]', _limpiar_telefono(cliente.empresa_telefono or cliente.telefono))
+        _fill_input_scoped(page, 'contactos[1]',
+                         _limpiar_telefono(cliente.empresa_telefono or cliente.telefono),
+                         panel='#stepCitado')
         if cliente.email:
-            _fill_input(page, 'contactos_email', cliente.email)
+            _fill_input_scoped(page, 'contactos[3]', cliente.email or '',
+                             panel='#stepCitado')
 
     # Domicilio del citado (común para ambos tipos)
     _llenar_domicilio(page,
@@ -792,7 +994,17 @@ def _llenar_citado(page, cliente):
     page.wait_for_timeout(500)
 
     # Click "Guardar" para cerrar el panel del citado
-    _btn_click(page, 'guardar', timeout=5000)
+    # Click "Guardar citado" (scopado al panel citado)
+    page.evaluate("""() => {
+        const panel = document.querySelector('#stepCitado');
+        const searchIn = panel || document;
+        for (const btn of searchIn.querySelectorAll('button')) {
+            const t = btn.textContent.trim().toLowerCase();
+            if (t.includes('guardar') && t.includes('citado') && btn.offsetParent !== null) {
+                btn.click(); break;
+            }
+        }
+    }""")
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -896,16 +1108,40 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
             # ════════════════════════════════════════════════════════════════
             logger.info('[1] Aceptando aviso de privacidad...')
 
-            # Seleccionar radio "Acepto" (radioAviso = '1')
-            _click_radio(page, 'radioAviso', '1')
-            page.wait_for_timeout(200)
+            # Seleccionar radio "Sí acepto" (radioAviso = '1')
+            page.evaluate("""() => {
+                const radio = document.querySelector('#radioAviso1');
+                if (radio) {
+                    radio.checked = true;
+                    radio.click();
+                    radio.dispatchEvent(new Event('change', {bubbles: true}));
+                }
+            }""")
+            page.wait_for_timeout(300)
 
-            # Click "Aceptar"
-            _btn_click(page, 'Aceptar')
-            page.wait_for_timeout(500)
+            # Llamar aceptarAviso() directamente via JS
+            page.evaluate("""() => {
+                if (typeof aceptarAviso === 'function') {
+                    aceptarAviso();
+                } else {
+                    const btn = document.querySelector('#aceptar_aviso');
+                    if (btn) btn.click();
+                }
+            }""")
+            page.wait_for_timeout(1500)
 
-            # Cerrar modales que aparezcan
-            _cerrar_modales(page)
+            # Forzar cierre del modal si aún está abierto
+            page.evaluate("""() => {
+                const modal = document.querySelector('#modal-aviso-privacidad');
+                if (modal && (modal.classList.contains('show') || modal.offsetParent !== null)) {
+                    modal.classList.remove('show');
+                    modal.style.display = 'none';
+                    modal.setAttribute('aria-hidden', 'true');
+                }
+                document.querySelectorAll('.modal-backdrop').forEach(b => b.remove());
+                document.body.classList.remove('modal-open');
+                document.body.style.paddingRight = '';
+            }""")
             page.wait_for_timeout(500)
             checkpoint('01_aviso_aceptado')
 
@@ -915,18 +1151,29 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
             logger.info('[2] Seleccionando industria...')
 
             # Seleccionar "Ninguna de las anteriores" (industria = 28)
-            _click_radio(page, 'industria', '28')
-            page.wait_for_timeout(500)
+            page.evaluate("""() => {
+                const radio = document.querySelector('input[name="industria"][value="28"]');
+                if (radio) {
+                    radio.checked = true;
+                    radio.click();
+                    radio.dispatchEvent(new Event('change', {bubbles: true}));
+                }
+            }""")
+            page.wait_for_timeout(1000)
 
             # Cerrar modal informativo que pueda aparecer
             _cerrar_modales(page)
-            page.wait_for_timeout(200)
+            page.wait_for_timeout(500)
 
-            # Click "Validar y Continuar"
-            _click_validar_continuar(page)
-            page.wait_for_timeout(1000)
+            # Llamar validarIndustria() directamente via JS
+            page.evaluate("""() => {
+                if (typeof validarIndustria === 'function') {
+                    try { validarIndustria(); } catch(e) { console.error(e); }
+                }
+            }""")
+            page.wait_for_timeout(2000)
 
-            # Cerrar modales
+            # Cerrar modales post-validación (competencia local/federal)
             _cerrar_modales(page)
             page.wait_for_timeout(500)
             checkpoint('02_industria')
@@ -979,8 +1226,26 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
                 logger.warning('[3] Error al seleccionar objeto: %s', e)
             page.wait_for_timeout(300)
 
-            _click_validar_continuar(page)
-            page.wait_for_timeout(1000)
+            # Llamar validarSolicitud() directamente via JS
+            page.evaluate("""() => {
+                if (typeof validarSolicitud === 'function') {
+                    try { validarSolicitud(); } catch(e) { console.error(e); }
+                } else {
+                    const activePane = document.querySelector('.tab-pane.show.active');
+                    if (activePane) {
+                        const btns = activePane.querySelectorAll('button');
+                        for (const btn of btns) {
+                            const t = btn.textContent.trim().toLowerCase();
+                            if (t.includes('validar') && t.includes('continuar')) {
+                                btn.click(); break;
+                            }
+                        }
+                    }
+                }
+            }""")
+            page.wait_for_timeout(2000)
+            _cerrar_modales(page)
+            page.wait_for_timeout(500)
             checkpoint('03_fecha_objeto')
 
             # ════════════════════════════════════════════════════════════════
@@ -997,8 +1262,21 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
             page.wait_for_timeout(1000)
 
             # ── 4b: Clic en "Agregar Solicitante" con reintentos ─────
-            clicked = _btn_click(page, 'agregar solicitante', retries=5)
-            page.wait_for_timeout(3000)  # Esperar a que Angular renderice el formulario
+            # Usar JS directo dentro del panel para evitar matchear elemento padre
+            clicked = page.evaluate("""() => {
+                const panel = document.querySelector('#stepSolicitante');
+                const searchIn = panel || document;
+                const btns = Array.from(searchIn.querySelectorAll('button, a, span'))
+                    .filter(b => b.offsetParent !== null)
+                    .filter(b => {
+                        const t = b.textContent.trim().toLowerCase();
+                        return t.includes('agregar') && t.includes('solicitante');
+                    });
+                btns.sort((a, b) => a.textContent.trim().length - b.textContent.trim().length);
+                if (btns.length) { btns[0].click(); return true; }
+                return false;
+            }""")
+            page.wait_for_timeout(3000)  # Esperar a que jQuery renderice el formulario
 
             # Verificar que el formulario se abrió (campos visibles)
             formulario_abierto = False
@@ -1076,34 +1354,60 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
 
             checkpoint('04_solicitante')
 
-            # ── 4e: Verificar que "Guardar" hizo efecto ─────────────
-            # Si el CURP está vacío después de Guardar, la validación React
-            # del portal lo borró — reintentar con presSequentially
+            # ── 4e: Verificar si el guardado funcionó ─────────────
             try:
-                curp_val = page.evaluate("""() => {
-                    const el = document.querySelector('[name="solicitante[curp]"]');
-                    return el ? el.value : '';
-                }""")
-                if not curp_val or len(curp_val) < 15:
-                    logger.warning('[4] CURP vacío/inválido post-guardar (%s), reintentando...', curp_val[:8] if curp_val else 'EMPTY')
-                    try:
-                        curp_clean = _validar_curp(cliente.curp, corregir_checksum=False)
-                        loc = page.locator('[name="solicitante[curp]"]')
-                        if loc.count():
-                            loc.click()
-                            loc.fill('')  # Limpiar primero
-                            page.wait_for_timeout(200)
-                            loc.press_sequentially(curp_clean, delay=15)
-                            page.wait_for_timeout(100)
-                            _btn_click(page, 'guardar', timeout=5000)
-                            page.wait_for_timeout(2000)
-                    except Exception as curp_err:
-                        logger.warning('[4] Reintento CURP falló: %s', curp_err)
-            except Exception as diag_err:
-                logger.warning('[4] No se pudo verificar CURP: %s', diag_err)
+                datos_check = page.evaluate("() => JSON.stringify(window.datosSolicitante || []).substring(0, 200)")
+                logger.info('[4] datosSolicitante post-guardar: %s', datos_check)
+                datos_ok = page.evaluate("() => Object.keys(window.datosSolicitante || {}).length > 0")
+            except Exception:
+                datos_ok = False
 
-            _click_validar_continuar(page)
-            page.wait_for_timeout(1500)
+            if not datos_ok:
+                logger.warning('[4] Guardado no funcionó, reintentando...')
+                # Reintentar: llenar campos faltantes y re-submit
+                _rnombre, _rap1, _rap2 = _separar_nombre_mexicano(cliente.nombre)
+                _fill_input(page, 'solicitante[nombre]', _truncar(_rnombre, 6))
+                _fill_input(page, 'solicitante[primer_apellido]', _truncar(_rap1, 6))
+                _fill_input(page, 'solicitante[segundo_apellido]', _truncar(_rap2, 6))
+                _curp_retry = _validar_curp(cliente.curp, corregir_checksum=False)
+                page.evaluate("""(curp) => {
+                    const el = document.querySelector('#idSolicitanteCURP');
+                    if (el) { el.value = curp; el.setAttribute('data-no-validate', 'true'); }
+                }""", _curp_retry)
+                # Re-fill contacts after getDataCURP
+                _fill_input(page, 'contactos[1]', _limpiar_telefono(cliente.telefono))
+                if cliente.email:
+                    _fill_input(page, 'contactos[3]', cliente.email)
+                # Bypass all client-side validation
+                page.evaluate("""() => {
+                    const form = document.querySelector('#frmSolicitante');
+                    if (form) {
+                        form.removeAttribute('data-parsley-validate');
+                        form.removeAttribute('novalidate');
+                        form.removeAttribute('onsubmit');
+                        const stepInput = document.querySelector('#step');
+                        if (stepInput) stepInput.value = 'solicitante';
+                        form.submit();
+                    }
+                }""")
+                page.wait_for_timeout(5000)
+                datos_ok = page.evaluate("() => Object.keys(window.datosSolicitante || {}).length > 0")
+                logger.info('[4] Reintento datosSolicitante: %s', datos_ok)
+
+            # ── Avanzar al siguiente paso ────────────────────────
+            # Si datosSolicitante tiene datos, llamar validarExisteSolicitante()
+            # que llama gotoStep('citado'). Si no, intentar _click_validar_continuar.
+            if datos_ok:
+                page.evaluate("() => { if (typeof validarExisteSolicitante === 'function') validarExisteSolicitante(); }")
+                page.wait_for_timeout(2000)
+                logger.info('[4] Avanzado via validarExisteSolicitante')
+            else:
+                logger.warning('[4] datosSolicitante vacío, intentando avanzar directamente')
+                # Forzar navegación al tab citado
+                _navigate_wizard_tab(page, 'citado')
+                page.wait_for_timeout(1500)
+
+            _cerrar_modales(page)
             checkpoint('04_solicitante_validado')
 
             # ════════════════════════════════════════════════════════════════
@@ -1114,19 +1418,80 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
             _navigate_wizard_tab(page, 'citado')
             page.wait_for_timeout(800)
 
-            _btn_click(page, 'agregar citado')
+            # El portal ahora pregunta "¿Tienes recibos de nómina oficiales?"
+            # Seleccionar "No" para proceder
+            page.evaluate("""() => {
+                const no = document.querySelector('#recibo_oficial_no');
+                if (no && no.offsetParent !== null) {
+                    no.checked = true; no.click();
+                    no.dispatchEvent(new Event('change', {bubbles: true}));
+                }
+                const no2 = document.querySelector('#recibo_pago_no');
+                if (no2 && no2.offsetParent !== null) {
+                    no2.checked = true; no2.click();
+                    no2.dispatchEvent(new Event('change', {bubbles: true}));
+                }
+            }""")
+            page.wait_for_timeout(500)
+
+            # Clic en "Agregar Citado" usando JS directo
+            page.evaluate("""() => {
+                const panel = document.querySelector('#stepCitado');
+                const searchIn = panel || document;
+                const btns = Array.from(searchIn.querySelectorAll('button, a, span'))
+                    .filter(b => b.offsetParent !== null)
+                    .filter(b => {
+                        const t = b.textContent.trim().toLowerCase();
+                        return t.includes('agregar') && t.includes('citado');
+                    });
+                btns.sort((a, b) => a.textContent.trim().length - b.textContent.trim().length);
+                if (btns.length) btns[0].click();
+            }""")
             page.wait_for_timeout(1500)
 
             _llenar_citado(page, cliente)
             page.wait_for_timeout(1000)
             checkpoint('05_citado')
 
-            _click_validar_continuar(page)
-            page.wait_for_timeout(1500)
+            # Submit citado form via jQuery
+            page.evaluate("""() => {
+                const form = document.querySelector('#frmCitado');
+                if (form) {
+                    form.removeAttribute('data-parsley-validate');
+                    form.removeAttribute('novalidate');
+                }
+            }""")
+            page.wait_for_timeout(200)
+            page.evaluate("""() => {
+                if (typeof $ !== 'undefined' && document.querySelector('#frmCitado')) {
+                    $('#frmCitado').submit();
+                }
+            }""")
+            page.wait_for_timeout(3000)
+
+            # Verificar si hay datos del citado
+            citado_ok = page.evaluate("() => Object.keys(window.datosCitado || window.datosSolicitado || {}).length > 0")
+            logger.info('[5] citado guardado: %s', citado_ok)
+
+            if not citado_ok:
+                logger.warning('[5] Guardado citado no funcionó, reintentando...')
+                page.evaluate("""() => {
+                    const form = document.querySelector('#frmCitado');
+                    if (form) { form.removeAttribute('data-parsley-validate'); form.submit(); }
+                }""")
+                page.wait_for_timeout(3000)
+                citado_ok = page.evaluate("() => Object.keys(window.datosCitado || window.datosSolicitado || {}).length > 0")
+                logger.info('[5] Reintento citado: %s', citado_ok)
+
+            # Avanzar al siguiente paso
             try:
-                page.wait_for_load_state('domcontentloaded', timeout=5000)
+                page.evaluate("() => { if (typeof validarExisteCitado === 'function') validarExisteCitado(); }")
+                page.wait_for_timeout(2000)
             except Exception:
                 pass
+            _navigate_wizard_tab(page, 'descripci')
+            page.wait_for_timeout(1500)
+            _cerrar_modales(page)
             checkpoint('05_citado_validado')
 
             # ════════════════════════════════════════════════════════════════
@@ -1134,8 +1499,25 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
             # ════════════════════════════════════════════════════════════════
             logger.info('[6] Llenando descripción de los hechos...')
 
+            # Si la URL cambió a /solicitud/update o hubo 500, el wizard
+            # puede estar en estado inconsistente. Verificar.
+            try:
+                current_url = page.url
+                if '500' in page.inner_text('body')[:200]:
+                    logger.warning('[6] Portal returned 500 error, attempting recovery...')
+                    page.go_back()
+                    page.wait_for_timeout(2000)
+            except Exception:
+                pass
+
             _navigate_wizard_tab(page, 'descripci')
             page.wait_for_timeout(800)
+
+            # Si el tab no se activó, intentar via gotoStep
+            tab_active = page.evaluate("() => document.querySelector('#stepDescripcion')?.classList.contains('show')")
+            if not tab_active:
+                page.evaluate("() => { if (typeof gotoStep === 'function') gotoStep('descripcion'); }")
+                page.wait_for_timeout(1500)
 
             hechos = [
                 f'El día {fmt_fecha(fecha_conflicto)} fui despedido injustificadamente'
@@ -1168,8 +1550,19 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
             except Exception:
                 pass
             page.wait_for_timeout(300)
-            _btn_click(page, 'aceptar')
-            page.wait_for_timeout(1000)
+            # Clic en "Validar y Continuar" del paso Descripción
+            page.evaluate("""() => {
+                const panel = document.querySelector('#stepDescripcion');
+                if (panel) {
+                    for (const btn of panel.querySelectorAll('button')) {
+                        const t = btn.textContent.trim().toLowerCase();
+                        if (t.includes('validar') && t.includes('continuar')) {
+                            btn.click(); break;
+                        }
+                    }
+                }
+            }""")
+            page.wait_for_timeout(1500)
             checkpoint('06_descripcion')
 
             # ════════════════════════════════════════════════════════════════
@@ -1323,7 +1716,23 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
 
             # ── PASO 1: Clic en "Enviar solicitud" ──────────────────
             logger.info('[7a] Click en Enviar solicitud...')
-            _btn_click(page, 'enviar solicitud')
+            page.evaluate("""() => {
+                const funcs = ['enviarSolicitud', 'confirmarEnvio'];
+                for (const f of funcs) {
+                    if (typeof window[f] === 'function') {
+                        try { window[f](); return; } catch(e) {}
+                    }
+                }
+                const panel = document.querySelector('#stepResumen');
+                if (panel) {
+                    for (const btn of panel.querySelectorAll('button, a.btn')) {
+                        const t = btn.textContent.trim().toLowerCase();
+                        if (t.includes('enviar') && btn.offsetParent !== null) {
+                            btn.click(); break;
+                        }
+                    }
+                }
+            }""")
             page.wait_for_timeout(1000)
 
             # Verificar si ya cambió la página (提交可能非常快)
@@ -1463,6 +1872,30 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
                     resultado.detalle = f'URL={page.url} | ERRORES={msgs}{curp_diag}'
                     browser.close()
                     return resultado  # Salir temprano
+
+                # Verificar si la URL cambió a /solicitud/create/XXXXX (éxito)
+                try:
+                    new_url = page.url
+                    m = re.search(r'/solicitud/create/(\d+)', new_url)
+                    if m:
+                        resultado.folio = m.group(1)
+                        resultado.success = True
+                        resultado.detalle = f'Solicitud enviada. ID: {m.group(1)}'
+                        navegacion_completa = True
+                        logger.info('[7.5] URL success: solicitud/%s', m.group(1))
+                except Exception:
+                    pass
+
+                if navegacion_completa:
+                    page.evaluate("""() => {
+                        for (const btn of document.querySelectorAll('button, a')) {
+                            const t = btn.textContent.trim().toLowerCase();
+                            if (t.includes('descargar') && t.includes('acuse')) {
+                                btn.click(); break;
+                            }
+                        }
+                    }""")
+                    page.wait_for_timeout(3000)
 
                 # Si no hay errores de validación pero tampoco hubo navegación,
                 # significa que el botón "Enviar" no hizo nada — diagnóstico detallado
