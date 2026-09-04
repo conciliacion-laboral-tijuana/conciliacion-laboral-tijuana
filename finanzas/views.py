@@ -93,18 +93,25 @@ def _totales_oficina(oficina, filtrar_fecha):
     `A or 0 + B` se evalúa como `A or (0 + B)` → TypeError si A y B son None,
     y subestima los totales si A es distinto de cero.
     """
+    def _safe_sum(qs, field):
+        # Evita el bug `A or 0 + B` sin paréntesis: cada agregado usa su propio
+        # paréntesis/zero-default antes de sumar, para que None + None no rompa ni
+        # subestime totales si un agregado es distinto de cero.
+        return (qs.aggregate(total=Sum(field))['total'] or 0)
+
     ing_of = (
-        (filtrar_fecha(oficina.settlementpayment_set.all()).aggregate(total=Sum('monto'))['total'] or 0)
-        + (filtrar_fecha(oficina.cashmovement_set.filter(tipo='ingreso')).aggregate(total=Sum('monto'))['total'] or 0)
+        _safe_sum(filtrar_fecha(oficina.settlementpayment_set.all()), 'monto')
+        + _safe_sum(filtrar_fecha(oficina.cashmovement_set.filter(tipo='ingreso')), 'monto')
     )
     gas_of = (
-        (filtrar_fecha(oficina.expense_set.all()).aggregate(total=Sum('monto'))['total'] or 0)
-        + (filtrar_fecha(oficina.cashmovement_set.filter(tipo='egreso')).aggregate(total=Sum('monto'))['total'] or 0)
-        + (filtrar_fecha(oficina.payroll_set.all(), campo_fecha='fecha_pago').aggregate(total=Sum('total_pagado'))['total'] or 0)
+        _safe_sum(filtrar_fecha(oficina.expense_set.all()), 'monto')
+        + _safe_sum(filtrar_fecha(oficina.cashmovement_set.filter(tipo='egreso')), 'monto')
+        + _safe_sum(filtrar_fecha(oficina.payroll_set.all(), campo_fecha='fecha_pago'), 'total_pagado')
     )
-    com_pagadas = filtrar_fecha(
-        Commission.objects.filter(oficina=oficina, estado='pagada')
-    ).aggregate(total=Sum('monto_comision'))['total'] or 0
+    com_pagadas = _safe_sum(
+        filtrar_fecha(Commission.objects.filter(oficina=oficina, estado='pagada')),
+        'monto_comision',
+    )
     return {
         'ingresos': ing_of,
         'gastos': gas_of,
@@ -400,6 +407,11 @@ class CashMovementDeleteView(LoginRequiredMixin, AdminOrSuperOnlyMixin, DeleteVi
         movimiento = self.get_object()
         messages.success(request, f'✅ Movimiento de {"ingreso" if movimiento.tipo == "ingreso" else "egreso"} eliminado correctamente.')
         return super().delete(request, *args, **kwargs)
+
+    def get_queryset(self):
+        # Solo administradores y superadmin pueden eliminar movimientos.
+        # Evita depender solo del modelo/browse para la Regla de negocio.
+        return CashMovement.objects.all()
 
 
 # ─── CRUD Socios ───────────────────────────────────────────────────────────

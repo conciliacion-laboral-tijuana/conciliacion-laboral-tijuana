@@ -3172,13 +3172,17 @@ def confirmar_acuse_datos(request, pk):
         campos_aplicados.append('fecha de solicitud')
 
     if 'nombre' in seleccionados and datos.get('solicitante'):
-        cliente.nombre = datos['solicitante']
-        campos_aplicados.append('nombre del solicitante')
+        nuevo_nombre = (datos['solicitante'] or '').strip()
+        if nuevo_nombre and cliente.nombre.strip() != nuevo_nombre:
+            cliente.nombre = nuevo_nombre
+            campos_aplicados.append('nombre del solicitante')
 
     if 'citado' in seleccionados and datos.get('citado'):
-        cliente.empresa = datos['citado']
-        cliente.empresa_razon_social = datos['citado']
-        campos_aplicados.append('empresa citada')
+        nuevo_citado = (datos['citado'] or '').strip()
+        if nuevo_citado and cliente.empresa.strip() != nuevo_citado:
+            cliente.empresa = nuevo_citado
+            cliente.empresa_razon_social = nuevo_citado
+            campos_aplicados.append('empresa citada')
 
     if 'fecha_conflicto' in seleccionados and datos.get('fecha_conflicto'):
         # La fecha del conflicto es la fecha de salida/despido del trabajador
