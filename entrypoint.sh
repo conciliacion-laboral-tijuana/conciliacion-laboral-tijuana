@@ -7,7 +7,9 @@ echo "=== Despacho Laboral - Iniciando ==="
 echo ">>> Ejecutando migraciones..."
 uv run python manage.py migrate --noinput
 
-# 2. Migrar datos de SQLite a PostgreSQL (si hay cambio de base de datos)
+# 2. Migrar datos de SQLite a PostgreSQL (solo si PG está vacío)
+#    Si PostgreSQL ya tiene expedientes, se omite para no re-importar
+#    datos viejos de SQLite en cada deploy.
 echo ">>> Verificando migración SQLite → PostgreSQL..."
 uv run python manage.py migrate_sqlite_to_pg 2>&1 || echo ">>> (Aviso: no se pudo migrar datos de SQLite — consulta logs para más detalles)"
 
@@ -123,6 +125,8 @@ elif [ -n "$_celery_redis" ] && [ "$_celery_worker_force" != "false" ]; then
     echo ">>> [worker] Redis detectado, iniciando Celery Worker automáticamente"
 fi
 
+CELERY_PID=""
+
 if [ "$should_start_celery" = true ]; then
     echo ">>> [worker] Iniciando Celery Worker..."
     uv run celery -A config worker --loglevel=info --concurrency=1 &
@@ -135,8 +139,13 @@ fi
 # Trap para shutdown graceful
 cleanup() {
     echo ">>> Deteniendo servicios..."
-    [ -n "$CELERY_PID" ] && kill "$CELERY_PID" 2>/dev/null
-    [ -n "$GUNICORN_PID" ] && kill "$GUNICORN_PID" 2>/dev/null
+    if [ -n "$CELERY_PID" ]; then
+        kill "$CELERY_PID" 2>/dev/null || true
+    fi
+    if [ -n "$GUNICORN_PID" ]; then
+        kill "$GUNICORN_PID" 2>/dev/null || true
+    fi
+    wait 2>/dev/null
     exit 0
 }
 # Signal names WITHOUT 'SIG' prefix (dash/POSIX compatible)
@@ -155,5 +164,8 @@ echo ">>> [web] Gunicorn PID: $GUNICORN_PID"
 # Si Gunicorn muere, detener Celery Worker y salir
 wait $GUNICORN_PID
 echo ">>> Gunicorn terminó. Deteniendo servicios secundarios..."
-[ -n "$CELERY_PID" ] && kill "$CELERY_PID" 2>/dev/null && wait "$CELERY_PID" 2>/dev/null
+if [ -n "$CELERY_PID" ]; then
+    kill "$CELERY_PID" 2>/dev/null || true
+    wait "$CELERY_PID" 2>/dev/null || true
+fi
 echo ">>> Todos los servicios detenidos."

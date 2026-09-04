@@ -57,6 +57,18 @@ class Command(BaseCommand):
         db_url = os.environ.get('DATABASE_URL', '')
         is_postgres = 'postgres' in db_url.lower()
 
+        # ── 3b. Saltar si PostgreSQL YA tiene datos (producción) ─────
+        # Evita re-importar datos viejos de SQLite en cada deploy.
+        if is_postgres and not options['force']:
+            from expedientes.models import Expediente
+            pg_count = Expediente.objects.count()
+            if pg_count > 0:
+                self.stdout.write(self.style.WARNING(
+                    f'ℹ️  PostgreSQL ya tiene {pg_count} expedientes. '
+                    f'Omitiendo migración desde SQLite (usa --force para forzar).'
+                ))
+                return
+
         if not is_postgres and not options['force']:
             # Revisar variables de Railway
             has_pg_vars = all(os.environ.get(v) for v in ['PGHOST', 'PGUSER', 'PGDATABASE'])
@@ -81,19 +93,20 @@ class Command(BaseCommand):
         self.stdout.write(f'   Tamaño:    {os.path.getsize(sqlite_path) / 1024:.1f} KB')
 
         # ── 4. Apps a incluir ─────────────────────────────────────────
-        exclude_apps = [
-            'contenttypes',   # Se regenera con migrate
-            'sessions',       # Sesiones temporales
-            'admin',          # No tiene datos de admin log
-        ]
+        sistemas_excluidos = {
+            'contenttypes',  # Se regenera con migrate
+            'sessions',      # Sesiones temporales
+            'admin',         # Admin log es regenerable
+            'auth',          # Usuarios del sistema pueden tratarse aparte
+        }
+        # ContentTypes ya se excluye si la opción se activó; evita duplicar
         if options['skip_contenttypes']:
-            exclude_apps.append('contenttypes')
+            sistemas_excluidos.add('contenttypes')
 
         include_apps = [
             'accounts',
             'expedientes',
             'finanzas',
-            'auth',           # Usuarios y grupos
         ]
 
         # ── 5. Dump desde SQLite (subprocess con DATABASE_URL temporal) ──
@@ -114,7 +127,7 @@ class Command(BaseCommand):
         ]
 
         # Excluir apps del sistema
-        for app in exclude_apps:
+        for app in sistemas_excluidos:
             dump_cmd.extend(['--exclude', app])
 
         # Incluir explícitamente las apps del proyecto
