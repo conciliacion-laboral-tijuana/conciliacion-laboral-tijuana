@@ -1012,7 +1012,7 @@ def _llenar_citado(page, cliente):
 # ══════════════════════════════════════════════════════════════════════════
 
 
-def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> ResultadoConciliacion:
+def enviar_a_conciliacion(expediente, headless=True, download_dir=None, modo='automatico') -> ResultadoConciliacion:
     """
     Automatiza el envío de la solicitud al portal de conciliación de Baja California.
 
@@ -1020,6 +1020,7 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
         expediente: Instancia del modelo Expediente con cliente relacionado.
         headless: Si True, corre el navegador sin interfaz gráfica.
         download_dir: Directorio para guardar screenshots y PDFs.
+        modo: 'automatico' (headless por defecto en prod) o 'debug'.
 
     Returns:
         ResultadoConciliacion con folio y ruta del PDF si tuvo éxito.
@@ -1049,7 +1050,11 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
         with sync_playwright() as p:
             # ── En producción (Railway/Docker) siempre forzar headless ──
             force_headless = os.environ.get('FORCE_HEADLESS', 'true').lower() == 'true'
-            actual_headless = headless if not force_headless else True
+            # Modo debug/extension puede forzar visible; en modo automatico_FORCE_HEADLESS fuerza headless sin importar el flag.
+            if modo == 'debug':
+                actual_headless = False
+            else:
+                actual_headless = headless if not force_headless else True
 
             browser = p.chromium.launch(
                 headless=actual_headless,

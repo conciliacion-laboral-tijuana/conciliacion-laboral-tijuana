@@ -48,7 +48,9 @@ from .marcadores import get_marcadores, get_datos_faltantes, get_completitud_sta
 def _get_machotes_queryset():
     """Retorna Machotes activos ordenados: favoritos primero, luego por orden y nombre."""
     return Machote.objects.filter(activo=True).order_by('-favorito', 'orden', 'nombre')
+
 from core.laboral.calculators import simular
+
 from .conciliacion_automation import enviar_y_guardar as enviar_conciliacion
 from .conciliacion_automation import _validar_curp, CurpInvalidoError, screenshots_a_urls
 from .tasks import ejecutar_conciliacion as ejecutar_conciliacion_task
@@ -2797,6 +2799,7 @@ def enviar_conciliacion_automation(request, pk):
                 args=(task.pk,),
                 daemon=False,  # Non-daemon: sobrevive si Gunicorn recicla el worker
             )
+            hilo.daemon = False
             hilo.start()
 
         messages.info(request, '🚀 Iniciando envío automático al portal de conciliación...')
@@ -3002,6 +3005,7 @@ def reintentar_conciliacion(request, task_pk):
             args=(task.pk,),
             daemon=False,  # Non-daemon: sobrevive si Gunicorn recicla el worker
         )
+        hilo.daemon = False
         hilo.start()
 
     messages.info(request, '🚀 Reintentando envío automático al portal de conciliación...')
