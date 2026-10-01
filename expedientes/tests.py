@@ -388,45 +388,43 @@ class FlujoCompletoDemandaTests(TestCase):
         self.assertIn('asistente', resp.url, 'Debe redirigir al asistente para completar datos')
 
     def test_wizard_completo_genera_demanda_y_guarda_machote(self):
-        """El asistente paso a paso avanza, valida datos críticos y guarda machotes con marcadores."""
+        """El acordeón guarda datos, valida críticos y genera la demanda; machotes con marcadores."""
         url = reverse('demanda_asistente', args=[self.expediente.pk])
 
-        # El expediente base tiene datos completos, pero probamos que el flujo avance
-        # paso 1 → 2 → 3 → 4 y termine en el editor
+        # GET muestra las 5 secciones del acordeón
+        resp = self.client.get(url)
+        self.assertEqual(resp.status_code, 200)
+        body = resp.content.decode('utf-8', errors='replace')
+        self.assertIn('acordeon-seccion', body, 'El acordeón debe renderizar secciones')
+        self.assertIn('sec-despido', body, 'Debe existir la sección de despido/pruebas')
+        self.assertIn('circunstancias_despido', body, 'La sección despido debe capturar circunstancias')
+
+        # Guardar datos (todas las secciones) desde el acordeón
         resp = self.client.post(url, {
-            'paso_actual': '1', 'accion': 'siguiente',
+            'accion': 'guardar',
             'nombre': self.cliente.nombre,
             'curp': self.cliente.curp,
             'oficina': self.cliente.oficina,
             'genero': self.cliente.genero,
-        })
-        self.assertEqual(resp.status_code, 302)
-        self.assertIn('paso=2', resp.url, 'El asistente debe avanzar al paso 2')
-
-        resp = self.client.post(url, {
-            'paso_actual': '2', 'accion': 'siguiente',
             'salario': str(self.cliente.salario),
             'fecha_ingreso': self.cliente.fecha_ingreso.isoformat(),
             'fecha_salida': self.cliente.fecha_salida.isoformat(),
-        })
-        self.assertIn('paso=3', resp.url, 'El asistente debe avanzar al paso 3')
-
-        resp = self.client.post(url, {
-            'paso_actual': '3', 'accion': 'siguiente',
             'empresa': self.cliente.empresa,
+            'puesto': self.cliente.puesto,
+            'circunstancias_despido': 'Me entregaron carta de despido el mismo día sin explicación.',
+            'testigos': 'Juan Pérez\nMaría López',
+            'documentos_prueba': 'Carta de despido\nRecibos de nómina',
         })
-        self.assertIn('paso=4', resp.url, 'El asistente debe avanzar al paso 4 (revisión)')
-
-        # Paso 4: revisión con cálculo y firma
-        resp = self.client.get(f'{url}?paso=4')
         self.assertEqual(resp.status_code, 200)
-        body = resp.content.decode('utf-8', errors='replace')
-        self.assertIn('tipo_despido', body, 'El paso 4 debe ofrecer tipo de despido')
-        self.assertIn('TOTAL', body, 'El paso 4 debe mostrar el cálculo')
+
+        self.cliente.refresh_from_db()
+        self.assertEqual(self.cliente.testigos, 'Juan Pérez\nMaría López')
+        self.assertEqual(self.cliente.documentos_prueba, 'Carta de despido\nRecibos de nómina')
+        self.assertTrue(self.cliente.circunstancias_despido)
 
         # Finalizar → editor de demanda
         resp = self.client.post(url, {
-            'paso_actual': '4', 'accion': 'finalizar', 'tipo_despido': 'injustificado',
+            'accion': 'finalizar', 'tipo_despido': 'injustificado',
         })
         self.assertEqual(resp.status_code, 302)
         self.assertIn('demanda', resp.url)

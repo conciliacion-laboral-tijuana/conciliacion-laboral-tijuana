@@ -278,6 +278,18 @@ def _conceptos_para_demanda(tipo_despido_key: str) -> dict:
     return conceptos
 
 
+def _texto_como_lista(valor: str | None) -> str:
+    """Convierte texto multilínea (uno por línea) en lista legible 'a), b), c)...'.
+    Para un solo elemento (o sin saltos de línea) devuelve el texto tal cual."""
+    if not valor:
+        return ""
+    lineas = [l.strip().rstrip('.') for l in valor.splitlines() if l.strip()]
+    if len(lineas) <= 1:
+        return (lineas[0] if lineas else "").strip()
+    letras = "abcdefghijklm".upper()
+    return "; ".join(f"{letras[i]}) {l}" for i, l in enumerate(lineas[:13])) + "."
+
+
 def _agregar_hechos(doc: Document, expediente: Expediente, tipo_despido: str = 'injustificado') -> None:
     """Agrega la sección de HECHOS con narrativa legal."""
     cliente = expediente.cliente
@@ -307,9 +319,54 @@ TERCERO.- El actor agotó la instancia conciliatoria ante el Centro de Conciliac
 CUARTO.- A la fecha de presentación de esta demanda, el demandado no ha cubierto al actor el pago de las prestaciones laborales que se reclaman, a pesar de haber sido requerido para ello.
 """
 
+    # Circunstancias del despido capturadas por el asesor (QUINTO)
+    circunstancias = (cliente.circunstancias_despido or '').strip()
+    if circunstancias:
+        hechos += f"\n\nQUINTO.- Respecto de los hechos que motivaron la terminación de la relación laboral, el actor manifiesta que: {circunstancias}"
+
+    # Testigos de los hechos (SEXTO)
+    testigos_txt = _texto_como_lista(cliente.testigos)
+    if testigos_txt:
+        hechos += ("\n\nSEXTO.- Los hechos anteriores podrán ser corroborados por las personas que "
+                   f"oportunamente se señalarán como testigos: {testigos_txt}")
+
     p_hechos = doc.add_paragraph()
     run_hechos = p_hechos.add_run(hechos.strip())
     run_hechos.font.size = BODY_FONT_SIZE
+    doc.add_paragraph()
+
+
+def _agregar_pruebas(doc: Document, expediente: Expediente) -> None:
+    """Agrega la sección de PRUEBAS (documental, testimonial, instrumental, presuncional)."""
+    p = doc.add_paragraph()
+    run = p.add_run("—  P R U E B A S  —")
+    run.bold = True
+    run.font.size = SECTION_FONT_SIZE
+    run.font.color.rgb = COLOR_PRIMARY
+
+    documentos_txt = _texto_como_lista(expediente.cliente.documentos_prueba)
+    numero = 1
+    if documentos_txt:
+        p = doc.add_paragraph()
+        run = p.add_run(f"  {numero}. DOCUMENTAL. Consistente en los documentos siguientes: {documentos_txt}.")
+        run.font.size = BODY_FONT_SIZE
+        numero += 1
+    if (expediente.cliente.testigos or '').strip():
+        p = doc.add_paragraph()
+        run = p.add_run(f"  {numero}. TESTIMONIAL. A cargo de las personas que oportunamente se señalarán, respecto de los hechos controvertidos.")
+        run.font.size = BODY_FONT_SIZE
+        numero += 1
+
+    fijas = [
+        "INSTRUMENTAL DE ACTUACIONES, consistente en todo lo actuado que favorezca a los intereses del trabajador.",
+        "PRESUNCIONAL LEGAL Y HUMANA, en todo aquello que beneficie a los intereses de la parte actora.",
+    ]
+    for f in fijas:
+        p = doc.add_paragraph()
+        run = p.add_run(f"  {numero}. {f}")
+        run.font.size = BODY_FONT_SIZE
+        numero += 1
+
     doc.add_paragraph()
 
 
@@ -551,6 +608,7 @@ def generar_demanda_word(expediente: Expediente, desde_cero=True,
         _agregar_hechos(doc, expediente, tipo_despido)
         _agregar_prestaciones(doc, expediente, calculo, tipo_despido)
         _agregar_derecho(doc, tipo_despido)
+        _agregar_pruebas(doc, expediente)
         _agregar_puntos_petitorios(doc, expediente, calculo)
         _agregar_firma(doc, expediente)
         _agregar_pie_generacion(doc, expediente)
@@ -815,6 +873,36 @@ def generar_demanda_html(expediente: Expediente, tipo_despido_override: str | No
 <p><strong>TERCERO.-</strong> El actor agotó la instancia conciliatoria ante el Centro de Conciliación Laboral, según consta en el expediente número {folio} de fecha {f_tramite}, sin que se lograra acuerdo conciliatorio alguno, por lo que se expidió la constancia de no conciliación correspondiente.</p>
 
 <p><strong>CUARTO.-</strong> A la fecha de presentación de esta demanda, el demandado no ha cubierto al actor el pago de las prestaciones laborales que se reclaman, a pesar de haber sido requerido para ello.</p>
+"""
+
+    # Circunstancias del despido capturadas por el asesor (QUINTO)
+    circunstancias_html = (cliente.circunstancias_despido or '').strip()
+    if circunstancias_html:
+        html += (f"\n<p><strong>QUINTO.-</strong> Respecto de los hechos que motivaron la terminación de la "
+                 f"relación laboral, el actor manifiesta que: {circunstancias_html}</p>\n")
+
+    # Testigos de los hechos (SEXTO)
+    testigos_html = _texto_como_lista(cliente.testigos)
+    if testigos_html:
+        html += ("\n<p><strong>SEXTO.-</strong> Los hechos anteriores podrán ser corroborados por las personas que "
+                 f"oportunamente se señalarán como testigos: {testigos_html}</p>\n")
+
+    # Sección de PRUEBAS (documental, testimonial, instrumental, presuncional)
+    pruebas_items_html = []
+    documentos_html = _texto_como_lista(cliente.documentos_prueba)
+    n = 1
+    if documentos_html:
+        pruebas_items_html.append(f"<p><strong>{n}. DOCUMENTAL.</strong> Consistente en los documentos siguientes: {documentos_html}.</p>")
+        n += 1
+    if (cliente.testigos or '').strip():
+        pruebas_items_html.append(f"<p><strong>{n}. TESTIMONIAL.</strong> A cargo de las personas que oportunamente se señalarán, respecto de los hechos controvertidos.</p>")
+        n += 1
+    pruebas_items_html.append(f"<p><strong>{n}. INSTRUMENTAL DE ACTUACIONES.</strong> Consistente en todo lo actuado que favorezca a los intereses del trabajador.</p>")
+    n += 1
+    pruebas_items_html.append(f"<p><strong>{n}. PRESUNCIONAL LEGAL Y HUMANA.</strong> En todo aquello que beneficie a los intereses de la parte actora.</p>")
+    pruebas_html = "\n".join(pruebas_items_html)
+
+    html += f"""
 
 <h3 style="color:#1F2937;">—  P R E S T A C I O N E S   R E C L A M A D A S  —</h3>
 
@@ -836,6 +924,10 @@ def generar_demanda_html(expediente: Expediente, tipo_despido_override: str | No
 <h3 style="color:#1F2937;">—  F U N D A M E N T O S   D E   D E R E C H O  —</h3>
 
 {_fundamentos_derecho_html(tipo_despido)}
+
+<h3 style="color:#1F2937;">—  P R U E B A S  —</h3>
+
+{pruebas_html}
 
 <h3 style="color:#1F2937;">—  P U N T O S   P E T I T O R I O S  —</h3>
 

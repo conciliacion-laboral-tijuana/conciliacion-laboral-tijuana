@@ -1473,28 +1473,33 @@ def demanda_editor(request, pk):
     })
 
 
-# ─── Asistente paso a paso para llenar la demanda ────────────────────────
+# ─── Acordeón de demanda (secciones en una sola página) ───────────────
 
-# Campos del cliente por paso del asistente
+# Campos del cliente por sección del acordeón
 WIZARD_PASOS = {
-    '1': {
-        'titulo': 'Datos personales del cliente',
+    'trabajador': {
+        'titulo': 'Trabajador (actor)',
         'descripcion': 'Nombre completo, CURP y contacto del trabajador.',
         'campos': ['nombre', 'curp', 'rfc', 'telefono', 'whatsapp', 'email',
                    'fecha_nacimiento', 'genero', 'como_supo', 'oficina'],
     },
-    '2': {
+    'laboral': {
         'titulo': 'Información laboral',
         'descripcion': 'Puesto, salario y fechas de ingreso/salida (requeridos para los cálculos).',
         'campos': ['puesto', 'salario', 'periodo_pago', 'horas_semanales', 'jornada',
                    'fecha_ingreso', 'fecha_salida'],
     },
-    '3': {
+    'empresa': {
         'titulo': 'Empresa / Patrón (demandado)',
         'descripcion': 'Datos de la empresa a la que se demandará.',
         'campos': ['empresa', 'empresa_razon_social', 'empresa_actividad', 'tipo_persona_citado',
                    'empresa_telefono', 'empresa_calle', 'empresa_numero',
                    'empresa_colonia', 'empresa_cp', 'empresa_referencias'],
+    },
+    'despido': {
+        'titulo': 'Despido, testigos y pruebas',
+        'descripcion': 'Circunstancias del despido, testigos y documentos disponibles (prueba documental).',
+        'campos': ['circunstancias_despido', 'testigos', 'documentos_prueba'],
     },
 }
 
@@ -1529,15 +1534,18 @@ def _verificar_datos_criticos(expediente):
 @login_required
 def demanda_asistente(request, pk):
     """
-    Asistente paso a paso para llenar la demanda sin omitir datos.
+    Acordeón de demanda: todas las secciones en UNA sola página.
 
-    Pasos:
-      1) Datos personales del cliente
-      2) Información laboral (salario, fechas → cálculos automáticos)
-      3) Empresa / patrón
-      4) Tipo de despido + revisión final (firma con nombre arriba y abajo)
+    Secciones (acordeón):
+      · trabajador — Datos personales del actor
+      · laboral    — salario, fechas → cálculos automáticos
+      · empresa    — demandado (con autocompletado de catálogo)
+      · despido    — circunstancias del despido, testigos y documentos
+      · revision   — tipo de despido, cálculo y firma
 
-    Al terminar redirige al editor de demanda con el contenido generado.
+    Un solo <form> envuelve todo el acordeón:
+      POST accion=guardar   → guarda todo y permanece en la página
+      POST accion=finalizar → valida críticos y redirige al editor de demanda
     """
     if not _puede_generar_documentos(request):
         messages.error(request, 'No tienes permiso para generar documentos legales.')
@@ -1545,29 +1553,36 @@ def demanda_asistente(request, pk):
     expediente = get_object_or_404(get_expedientes_queryset(request.user), pk=pk)
     cliente = expediente.cliente
 
-    PASOS_VALIDOS = list(WIZARD_PASOS.keys()) + ['4']
-    SIGUIENTE_PASO = {'1': '2', '2': '3', '3': '4'}
-    paso = request.POST.get('paso_actual') or request.GET.get('paso') or '1'
-    paso = paso if paso in PASOS_VALIDOS else '1'
-
     errores = {}
+    seccion_abierta = request.GET.get('seccion') or request.POST.get('seccion_abierta') or ''
 
     if request.method == 'POST':
-        accion = request.POST.get('accion', 'siguiente')
+        accion = request.POST.get('accion', 'guardar')
 
-        if paso in WIZARD_PASOS:
-            # Validar y guardar solo los campos de este paso (reutilizando ClienteForm)
-            form = ClienteForm(request.POST, instance=cliente)
-            # Campos opcionales del modelo (vacío en el wizard = conservar el valor actual)
-            opcionales = {'rfc', 'telefono', 'whatsapp', 'email', 'fecha_nacimiento', 'genero',
-                          'puesto', 'periodo_pago', 'horas_semanales', 'jornada',
-                          'empresa_razon_social', 'empresa_actividad', 'tipo_persona_citado',
-                          'empresa_telefono', 'empresa_calle', 'empresa_numero',
-                          'empresa_colonia', 'empresa_cp', 'empresa_referencias', 'como_supo'}
-            for campo in WIZARD_PASOS[paso]['campos']:
+        # ─── Validar y guardar los campos del acordeón ────────────────
+        form = ClienteForm(request.POST, instance=cliente)
+        campos_acordeon = []
+        for info in WIZARD_PASOS.values():
+            campos_acordeon.extend(info['campos'])
+
+        # Campos opcionales del modelo (vacío en el POST = conservar el valor
+        # actual; algunos tienen default y no aceptan cadena vacía)
+        opcionales = {'rfc', 'telefono', 'whatsapp', 'email', 'fecha_nacimiento', 'genero',
+                      'puesto', 'periodo_pago', 'horas_semanales', 'jornada',
+                      'empresa_razon_social', 'empresa_actividad', 'tipo_persona_citado',
+                      'empresa_telefono', 'empresa_calle', 'empresa_numero',
+                      'empresa_colonia', 'empresa_cp', 'empresa_referencias', 'como_supo',
+                      'circunstancias_despido', 'testigos', 'documentos_prueba'}
+
+        # ¿Vienen datos del acordeón en este POST? Si el formulario solo
+        # trae la sección de revisión (tipo_despido), NO tocar el cliente.
+        postea_acordeon = any(c in request.POST for c in campos_acordeon)
+
+        if postea_acordeon:
+            for campo in campos_acordeon:
                 raw = request.POST.get(campo, '')
                 # Si es opcional y viene vacío, no validar (conserva su valor)
-                if campo in opcionales and raw == '':
+                if campo in opcionales and raw.strip() == '':
                     continue
                 try:
                     form.fields[campo].clean(raw)
@@ -1575,9 +1590,8 @@ def demanda_asistente(request, pk):
                     errores[campo] = list(e.messages) if hasattr(e, 'messages') else [str(e)]
 
             if not errores:
-                # Guardar solo los campos del paso (sin tocar el resto)
                 datos = {}
-                for campo in WIZARD_PASOS[paso]['campos']:
+                for campo in campos_acordeon:
                     raw = request.POST.get(campo, '')
                     if campo in form.fields and raw != '':
                         datos[campo] = form.fields[campo].clean(raw)
@@ -1586,51 +1600,48 @@ def demanda_asistente(request, pk):
                         setattr(cliente, campo, valor)
                     cliente.save(update_fields=list(datos))
 
-                # Avanzar al siguiente paso (¡con ?paso=X para no volver al paso 1!)
-                siguiente = SIGUIENTE_PASO.get(paso, '4')
-                return redirect(f"{reverse('demanda_asistente', kwargs={'pk': expediente.pk})}?paso={siguiente}")
-
         if accion == 'finalizar':
-            # Paso 4: guardar tipo de despido y generar la demanda
+            # Guardar tipo de despido y generar la demanda
             tipo = request.POST.get('tipo_despido', '')
             if tipo in dict(Expediente.TIPO_DESPIDO_CHOICES):
                 expediente.tipo_despido = tipo
                 expediente.save(update_fields=['tipo_despido'])
 
-            faltantes = _verificar_datos_criticos(expediente)
-            if faltantes:
-                for f in faltantes:
-                    messages.error(request, f'Falta: {f["label"]}. Completa el dato para generar la demanda.')
-                return redirect(f"{reverse('demanda_asistente', kwargs={'pk': expediente.pk})}?paso=4")
+            if not errores:
+                faltantes = _verificar_datos_criticos(expediente)
+                if faltantes:
+                    for f in faltantes:
+                        messages.error(request, f'Falta: {f["label"]}. Completa el dato para generar la demanda.')
+                    seccion_abierta = 'revision'
+                else:
+                    registrar_movimiento(
+                        expediente=expediente,
+                        usuario=request.user,
+                        accion='actualizacion',
+                        detalle='Demanda llenada con el acordeón de demanda'
+                    )
+                    messages.success(request, '✅ Demanda lista. Revisa el contenido en el editor antes de descargar.')
+                    return redirect('demanda_editor', pk=expediente.pk)
+            else:
+                seccion_abierta = 'revision'
+        elif postea_acordeon and not errores:
+            messages.success(request, '✅ Datos guardados. Puedes continuar con otra sección.')
+        elif errores:
+            messages.error(request, 'Corrige los campos marcados en rojo.')
 
-            registrar_movimiento(
-                expediente=expediente,
-                usuario=request.user,
-                accion='actualizacion',
-                detalle='Demanda llenada con el asistente paso a paso'
-            )
-            messages.success(request, '✅ Demanda lista. Revisa el contenido en el editor antes de descargar.')
-            return redirect('demanda_editor', pk=expediente.pk)
-
-    # ─── Construir formulario para el paso actual ─────────────────────
+    # ─── Formulario y contexto del acordeón ─────────────────────────
     form = ClienteForm(instance=cliente)
-
-    # Paso 4: cálculo y previsualización de la firma
-    calculo = None
-    if paso == '4':
-        calculo = calcular_desde_expediente(expediente)
-
-    # Datos críticos para mostrar en el paso 4
+    calculo = calcular_desde_expediente(expediente)
     faltantes_criticos = _verificar_datos_criticos(expediente)
 
     return render(request, 'expedientes/demanda_asistente.html', {
         'expediente': expediente,
         'cliente': cliente,
         'form': form,
-        'paso': paso,
         'pasos_info': WIZARD_PASOS,
-        'pasos_keys': list(WIZARD_PASOS.keys()) + ['4'],
+        'pasos_keys': list(WIZARD_PASOS.keys()),
         'errores': errores,
+        'seccion_abierta': seccion_abierta if seccion_abierta in WIZARD_PASOS or seccion_abierta == 'revision' else '',
         'tipos_despido': Expediente.TIPO_DESPIDO_CHOICES,
         'calculo': calculo,
         'faltantes_criticos': faltantes_criticos,

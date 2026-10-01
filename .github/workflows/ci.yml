@@ -5,6 +5,12 @@ on:
     branches: [main]
   pull_request:
 
+env:
+  SECRET_KEY: ci-secret-key
+  ALLOWED_HOSTS: "*"
+  CSRF_TRUSTED_ORIGINS: http://localhost
+  DEBUG: "False"
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -26,21 +32,11 @@ jobs:
 
       - name: Django system check
         run: uv run python manage.py check
-        env:
-          SECRET_KEY: ci-secret-key
-          ALLOWED_HOSTS: "*"
-          CSRF_TRUSTED_ORIGINS: http://localhost
-          DEBUG: "False"
 
       - name: Run tests (incluye verificación de cálculos laborales y flujo completo)
         # settings_test: usa StaticFilesStorage simple (en CI no existe el
         # manifest de collectstatic que exige CompressedManifestStaticFilesStorage)
         run: uv run python manage.py test expedientes.tests --settings=config.settings_test --verbosity 2
-        env:
-          SECRET_KEY: ci-secret-key
-          ALLOWED_HOSTS: "*"
-          CSRF_TRUSTED_ORIGINS: http://localhost
-          DEBUG: "False"
 
       - name: Verify demandas cálculos (script CLI)
         # El script usa la BD de desarrollo por defecto (sqlite); se ejecutan
@@ -48,8 +44,158 @@ jobs:
         run: |
           uv run python manage.py migrate --noinput
           uv run python verify_demandas_calculos.py
+
+  e2e-acordeon:
+    # E2E en navegador real (Chromium headless) del acordeón de demanda:
+    # levanta el servidor de desarrollo y ejecuta prueba_acordeon_navegador.py,
+    # que crea usuario y expediente temporales y los limpia al terminar.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: ".python-version"
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('uv.lock') }}
+
+      - name: Install Chromium (Playwright)
+        run: uv run playwright install --with-deps chromium
+
+      - name: Migraciones y collectstatic
+        # collectstatic es necesario porque el servidor corre con DEBUG=False
+        # y Whitenoise en modo manifest ({% static %} exige staticfiles.json).
+        run: |
+          uv run python manage.py migrate --noinput
+          uv run python manage.py collectstatic --noinput
+
+      - name: Run E2E acordeón de demanda (Chromium headless)
+        run: |
+          # Servidor de desarrollo en segundo plano (mismo flujo que local)
+          uv run python run_local.py > e2e_server.log 2>&1 &
+          SERVER_PID=$!
+
+          # Esperar a que el servidor responda (máx 60 s)
+          for i in $(seq 1 60); do
+            curl -sf http://127.0.0.1:8080/accounts/login/ > /dev/null && break
+            sleep 1
+          done
+
+          # Correr el E2E conservando el código de salida
+          EXIT=0
+          uv run python prueba_acordeon_navegador.py || EXIT=$?
+
+          kill $SERVER_PID 2>/dev/null || true
+
+          # Si falló, mostrar el log del servidor para depurar
+          if [ $EXIT -ne 0 ]; then
+            echo '--- e2e_server.log (últimas 50 líneas) ---'
+            tail -50 e2e_server.log || true
+          fi
+          exit $EXIT
+
+      - name: Upload E2E artifacts (screenshots/HTML al fallar)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-acordeon-artifacts
+          path: |
+            e2e_artifacts/
+            e2e_server.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+  e2e-acordeon-pg:
+    # Mismo E2E contra PostgreSQL (el stack de producción en Railway):
+    # valida migraciones, Whitenoise manifest y el flujo completo con PG.
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
         env:
-          SECRET_KEY: ci-secret-key
-          ALLOWED_HOSTS: "*"
-          CSRF_TRUSTED_ORIGINS: http://localhost
-          DEBUG: "False"
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: despacho
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/despacho
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: ".python-version"
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('uv.lock') }}
+
+      - name: Install Chromium (Playwright)
+        run: uv run playwright install --with-deps chromium
+
+      - name: Migraciones y collectstatic (PostgreSQL)
+        run: |
+          uv run python manage.py migrate --noinput
+          uv run python manage.py collectstatic --noinput
+
+      - name: Run E2E acordeón de demanda (PostgreSQL)
+        run: |
+          uv run python run_local.py > e2e_server.log 2>&1 &
+          SERVER_PID=$!
+
+          for i in $(seq 1 60); do
+            curl -sf http://127.0.0.1:8080/accounts/login/ > /dev/null && break
+            sleep 1
+          done
+
+          EXIT=0
+          uv run python prueba_acordeon_navegador.py || EXIT=$?
+
+          kill $SERVER_PID 2>/dev/null || true
+
+          if [ $EXIT -ne 0 ]; then
+            echo '--- e2e_server.log (últimas 50 líneas) ---'
+            tail -50 e2e_server.log || true
+          fi
+          exit $EXIT
+
+      - name: Upload E2E artifacts (screenshots/HTML al fallar)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-acordeon-artifacts-pg
+          path: |
+            e2e_artifacts/
+            e2e_server.log
+          if-no-files-found: ignore
+          retention-days: 7

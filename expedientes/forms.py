@@ -15,6 +15,7 @@ class ClienteForm(forms.ModelForm):
                    'empresa_curp', 'empresa_rfc', 'tipo_persona_citado',
                    'puesto', 'salario', 'periodo_pago', 'horas_semanales', 'jornada',
                    'fecha_ingreso', 'fecha_salida', 'tipo_despido',
+                   'circunstancias_despido', 'testigos', 'documentos_prueba',
                    'como_supo', 'oficina',
                    'asesoria_gratuita_ofrecida', 'asesoria_gratuita_agendada', 'fecha_asesoria_gratuita']
         widgets = {
@@ -52,6 +53,12 @@ class ClienteForm(forms.ModelForm):
             'fecha_ingreso': forms.DateInput(attrs={'class': 'input', 'type': 'date'}),
             'fecha_salida': forms.DateInput(attrs={'class': 'input', 'type': 'date'}),
             'tipo_despido': forms.Select(attrs={'class': 'input'}),
+            'circunstancias_despido': forms.Textarea(attrs={'class': 'input', 'rows': 6,
+                                                            'placeholder': 'Cómo ocurrió el despido: qué te dijeron, quién te lo comunicó, si te entregaron carta…'}),
+            'testigos': forms.Textarea(attrs={'class': 'input', 'rows': 3,
+                                              'placeholder': 'Un testigo por línea: nombre completo y contacto.'}),
+            'documentos_prueba': forms.Textarea(attrs={'class': 'input', 'rows': 4,
+                                                       'placeholder': 'Un documento por línea: contrato, recibos, mensajes, cartas…'}),
             'asesoria_gratuita_ofrecida': forms.CheckboxInput(attrs={'class': 'w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500'}),
             'asesoria_gratuita_agendada': forms.CheckboxInput(attrs={'class': 'w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500'}),
             'fecha_asesoria_gratuita': forms.DateInput(attrs={'class': 'input', 'type': 'date'}),

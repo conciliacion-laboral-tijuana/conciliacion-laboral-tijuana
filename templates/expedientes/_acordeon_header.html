@@ -1,0 +1,22 @@
+{# Encabezado clicable de una sección del acordeón de demanda. #}
+{# Parámetros: sec_id, num, titulo, descripcion, completa (truthy/falsy) #}
+<div id="sec-{{ sec_id }}"
+     class="acordeon-seccion {% if completa %}completa{% else %}incompleta{% endif %}"
+     data-seccion="{{ sec_id }}">
+  <button type="button" data-acordeon-toggle="{{ sec_id }}"
+          class="w-full flex items-center gap-3 px-5 py-4 text-left hover:bg-gray-50 transition-colors">
+    <span class="acordeon-num flex-shrink-0 w-8 h-8 rounded-full border-2 flex items-center justify-center text-sm font-bold
+                 {% if completa %}bg-green-50 border-green-200 text-green-700{% else %}bg-red-50 border-red-200 text-red-600{% endif %}">
+      {% if completa %}<i class="fas fa-check text-xs"></i>{% else %}{{ num }}{% endif %}
+    </span>
+    <span class="flex-1 min-w-0">
+      <span class="block text-sm font-bold text-gray-800">{{ titulo }}</span>
+      <span class="block text-xs text-gray-500 truncate">{{ descripcion }}</span>
+    </span>
+    {% if completa %}
+    <span class="hidden sm:inline-flex text-[10px] font-bold bg-green-100 text-green-700 px-2 py-0.5 rounded-full">COMPLETA</span>
+    {% else %}
+    <span class="hidden sm:inline-flex text-[10px] font-bold bg-red-100 text-red-600 px-2 py-0.5 rounded-full">PENDIENTE</span>
+    {% endif %}
+    <i class="fas fa-chevron-down acordeon-flecha text-gray-400 text-xs ml-1"></i>
+  </button>

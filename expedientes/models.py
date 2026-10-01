@@ -78,6 +78,17 @@ class Cliente(models.Model):
     fecha_ingreso = models.DateField('Fecha de ingreso', null=True, blank=True)
     fecha_salida = models.DateField('Fecha de salida/despido', null=True, blank=True)
 
+    # Narrativa del despido y elementos probatorios (para la demanda)
+    circunstancias_despido = models.TextField(
+        'Circunstancias del despido', blank=True,
+        help_text='Cómo ocurrió el despido: lo que te dijeron, cómo te notificaron, etc.')
+    testigos = models.TextField(
+        'Testigos de los hechos', blank=True,
+        help_text='Nombres y datos de personas que pueden corroborar los hechos (una por línea si son varios)')
+    documentos_prueba = models.TextField(
+        'Documentos disponibles (prueba documental)', blank=True,
+        help_text='Documentos que tiene el cliente: contratos, recibos, mensajes, cartas, etc. (uno por línea si son varios)')
+
     # Tipo de despido
     TIPO_DESPIDO_CHOICES = [
         ('justificado', 'Despido justificado'),

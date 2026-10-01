@@ -51,3 +51,6 @@ test_*.py
 *_test.png
 diagnostico_*.png
 test_v2_*.png
+
+# Artefactos del E2E del acordeón (screenshots, HTML, consola)
+e2e_artifacts/
