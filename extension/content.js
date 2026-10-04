@@ -339,35 +339,48 @@
 
   // ─── Descarga del acuse PDF → base64 ────────────────────────────────────
 
+  // Endpoint oficial del portal (botón "descargar acuse" del modal de éxito).
+  // Sirve el PDF con la sesión actual — no necesita parámetros.
+  const ENDPOINT_ACUSE = 'https://app.conciliacionbc.gob.mx/api/documentos/getFile/';
+
+  async function _fetchPdfSiValido(url, nombre) {
+    // Descarga y valida que sea un PDF real (magic bytes %PDF-).
+    // El portal a veces responde HTML (sesión/error) — sin validación se
+    // guardaría HTML como acuse.pdf.
+    try {
+      const res = await fetch(url, { credentials: 'include' });
+      if (!res.ok) return null;
+      const blob = await res.blob();
+      const buf = new Uint8Array(await blob.arrayBuffer());
+      const magic = String.fromCharCode(...buf.slice(0, 5));
+      if (magic !== '%PDF-') return null;
+      return { nombre: nombre || 'acuse.pdf', b64: await blobToBase64(blob) };
+    } catch (_) { return null; }
+  }
+
   async function descargarAcuse() {
+    // 1) Intento directo por el endpoint oficial (siempre, aunque el modal
+    //    ya no esté en la página — p. ej. si el asesor navegó a otra vista).
+    const directo = await _fetchPdfSiValido(ENDPOINT_ACUSE, 'acuse_conciliacion.pdf');
+    if (directo) return directo;
+
+    // 2) Fallback: buscar el link del acuse en la página actual
     const keywords = ['getFile', 'acuse', 'documento', 'folio', '.pdf', 'descargar', 'generaDocumento', 'firma'];
     const links = document.querySelectorAll('a');
     for (const a of links) {
       const href = (a.href || '').toLowerCase();
       const text = (a.textContent || '').toLowerCase().trim();
       if (keywords.some(k => href.includes(k) || text.includes(k)) && a.offsetParent !== null) {
-        try {
-          const res = await fetch(a.href, { credentials: 'include' });
-          if (res.ok) {
-            const blob = await res.blob();
-            if (blob.type.includes('pdf') || a.href.toLowerCase().includes('getFile') || a.href.toLowerCase().includes('.pdf')) {
-              return { nombre: (a.href.split('/').pop() || 'acuse.pdf'), b64: await blobToBase64(blob) };
-            }
-          }
-        } catch (_) { /* probar siguiente */ }
+        const ok = await _fetchPdfSiValido(a.href, (a.href.split('/').pop() || 'acuse.pdf'));
+        if (ok) return ok;
       }
     }
-    // Fallback: iframe/embed PDF
+    // 3) Fallback: iframe/embed PDF
     for (const el of document.querySelectorAll('iframe, embed, object')) {
       const src = el.src || '';
       if (src.toLowerCase().includes('pdf')) {
-        try {
-          const res = await fetch(src, { credentials: 'include' });
-          if (res.ok) {
-            const blob = await res.blob();
-            return { nombre: 'acuse.pdf', b64: await blobToBase64(blob) };
-          }
-        } catch (_) { /* sin acuse */ }
+        const ok = await _fetchPdfSiValido(src, 'acuse.pdf');
+        if (ok) return ok;
       }
     }
     return null;
@@ -797,7 +810,10 @@
         payload,
       });
       if (resp && resp.ok) {
-        setEstado(`🎉 ¡Listo! Folio <strong>${folio || 'N/A'}</strong> guardado en la app.`, 'ok');
+        const folioFinal = resp.folio || folio;
+        setEstado(folioFinal
+          ? `🎉 ¡Listo! Folio <strong>${folioFinal}</strong> guardado en la app.`
+          : '🎉 ¡Listo! Acuse guardado en la app (folio aún pendiente: viene dentro del PDF).', 'ok');
         setPasos(['✅ Aviso', '✅ Industria', '✅ Fecha/objeto', '✅ Solicitante',
                   '✅ Citado', '✅ Descripción', '✅ Envío', '✅ Acuse guardado'], 8);
       } else {

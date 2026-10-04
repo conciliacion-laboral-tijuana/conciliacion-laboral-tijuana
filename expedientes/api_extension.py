@@ -35,6 +35,16 @@ MAX_SCREENSHOT_BYTES = 1 * 1024 * 1024  # 1 MB cada uno
 MAX_SCREENSHOTS = 5                     # máximo de capturas por reporte
 
 
+def _es_pdf_real(contenido: bytes) -> bool:
+    """Valida que los bytes sean un PDF real (magic bytes '%PDF-').
+
+    El endpoint oficial del portal (/api/documentos/getFile/) a veces responde
+    una página HTML (sesión expirada, error) — sin esta validación se guardaría
+    HTML como 'acuse.pdf'.
+    """
+    return bool(contenido) and contenido[:5] == b'%PDF-'
+
+
 # ─── Autenticación por token ──────────────────────────────────────────────
 
 def _usuario_por_token(request):
@@ -233,45 +243,88 @@ def reportar_tarea(request, task_pk):
         tarea.folio = folio
         expediente = tarea.expediente
 
-        # Guardar folio en el expediente
-        if folio:
-            expediente.folio = folio
-            expediente.fecha_tramite = timezone.now().date()
-            expediente.save(update_fields=['folio', 'fecha_tramite'])
-
         # Guardar el PDF del acuse como Documento (con límite de tamaño)
+        acuse_contenido = None
+        acuse_avisos = []
         if acuse_b64:
             try:
                 contenido = base64.b64decode(acuse_b64)
-                if len(contenido) > MAX_ACUSE_BYTES:
+                if not _es_pdf_real(contenido):
+                    # El portal respondió HTML u otra cosa: no guardar basura.
+                    logger.warning('Acuse no válido (sin magic bytes %%PDF-) para expediente %s',
+                                   expediente.numero)
+                    acuse_avisos.append('El archivo descargado del portal no es un PDF válido; '
+                                        'no se guardó como acuse.')
+                elif len(contenido) > MAX_ACUSE_BYTES:
                     logger.warning('Acuse demasiado grande (%d bytes) para expediente %s',
                                    len(contenido), expediente.numero)
-                    return JsonResponse({'ok': False, 'error': 'El acuse supera los 2 MB'}, status=413)
+                    acuse_avisos.append('El acuse supera los 2 MB; no se guardó.')
+                else:
+                    acuse_contenido = contenido
+            except Exception as e:
+                logger.warning('No se pudo decodificar el acuse de la extensión: %s', e)
+                acuse_avisos.append('No se pudo decodificar el acuse recibido.')
+
+        # El portal NO muestra el folio en pantalla: solo vive dentro del PDF.
+        # Si la extensión no pudo extraerlo, parsear el acuse para obtenerlo.
+        folio_final = folio
+        fecha_desde_pdf = None
+        if not folio_final and acuse_contenido:
+            try:
+                from .acuse_parser import parsear_acuse_pdf
+                datos = parsear_acuse_pdf(acuse_contenido)
+                if datos.get('folio'):
+                    folio_final = datos['folio']
+                    tarea.folio = folio_final
+                    logger.info('Folio %s extraído del PDF de acuse (expediente %s)',
+                                folio_final, expediente.numero)
+                if not expediente.fecha_tramite and datos.get('fecha_solicitud'):
+                    fecha_desde_pdf = datos['fecha_solicitud']
+                    expediente.fecha_tramite = fecha_desde_pdf
+            except Exception as e:
+                logger.warning('No se pudo parsear el acuse para extraer folio: %s', e)
+
+        # Guardar folio en el expediente
+        if folio_final:
+            tarea.folio = folio_final
+            expediente.folio = folio_final
+            expediente.fecha_tramite = expediente.fecha_tramite or timezone.now().date()
+            expediente.save(update_fields=['folio', 'fecha_tramite'])
+        elif fecha_desde_pdf:
+            expediente.save(update_fields=['fecha_tramite'])
+
+        if acuse_contenido:
+            try:
                 doc = Documento(
                     expediente=expediente,
-                    descripcion=f'Acuse de Conciliación - Folio: {folio or "N/A"}',
+                    descripcion=f'Acuse de Conciliación - Folio: {folio_final or "N/A"}',
                     tipo='citatorio',
                     subido_por=user,
                 )
-                doc.archivo.save(acuse_nombre, ContentFile(contenido), save=True)
+                doc.archivo.save(acuse_nombre, ContentFile(acuse_contenido), save=True)
                 logger.info('Acuse de la extensión guardado para expediente %s: %s',
                             expediente.numero, acuse_nombre)
             except Exception as e:
                 logger.warning('No se pudo guardar el acuse de la extensión: %s', e)
+                acuse_avisos.append('No se pudo guardar el PDF del acuse.')
+
+        if acuse_avisos:
+            detalle = (detalle + '\n' if detalle else '') + ' '.join(acuse_avisos)
+            tarea.detalle = detalle
 
         registrar_movimiento(
             expediente=expediente,
             usuario=user,
             accion='actualizacion',
             detalle=f'Solicitud de conciliación enviada desde la extensión de Chrome. '
-                    f'Folio: {folio or "N/A"}'
+                    f'Folio: {folio_final or "N/A"}'
         )
 
         # Guardar screenshots (espejo en vivo)
         _guardar_screenshots(tarea, screenshots)
 
         tarea.save(update_fields=['estado', 'folio', 'detalle', 'screenshots_json', 'completed_at'])
-        return JsonResponse({'ok': True, 'estado': tarea.estado, 'folio': folio})
+        return JsonResponse({'ok': True, 'estado': tarea.estado, 'folio': folio_final})
 
     # Fallido
     tarea.estado = 'fallido'

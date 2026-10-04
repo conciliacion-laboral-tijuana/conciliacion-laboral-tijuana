@@ -1634,6 +1634,87 @@ class ExtensionChromeApiTests(TestCase):
         self.assertEqual(doc.descripcion, 'Acuse de Conciliación - Folio: CCL-2025-1234')
         self.assertTrue(doc.archivo.name.endswith('.pdf'))
 
+    @staticmethod
+    def _pdf_acuse_real():
+        """Genera un PDF real con el texto del acuse (PyMuPDF) para el parser."""
+        import fitz
+        texto = (
+            'ACUSE DE SOLICITUD DE CONCILIACIÓN\n'
+            'FECHA DE SOLICITUD: 07 de Agosto de 2026\n'
+            'SOLICITANTE(S): JUAN CARLOS LOPEZ MORENO\n'
+            'CITADO(S): MI EMPRESA SA DE CV\n'
+            'FECHA DE CONFLICTO: 30 de Junio de 2025\n'
+            'OBJETO DE LA CONCILIACIÓN: Despido\n'
+            'UNIDAD DE CONCILIACIÓN TIJUANA\n'
+            'su solicitud quedó registrada con folio TIJ/26427/2026\n'
+        )
+        doc = fitz.open()
+        page = doc.new_page()
+        page.insert_text((72, 72), texto, fontsize=10)
+        contenido = doc.tobytes()
+        doc.close()
+        return contenido
+
+    def test_reportar_folio_vacio_extrae_folio_del_pdf(self):
+        """
+        El portal NO muestra el folio en pantalla: solo vive dentro del PDF
+        del acuse. Si la extensión reporta folio vacío, la API debe extraerlo
+        del PDF y guardarlo en tarea + expediente.
+        """
+        import base64 as b64
+        pdf = self._pdf_acuse_real()
+        payload = {
+            'estado': 'completado',
+            'folio': '',  # la extensión no pudo leerlo de la página
+            'acuse_pdf': b64.b64encode(pdf).decode(),
+            'acuse_nombre': 'acuse.pdf',
+        }
+        r = self.client.post(
+            reverse('extension_api_reportar', args=[self.tarea.pk]),
+            data=json.dumps(payload),
+            content_type='application/json',
+            **self._auth(),
+        )
+        self.assertEqual(r.status_code, 200)
+        data = r.json()
+        self.assertTrue(data['ok'])
+        self.assertEqual(data['folio'], 'TIJ/26427/2026')  # extraído del PDF
+
+        self.tarea.refresh_from_db()
+        self.expediente.refresh_from_db()
+        self.assertEqual(self.tarea.folio, 'TIJ/26427/2026')
+        self.assertEqual(self.expediente.folio, 'TIJ/26427/2026')
+        self.assertEqual(self.expediente.fecha_tramite, date(2026, 8, 7))
+
+    def test_reportar_acuse_no_pdf_no_se_guarda(self):
+        """
+        Si el portal devolvió HTML (sesión expirada) en vez del PDF, la API no
+        debe guardarlo como Documento, pero la tarea sí se completa con aviso.
+        """
+        import base64 as b64
+        html_falso = b'<html><body><h1>Sesi\xc3\xb3n expirada</h1></body></html>'
+        payload = {
+            'estado': 'completado',
+            'folio': 'TIJ/111/2026',
+            'acuse_pdf': b64.b64encode(html_falso).decode(),
+            'acuse_nombre': 'acuse.pdf',
+        }
+        r = self.client.post(
+            reverse('extension_api_reportar', args=[self.tarea.pk]),
+            data=json.dumps(payload),
+            content_type='application/json',
+            **self._auth(),
+        )
+        self.assertEqual(r.status_code, 200)
+        self.assertTrue(r.json()['ok'])
+
+        self.tarea.refresh_from_db()
+        self.assertEqual(self.tarea.estado, 'completado')
+        self.assertEqual(self.tarea.folio, 'TIJ/111/2026')  # folio de la extensión sí se respeta
+        # El HTML NO se guardó como documento de acuse
+        self.assertFalse(self.expediente.documentos.filter(descripcion__startswith='Acuse').exists())
+        self.assertIn('no es un PDF válido', self.tarea.detalle)
+
     def test_reportar_fallido_guarda_error(self):
         payload = {'estado': 'fallido', 'error': 'El portal rechazó la CURP'}
         r = self.client.post(

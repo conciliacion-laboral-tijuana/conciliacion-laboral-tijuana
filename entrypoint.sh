@@ -65,24 +65,15 @@ else:
     print('>>> No se necesita resincronización.')
 " || echo ">>> (Aviso: no se pudieron resincronizar sequences, ignorando)"
 
-# 5. Datos de prueba — SOLO en base de datos vacía (primer deploy)
-#    Si la BD ya tiene datos reales (expedientes), se omiten usuarios y
-#    datos de prueba para no contaminar producción.
-echo ">>> Verificando si la base de datos tiene datos reales..."
-HAS_EXPEDIENTES=$(uv run python manage.py shell -c "
-from expedientes.models import Expediente
-print(Expediente.objects.count())
-" 2>/dev/null | tail -1)
-HAS_EXPEDIENTES="${HAS_EXPEDIENTES:-0}"
-
-if [ "${HAS_EXPEDIENTES}" = "0" ]; then
-    echo ">>> Base de datos vacía — sembrando datos de prueba..."
-    # 5a. Crear usuarios de prueba (idempotente — omite si ya existen)
+# 5. Datos de prueba — SOLO si SEED_DEMO_DATA=true (opt-in).
+#    Producción empieza SIEMPRE limpia: solo superadmin. Para un entorno de
+#    demostración, definir SEED_DEMO_DATA=true en Railway y reiniciar.
+if [ "${SEED_DEMO_DATA:-}" = "true" ]; then
+    echo ">>> SEED_DEMO_DATA=true — sembrando usuarios y datos de prueba..."
     uv run python manage.py crear_usuarios_prueba 2>&1 || echo ">>> (Aviso: no se pudieron crear usuarios de prueba)"
-    # 5b. Sembrar datos de prueba (idempotente — omite si ya existen)
     uv run python manage.py seed_datos 2>&1 || echo ">>> (Aviso: no se pudieron sembrar datos de prueba)"
 else
-    echo ">>> BD con datos reales (${HAS_EXPEDIENTES} expedientes) — se omiten usuarios y datos de prueba"
+    echo ">>> Sin datos de demostración (define SEED_DEMO_DATA=true para sembrarlos)"
 fi
 
 # 6b. Reset de contraseñas de asesores (solo si RESET_ASESOR_PASSWORDS=true)
