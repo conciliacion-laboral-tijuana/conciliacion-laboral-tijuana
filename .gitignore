@@ -54,3 +54,8 @@ test_v2_*.png
 
 # Artefactos del E2E del acordeón (screenshots, HTML, consola)
 e2e_artifacts/
+
+# Datos reales / material de referencia — NO subir al repo (el mirror lo
+# copiaría al repo del despacho)
+usuarios_asesores.xlsx
+app-codigo/
