@@ -201,52 +201,193 @@ Cuando un asesor no puede asistir a una audiencia (conflicto de horario, etc.):
 
 ### 5.1 Reglas legales configurables (`LegalConfig`)
 
-Todos los parámetros legales se almacenan en la base de datos y son editables desde el
-admin de Django — **sin necesidad de tocar código cuando cambian las leyes**:
+Todos los parámetros legales viven en un objeto `ReglasLegales`
+(`core/laboral/rules.py`) que se construye desde la fila de `LegalConfig` guardada en la base
+de datos y editable desde el admin de Django — **sin necesidad de tocar código cuando cambian
+las leyes** (`LegalConfig.to_reglas()` es el puente):
 
-- **UMA** diaria, salario mínimo general y **salario mínimo de la zona libre de la
-  frontera norte (ZLF)**.
+- **UMA** diaria (2026: $117.31), salario mínimo general ($315.04) y **salario mínimo de la
+  Zona Libre de la Frontera Norte** ($440.87; Tijuana está en la ZLFN).
 - **Días de aguinaldo** (mínimo legal: 15).
 - **% de prima vacacional** (mínimo 25%).
-- **Prima de antigüedad:** días por año (12) + tipo de tope salarial (2× UMA / 2× SM /
-  2× SM frontera) y múltiplo.
-- **Días de indemnización** (3 meses = 90).
+- **Prima de antigüedad:** días por año (12) y **tope = 2 × salario mínimo del área
+  geográfica** (arts. 485/486 LFT): frontera $881.74 · general $630.08. **No es 2 × UMA**
+  ($234.62), que era el error anterior.
+- **Días de indemnización** (3 meses = 90) y **20 días por año** (art. 50 fr. II).
+- **Criterio de vacaciones antes del primer año** (proporcional / ninguna).
+- **Modo de salario integrado** (por conceptos del art. 84 o por porcentaje).
+- **Años exigidos para prima de antigüedad en renuncia voluntaria** (15, art. 162 fr. III).
 - Solo una configuración puede estar *activa* a la vez; al guardar una se desactivan las demás.
 
-### 5.2 Tabla de vacaciones (Reforma LFT 2023)
+### 5.1b Tablas graduales (reforma DOF 01-05-2026)
 
-El sistema implementa la tabla de vacaciones vigente en México (año 1 → 12 días, +2 por
-año hasta 20, después +2 cada 5 años), extrapolando más allá de la tabla cuando es necesario.
+La reducción de la jornada es **gradual**, así que se modela por año y no como constante:
+
+| Año | Jornada ordinaria máx. semanal (art. 59 + transitorio Segundo) | Horas al doble máx. por semana (art. 66 + transitorio Cuarto) |
+|-----|----------------------------------------------|-------------------------------------------------------------|
+| 2026 | 48 | 9 |
+| 2027 | 46 | 9 |
+| 2028 | 44 | 10 |
+| 2029 | 42 | 11 |
+| 2030 | 40 | 12 |
+
+Lo que excede el límite del art. 66 se paga al triple (art. 68) con un máximo de **4 horas
+extra por semana**; la jornada ordinaria más la extraordinaria nunca puede exceder 12 horas
+diarias.
+
+### 5.2 Modelo temporal de la relación laboral (`PeriodoLaboral`)
+
+Cada concepto ya no comparte una misma cifra de "días trabajados".
+`core/laboral/periodo.py` descompone la relación en el periodo que exige cada artículo:
+
+```
+RELACIÓN LABORAL
+├── antigüedad exacta (aniversarios cumplidos, bisiesto-aware) + fracción del ciclo
+├── aniversario vigente / próximo aniversario
+├── días del AÑO CALENDARIO en curso  → aguinaldo (art. 87)
+├── ciclos de vacaciones (uno por año de servicio) → arts. 76 y 81
+│   ├── derecho del último año cumplido, no disfrutado
+│   └── proporcional del ciclo en curso
+└── semanas trabajadas → topes de horas extra (arts. 66 y 68)
+```
+
+Consecuencias:
+
+- **El aguinaldo** es proporcional a los días trabajados **del año calendario en curso**, no a
+  toda la antigüedad (art. 87: "conforme al tiempo que hubieren trabajado"). Un trabajador con
+  5 años despedido el 15 de septiembre de 2026 cobra 258/365, no 5 años de aguinaldo.
+- **Las vacaciones** se calculan por ciclo de aniversario: el derecho del último año
+  completado **más** la parte proporcional del año en curso. La proporcionalidad se aplica
+  **una sola vez** (antes se aplicaba dos veces, dejando los días al cuadrado).
+- **La antigüedad** se mide por aniversarios cumplidos, no con `días / 365`: los años
+  bisiestos no distorsionan y quien termina justo en su aniversario da una cifra exacta.
+
+### 5.3 Tabla de vacaciones (Reforma LFT 2022)
+
+| Años de servicio | 1 | 2 | 3 | 4 | 5 | 6-10 | 11-15 | 16-20 | 21-25 | 26-30 |
+|-------------------|---|---|---|---|---|-------|-------|-------|-------|-------|
+| Días | 12 | 14 | 16 | 18 | 20 | 22 | 24 | 26 | 28 | 30 |
+
+Antes del primer aniversario el derecho es 0 bajo el criterio mayoritario (el art. 76 exige
+"más de un año de servicios"); el criterio `proporcional` también está disponible y es
+configurable por caso.
 
 ### 5.3 Conceptos calculados
 
-| Concepto | Artículo | Tipo |
-|----------|----------|------|
-| Aguinaldo proporcional | Art. 87 LFT | automático |
-| Vacaciones proporcionales | Art. 76 LFT | automático |
-| Prima vacacional | Art. 80 LFT | automático |
-| Prima de antigüedad (con indicador de tope) | Art. 162 LFT | automático |
-| Indemnización constitucional (90 días) | Art. 50 LFT | automático |
-| Indemnización 20 días por año | Art. 50-II LFT | automático |
-| Vacaciones vencidas (días manuales) | Art. 76 LFT | semiautomático |
-| Horas extras (horas manuales) | Art. 66-68 LFT | semiautomático |
-| Salarios devengados (monto manual) | Art. 48 LFT | manual |
-| Días festivos (días manuales) | Art. 75 LFT | semiautomático |
+| Concepto | Artículo | Tipo | Base de cálculo |
+|----------|----------|------|-----------------|
+| Aguinaldo proporcional | Art. 87 LFT | automático | días del año calendario en curso |
+| Vacaciones (año cumplido + proporcional) | Arts. 76 y 81 LFT | automático | ciclo de aniversario |
+| Prima vacacional | Art. 80 LFT | automático | 25% de las vacaciones |
+| Prima de antigüedad (con piso y tope de zona) | Arts. 162, 485 y 486 LFT | según tipo de despido | salario diario con piso/techo del área |
+| Indemnización constitucional (90 días) | Art. 50 fr. III LFT | según tipo de despido | **salario diario integrado** |
+| Indemnización 20 días por año | Art. 50 fr. II LFT | según tipo de despido | **salario diario integrado** |
+| Vacaciones de ciclos anteriores (días manuales) | Art. 79 LFT | semiautomático | salario diario |
+| Horas extras: dobles + excedentes | Arts. 66 y 68 LFT | semiautomático | valor hora según jornada (art. 61) |
+| Salarios devengados (monto manual) | Art. 48 LFT | manual | — |
+| Días festivos laborados | Arts. 74-75 LFT | semiautomático | 3 × salario diario |
+| Días de descanso semanal laborados | Arts. 69 y 73 LFT | semiautomático | 2 × salario diario |
+
+### 5.4 Salario diario vs. salario diario integrado (arts. 84 y 89 LFT)
+
+El motor separa las dos bases porque la ley lo hace:
+
+- **Salario diario** = salario ÷ 30 / 15 / 7 / 1 (art. 89). Base de aguinaldo, vacaciones,
+  prima vacacional, horas extras, festivos.
+- **Salario diario integrado** = salario diario + parte proporcional de los conceptos del
+  art. 84 (cuota diaria, gratificaciones, ayudas, comisiones, prestaciones en especie). Base
+  de las **indemnizaciones** (90 días y 20 días por año).
+
+Ambas cifras aparecen en la pantalla de cálculo y se asientan en la demanda ("Salario
+diario: $X · Salario diario integrado: $Y"). La prima de antigüedad usa su propia base (piso
+y techo del salario mínimo del área, arts. 485/486) — nunca la UMA.
+
+### 5.5 Las horas extras son estructuradas, nunca un factor promedio
+
+Una cantidad total de horas no contiene información jurídica: el límite de horas al doble es
+semanal y depende del año, y lo que lo excede se paga al triple. Por eso el motor recibe
+`horas_extra_normales` (art. 66) y `horas_extra_excedentes` (art. 68). Si sólo se captura un
+total, se reparte contra los topes semanales del año (9 + 4 h en 2026) en lugar de aplicar el
+antiguo factor promedio de 2.5×. El valor de la hora sigue la duración de la jornada
+(8 / 7 / 7.5 h, art. 61 LFT).
+
+### 5.6 Procedencia por tipo de terminación (arts. 46, 50 y 162 LFT)
+
+La indemnización no es una prestación automática:
+`ReglasLegales.restricciones_por_tipo()` decide según la causa de terminación, y la demanda,
+la pantalla y el recálculo comparten esa única regla:
+
+| Terminación | 90 días (art. 50 fr. III) | 20 días/año (art. 50 fr. II) | Prima de antigüedad (art. 162) |
+|-------------|------------------------------|--------------------------------|--------------------------------|
+| Despido injustificado | ✔ | ✔ | ✔ |
+| Rescisión (arts. 51-52) | ✔ | ✔ | ✔ |
+| Despido justificado | ✘ (art. 46) | ✘ | ✔ (fr. III) |
+| Renuncia voluntaria | ✘ | ✘ | ✔ sólo con 15 años o más |
+
+Las prestaciones ordinarias (aguinaldo, vacaciones, prima vacacional, horas extras) se deben
+en todos los casos.
+
+### 5.7 Narrativa del despido (art. 47 LFT)
+
+Los HECHOS de la demanda se arman con campos **estructurados** capturados en el acordeón, no con
+un solo texto libre. Cada modalidad tiene redactado propio, porque la forma de la separación tiene
+consecuencia jurídica:
+
+| Modalidad | Redactado | Nota legal |
+|-----------|-----------|------------|
+| `verbal` | Despido verbal sin documento; cita a quien comunicó, dónde y la frase textual | Sin aviso escrito se presume la separación injustificada (art. 47 LFT) |
+| `escrito` | Recepción del documento de terminación; cita el motivo consignado | Si el documento no consigna causa, el hecho lo hace constar |
+| `acceso` | Se presentó al centro de trabajo y se le impidió el acceso | La negativa de acceso equivale a la separación |
+| `otro` | Explicación libre del asesor | — |
+
+Campos que alimentan el redactado: `modalidad_despido`, `hubo_documento_despido`,
+`despido_comunicado_por`, `despido_lugar`, `despido_frase`, `despido_documento_motivo`,
+`despido_otra_modalidad`, `lugar_trabajo` y `circunstancias_despido` (anotaciones libres, que se
+suman al final).
+
+`construir_hechos()` es la **fuente única** de la narrativa: la consumen tanto el generador DOCX
+como el HTML, de modo que ambas descargas dicen exactamente lo mismo.
+
+### 5.8 Acción preferida (arts. 48 y 49 LFT)
+
+El art. 48 LFT da al trabajador una **elección** entre la reinstalación en el puesto que
+desempeñaba y la indemnización de tres meses de salario. No son prestaciones acumulables: son
+acciones excluyentes. El campo `Cliente.accion_preferida` captura la elección y
+`ReglasLegales.accion_posible()` la resuelve:
+
+| Situación | Resultado |
+|-----------|-----------|
+| `reinstalacion` con ≥ 1 año y despido injustificado o rescisión | **Procede**: la indemnización de 3 meses sale del total y el petitorio pide reinstalación + salarios caídos |
+| `reinstalacion` con < 1 año | **No procede** (art. 49 fr. I LFT): se mantiene la indemnización y el motor explica por qué |
+| `reinstalacion` en despido justificado o renuncia voluntaria | **No procede** (art. 46 LFT) |
+| `indemnizacion` | Siempre procede si el tipo de separación genera responsabilidad |
+
+Cuando la elección es la reinstalación pero no procede, la pantalla del acordeón muestra una
+advertencia (`advertencias_accion`) antes de generar la demanda, para que el asesor no formule una
+acción imposible.
 
 ### 5.4 Cálculo por caso (`CalculoLaboral`)
 
 - Un cálculo por expediente que guarda una **instantánea de los datos de entrada** para
   conservar el histórico.
-- **Casillas de verificación** que permiten al asesor elegir qué conceptos incluir
-  (con valores por defecto sensatos).
+- **Casillas de verificación** que permiten al asesor elegir qué conceptos incluir (5 conceptos
+  base activos por defecto). Los conceptos que dependen de la causa de terminación los
+  enciende o apaga la ley, no la casilla.
 - **Sustitución manual** de los días de vacaciones realmente adeudados (cuando algunos
   años ya se pagaron o disfrutaron) — se muestra con el indicador *override aplicado*.
-- Muestra salario diario, días trabajados, años de servicio, desglose por concepto con
-  referencia legal, advertencias de tope aplicado y **total**.
+- Capturas para los **componentes del salario integrado**, el **desglose de horas extras**
+  (dobles / excedentes) y los **días de descanso semanal laborados**.
+- Muestra salario diario, salario diario integrado, días trabajados, antigüedad exacta, la
+  base del aguinaldo en días del año calendario, el desglose del ciclo de vacaciones, el piso
+  y el tope aplicados a la prima de antigüedad, el detalle por concepto con referencia legal y
+  el **total**.
 - **Recálculo automático** cuando cambian los datos del cliente/expediente o las reglas
   legales (`recalcular`).
 - **Simulación rápida** (`simulacion-rapida`) — estimación instantánea para un prospecto
-  sin crear un caso: captura salario + fechas y obtén el desglose completo.
+  sin crear un caso: captura salario, fechas, zona salarial, jornada y tipo de terminación y
+  obtén el desglose completo.
+- La **demanda usa el cálculo guardado**, así que lo que se reclama siempre coincide con lo
+  que se le mostró al cliente en pantalla.
 
 ---
 

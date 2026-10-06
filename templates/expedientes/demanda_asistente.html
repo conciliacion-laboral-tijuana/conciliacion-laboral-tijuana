@@ -198,20 +198,108 @@
     </div>
 
     <!-- ─── 4. Despido, testigos y pruebas ────────────────────────── -->
-    {% include 'expedientes/_acordeon_header.html' with sec_id='despido' num=4 titulo=pasos_info|get_item:'despido'|get_item:'titulo' descripcion=pasos_info|get_item:'despido'|get_item:'descripcion' completa=cliente.circunstancias_despido %}
+    {% include 'expedientes/_acordeon_header.html' with sec_id='despidio' num=4 titulo=pasos_info|get_item:'despido'|get_item:'titulo' descripcion=pasos_info|get_item:'despido'|get_item:'descripcion' completa=cliente.modalidad_despido %}
     <div class="acordeon-body">
       <div class="p-6 space-y-5">
+
+        <div class="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <h3 class="text-sm font-semibold text-blue-900 mb-1">Modalidad de la separación</h3>
+          <p class="text-xs text-blue-700 mb-3">
+            La modalidad determina cómo se redacta el hecho de la separación en la demanda.
+            Sin aviso escrito, el artículo 47 LFT presume la separación injustificada
+            aunque el patrón alegue una causa.
+          </p>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+            {% for valor, etiqueta in cliente.MODALIDAD_DESPIDO_CHOICES %}
+            <label class="flex items-center gap-2 px-3 py-2 bg-white border rounded-lg cursor-pointer
+                          {% if cliente.modalidad_despido == valor %}border-blue-500 ring-1 ring-blue-300{% else %}border-gray-200{% endif %}">
+              <input type="radio" name="modalidad_despido" value="{{ valor }}"
+                     class="text-blue-600 focus:ring-blue-500"
+                     {% if cliente.modalidad_despido == valor %}checked{% endif %}>
+              <span class="text-xs text-gray-700">{{ etiqueta }}</span>
+            </label>
+            {% endfor %}
+          </div>
+
+          <label class="flex items-center gap-2 text-sm text-gray-700">
+            <input type="checkbox" name="hubo_documento_despidio" value="on" class="rounded border-gray-300 text-blue-600"
+                   {% if cliente.hubo_documento_despidio %}checked{% endif %}>
+            Se entregó documento de terminación (aviso escrito)
+          </label>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Centro de trabajo</label>
+            <input type="text" name="lugar_trabajo" class="input w-full"
+                   placeholder="Nombre o dirección donde prestaba servicios"
+                   value="{{ cliente.lugar_trabajo }}">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Quién comunicó la separación</label>
+            <input type="text" name="despido_comunicado_por" class="input w-full"
+                   placeholder="Nombre de quien se la comunicó" value="{{ cliente.despidio_comunicado_por }}">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Dónde ocurrió</label>
+            <input type="text" name="despido_lugar" class="input w-full"
+                   placeholder="Oficina, caseta o lugar físico" value="{{ cliente.despidio_lugar }}">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Motivo en el documento</label>
+            <input type="text" name="despidio_documento_motivo" class="input w-full"
+                   placeholder="Causa que consigna el documento (si hubo)"
+                   value="{{ cliente.despidio_documento_motivo }}">
+          </div>
+        </div>
+
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Circunstancias del despido</label>
-          <textarea name="circunstancias_despido" rows="6" class="input w-full"
-                    placeholder="Cuenta cómo ocurrió el despido: qué te dijeron, quién te lo comunicó, si te entregaron carta, si firmaste algo, cómo te pagaron lo pendiente…">{{ cliente.circunstancias_despido }}</textarea>
-          <p class="text-xs text-gray-400 mt-1">Se integra a la demanda como hecho QUINTO. Puedes escribir varios párrafos.</p>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Qué le dijeron al separarlo</label>
+          <textarea name="despido_frase" rows="2" class="input w-full"
+                    placeholder="Frase textual. Se citará entre comillas en la demanda.">{{ cliente.despido_frase }}</textarea>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Si fue otra modalidad, explique</label>
+          <textarea name="despido_otra_modalidad" rows="2" class="input w-full"
+                    placeholder="Describa la modalidad cuando no sea verbal, documento ni negada la entrada">{{ cliente.despido_otra_modalidad }}</textarea>
+        </div>
+
+        <div class="p-4 bg-purple-50 border border-purple-200 rounded-lg">
+          <h3 class="text-sm font-semibold text-purple-900 mb-1">Acción preferida (art. 48 LFT)</h3>
+          <p class="text-xs text-purple-700 mb-3">
+            El trabajador elige entre reinstalación o indemnización de tres meses: no son acumulables.
+            La reinstalación no procede con menos de un año de antigüedad (art. 49 fr. I LFT).
+          </p>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {% for valor, etiqueta in cliente.ACCION_CHOICES %}
+            <label class="flex items-start gap-2 px-3 py-2 bg-white border rounded-lg cursor-pointer
+                          {% if cliente.accion_preferida == valor %}border-purple-500 ring-1 ring-purple-300{% else %}border-gray-200{% endif %}">
+              <input type="radio" name="accion_preferida" value="{{ valor }}"
+                     class="mt-0.5 text-purple-600 focus:ring-purple-500"
+                     {% if cliente.accion_preferida == valor %}checked{% endif %}>
+              <span class="text-xs text-gray-700">{{ etiqueta }}</span>
+            </label>
+            {% endfor %}
+          </div>
+          {% for aviso in advertencias_accion %}
+          <p class="mt-3 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded p-2">
+            <strong>Atención:</strong> {{ aviso }}
+          </p>
+          {% endfor %}
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Circunstancias del despido (texto libre)</label>
+          <textarea name="circunstancias_despido" rows="5" class="input w-full"
+                    placeholder="Anotaciones adicionales. Se suman al redactado estructurado como último hecho de la demanda.">{{ cliente.circunstancias_despidio }}</textarea>
+          <p class="text-xs text-gray-400 mt-1">Opcional: la narración principal ya se arma con los campos de arriba.</p>
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Testigos de los hechos</label>
           <textarea name="testigos" rows="3" class="input w-full"
                     placeholder="Un testigo por línea: nombre completo y datos de contacto si los tienes.">{{ cliente.testigos }}</textarea>
-          <p class="text-xs text-gray-400 mt-1">Se citan en los hechos (SEXTO) y se ofrece la prueba TESTIMONIAL.</p>
+          <p class="text-xs text-gray-400 mt-1">Se citan en los hechos y se ofrece la prueba TESTIMONIAL.</p>
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Documentos disponibles (prueba documental)</label>
@@ -223,7 +311,7 @@
     </div>
     </div>
 
-    <!-- ─── 5. Revisión final: tipo de despido, cálculo y firma ──── -->
+<!-- ─── 5. Revisión final: tipo de despido, cálculo y firma ──── -->
     {% include 'expedientes/_acordeon_header.html' with sec_id='revision' num=5 titulo='Revisión final' descripcion='Tipo de despido, cálculo automático y verificación de la firma.' completa=expediente.tipo_despido %}
     <div class="acordeon-body">
       <div class="p-6 space-y-5">

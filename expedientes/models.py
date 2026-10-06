@@ -23,6 +23,23 @@ class Cliente(models.Model):
         ('mixta', 'Mixta'),
     ]
 
+    ZONA_SALARIAL_CHOICES = [
+        ('frontera', 'Zona Libre de la Frontera Norte'),
+        ('general', 'Resto del país'),
+    ]
+
+    MODALIDAD_DESPIDO_CHOICES = [
+        ('verbal', 'Despido verbal (sin documento)'),
+        ('escrito', 'Despido notificado por documento'),
+        ('acceso', 'Se le impidió el acceso al centro de trabajo'),
+        ('otro', 'Otra modalidad'),
+    ]
+
+    ACCION_CHOICES = [
+        ('indemnizacion', 'Indemnización (3 meses de salario integrado)'),
+        ('reinstalacion', 'Reinstalación en el puesto que desempeñaba'),
+    ]
+
     TIPO_PERSONA_CHOICES = [
         ('fisica', 'Persona Física'),
         ('moral', 'Persona Moral'),
@@ -75,13 +92,65 @@ class Cliente(models.Model):
                                                     help_text='Horas trabajadas por semana')
     jornada = models.CharField('Jornada', max_length=10, choices=JORNADA_CHOICES, default='diurna',
                                 help_text='Tipo de jornada laboral')
+    zona_salarial = models.CharField(
+        'Zona salarial', max_length=12, choices=ZONA_SALARIAL_CHOICES, default='frontera',
+        help_text='Zona Libre de la Frontera Norte (Tijuana, Mexicali, Ciudad Juárez…) o resto '
+                  'del país. Define el salario mínimo y el tope de los arts. 485/486 LFT.')
     fecha_ingreso = models.DateField('Fecha de ingreso', null=True, blank=True)
     fecha_salida = models.DateField('Fecha de salida/despido', null=True, blank=True)
 
-    # Narrativa del despido y elementos probatorios (para la demanda)
+    # ─── Narrativa del despido (campos estructurados) ───────────────
+    #
+    # El redactado de los HECHOS de la demanda se arma con estos campos y no con
+    # un solo texto libre: cada modalidad tiene un redactado jurídico propio y
+    # algunas tienen consecuencia legal.  Sin aviso escrito, el art. 47 LFT
+    # presume la separación injustificada aunque el patrón alegue una causa.
+    modalidad_despido = models.CharField(
+        'Modalidad del despido', max_length=12,
+        choices=MODALIDAD_DESPIDO_CHOICES, blank=True,
+        help_text='Cómo se le comunicó la separación: verbal, documento, negada la '
+                  'entrada u otra modalidad. Define el redactado de los HECHOS.')
+    hubo_documento_despido = models.BooleanField(
+        'Se entregó documento de terminación', default=False,
+        help_text='Si no se entregó aviso escrito, el art. 47 LFT presume la separación '
+                  'injustificada aunque el patrón alegue una causa.')
+    despido_comunicado_por = models.CharField(
+        'Quién comunicó la separación', max_length=150, blank=True,
+        help_text='Nombre de quien le comunicó la separación (jefe, supervisor, RR.HH.)')
+    despido_lugar = models.CharField(
+        'Dónde ocurrió la separación', max_length=200, blank=True,
+        help_text='Oficina, caseta, planta o lugar físico donde ocurrió')
+    despido_frase = models.TextField(
+        'Qué le dijeron al separarlo', blank=True,
+                help_text='Frase textual manifestada al separarlo.')
+    despido_documento_motivo = models.CharField(
+        'Motivo señalado en el documento', max_length=300, blank=True,
+        help_text='Causa que el documento de terminación consigna (si lo hubo)')
+    despido_otra_modalidad = models.TextField(
+        'Otra modalidad: explicación', blank=True,
+        help_text='Describa la modalidad cuando no sea verbal, documento ni negada la entrada')
+    lugar_trabajo = models.CharField(
+        'Centro de trabajo', max_length=200, blank=True,
+        help_text='Nombre o dirección del centro de trabajo donde prestaba servicios')
+
+    # ─── Acción preferida ante un despido (art. 48 LFT) ─────────────
+    #
+    # El art. 48 LFT da al trabajador una ELECCIÓN entre la reinstalación en el
+    # puesto que desempeñaba y la indemnización de tres meses de salario.  No
+    # es una prestación más: son acciones mutuamente excluyentes, y la
+    # reinstalación desaparece en los supuestos del art. 49 LFT (antigüedad
+    # menor a un año, contacto directo y permanente, confianza, trabajo del
+    # hogar, eventuales y plataformas digitales).
+    accion_preferida = models.CharField(
+        'Acción preferida', max_length=15, choices=ACCION_CHOICES,
+        default='indemnizacion',
+        help_text='Elección del trabajador conforme al art. 48 LFT. Si procede la '
+                  'reinstalación, la indemnización de 3 meses no se incluye en el total.')
+
     circunstancias_despido = models.TextField(
-        'Circunstancias del despido', blank=True,
-        help_text='Cómo ocurrió el despido: lo que te dijeron, cómo te notificaron, etc.')
+        'Circunstancias del despido (texto libre)', blank=True,
+        help_text='Anotaciones adicionales del asesor. Se suman al redactado '
+                  'estructurado como último hecho de la demanda.')
     testigos = models.TextField(
         'Testigos de los hechos', blank=True,
         help_text='Nombres y datos de personas que pueden corroborar los hechos (una por línea si son varios)')
@@ -589,45 +658,80 @@ class LegalConfig(models.Model):
     
     El administrador modifica estos valores desde el panel de admin
     SIN necesidad de tocar código cuando cambian las leyes.
+
+    Estos valores se convierten en un `core.laboral.rules.ReglasLegales` con
+    `LegalConfig.to_reglas()`, que es lo que consume el motor.
     """
 
     # Solo debe existir UNA fila
-    nombre = models.CharField('Nombre de la configuración', max_length=100, default='Configuración Legal 2024')
+    nombre = models.CharField('Nombre de la configuración', max_length=100, default='Configuración Legal 2026')
     activo = models.BooleanField('Configuración activa', default=True,
                                   help_text='Solo una configuración puede estar activa a la vez')
 
-    # UMA y Salario Mínimo
+    # UMA y Salario Mínimo (CONASAMI / INEGI 2026)
     uma_diaria = models.DecimalField('UMA diaria', max_digits=10, decimal_places=2,
-                                      default=108.57, help_text='Valor de la UMA diaria (2024: $108.57)')
+                                      default=117.31, help_text='Valor de la UMA diaria (2026: $117.31, vigente desde el 1 de febrero)')
     salario_minimo = models.DecimalField('Salario mínimo general', max_digits=10, decimal_places=2,
-                                          default=248.93, help_text='Salario mínimo general diario (2024: $248.93)')
+                                          default=315.04, help_text='Salario mínimo general diario (2026: $315.04)')
     salario_minimo_frontera = models.DecimalField('Salario mínimo frontera', max_digits=10, decimal_places=2,
-                                                    default=374.89, help_text='Salario mínimo ZLF (2024: $374.89)')
+                                                    default=440.87, help_text='Salario mínimo ZLFN (2026: $440.87)')
 
-    # Aguinaldo
+    # Prestaciones
     aguinaldo_dias = models.PositiveIntegerField('Días de aguinaldo', default=15,
-                                                   help_text='Mínimo legal: 15 días')
-
-    # Prima Vacacional
+                                                   help_text='Mínimo legal: 15 días (art. 87 LFT)')
     prima_vacacional_porcentaje = models.DecimalField('% Prima vacacional', max_digits=5, decimal_places=2,
-                                                       default=25.00, help_text='Mínimo 25%')
-
-    # Prima de Antigüedad
+                                                       default=25.00, help_text='Mínimo 25% (art. 80 LFT)')
     prima_antiguedad_dias_por_ano = models.PositiveIntegerField('Días por año (prima antigüedad)', default=12,
-                                                                  help_text='Normalmente 12 días por año')
-    tope_prima_tipo = models.CharField('Tipo de tope', max_length=20, default='uma',
-                                        choices=[
-                                            ('uma', '2 × UMA'),
-                                            ('salario_minimo', '2 × Salario Mínimo'),
-                                            ('frontera', '2 × Salario Mínimo Frontera'),
-                                        ],
-                                        help_text='Tope salarial para prima de antigüedad')
-    tope_prima_multiplo = models.PositiveIntegerField('Múltiplo del tope', default=2,
-                                                       help_text='Normalmente 2 × UMA o 2 × SM')
+                                                                  help_text='12 días por año (art. 162 fr. I LFT)')
+    prima_antiguedad_anios_voluntaria = models.PositiveIntegerField(
+        'Años para prima antigüedad en renuncia', default=15,
+        help_text='El art. 162 fr. III LFT sólo paga prima de antigüedad en la renuncia '
+                  'voluntaria a partir de 15 años de servicios')
 
-    # Indemnización
+    # Vacaciones antes del primer año (criterio jurisprudencial)
+    VACACIONES_ANTES_DE_UN_ANO_CHOICES = [
+        ('proporcional', 'Proporcional (12 × tiempo/año)'),
+        ('ninguna', 'Ninguna (el art. 76 LFT exige más de un año de servicios)'),
+    ]
+    vacaciones_antes_de_un_ano = models.CharField(
+        'Vacaciones con menos de un año', max_length=15,
+        choices=VACACIONES_ANTES_DE_UN_ANO_CHOICES, default='proporcional',
+        help_text='Criterio aplicable cuando la relación termina antes del primer '
+                  'aniversario. El criterio mayoritario es "ninguna".')
+
+    # Indemnizaciones (art. 50 LFT)
     indemnizacion_dias = models.PositiveIntegerField('Días de indemnización', default=90,
-                                                      help_text='3 meses = 90 días')
+                                                      help_text='3 meses = 90 días (art. 50 fr. III LFT)')
+    indemnizacion_20dias_dias_por_ano = models.PositiveIntegerField(
+        'Días por año (indemnización 20 días)', default=20,
+        help_text='20 días por año de servicios (art. 50 fr. II LFT)')
+
+    # Tope de la prima de antigüedad (arts. 485/486 LFT)
+    # Es 2 × salario mínimo del ÁREA geográfica donde se prestó el trabajo, NO
+    # 2 × UMA.  Los campos UMA/salario_minimo quedan sólo como referencia.
+    tope_prima_tipo = models.CharField('Tipo de tope', max_length=30, default='salario_minimo_frontera',
+                                        choices=[
+                                            ('uma', '2 × UMA (referencia, NO es el tope legal)'),
+                                            ('salario_minimo', '2 × Salario Mínimo general'),
+                                            ('salario_minimo_frontera', '2 × Salario Mínimo Frontera Norte'),
+                                        ],
+                                        help_text='Tope salarial para prima de antigüedad. El valor legal '
+                                                  'es el doble del salario mínimo del área (arts. 485/486 LFT).')
+    tope_prima_multiplo = models.PositiveIntegerField('Múltiplo del tope', default=2,
+                                                       help_text='Normalmente 2 (doble del salario mínimo del área)')
+
+    # Salario integrado (arts. 84 y 89 LFT)
+    salario_integrado_modo = models.CharField(
+        'Modo de salario integrado', max_length=15, default='explicit',
+        choices=[
+            ('explicit', 'Por conceptos (cuota diaria, gratificaciones, ayudas…)'),
+            ('porcentaje', 'Por porcentaje sobre el salario diario'),
+        ],
+        help_text='Base de las indemnizaciones: cuota diaria y parte proporcional '
+                  'de las prestaciones del art. 84 LFT.')
+    salario_integrado_porcentaje = models.DecimalField(
+        '% prestaciones integradas', max_digits=6, decimal_places=2, default=0,
+        help_text='Sólo si el modo es "Por porcentaje"')
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -653,6 +757,19 @@ class LegalConfig(models.Model):
             config = cls.objects.first()
         return config
 
+    def to_reglas(self, **extra):
+        """Convierte esta fila en el objeto de reglas que consume el motor."""
+        from core.laboral.rules import ReglasLegales
+        return ReglasLegales.desde_legal_config(
+            self,
+            vacaciones_antes_de_un_ano=self.vacaciones_antes_de_un_ano,
+            prima_antiguedad_anios_voluntaria=self.prima_antiguedad_anios_voluntaria,
+            indemnizacion_20dias_dias_por_ano=self.indemnizacion_20dias_dias_por_ano,
+            salario_integrado_modo=self.salario_integrado_modo,
+            salario_integrado_porcentaje=self.salario_integrado_porcentaje,
+            **extra,
+        )
+
 
 class CalculoLaboral(models.Model):
     """Resultado de cálculos laborales vinculado a un expediente.
@@ -674,6 +791,12 @@ class CalculoLaboral(models.Model):
     # Datos usados para el cálculo (copia, para mantener histórico)
     salario_mensual = models.DecimalField('Salario mensual', max_digits=12, decimal_places=2, default=0)
     salario_diario = models.DecimalField('Salario diario calculado', max_digits=12, decimal_places=2, default=0)
+    salario_diario_integrado = models.DecimalField(
+        'Salario diario integrado', max_digits=12, decimal_places=2, default=0,
+        help_text='Base de las indemnizaciones (arts. 84 y 89 LFT): cuota diaria y parte '
+                  'proporcional de las prestaciones que integran el salario')
+    zona_salarial = models.CharField('Zona salarial', max_length=12, default='frontera',
+                                     help_text='Zona Libre de la Frontera Norte o resto del país')
     periodo_pago = models.CharField('Periodo de pago', max_length=20, choices=PERIODO_PAGO_CHOICES, default='mensual')
     fecha_ingreso = models.DateField('Fecha de ingreso', null=True, blank=True)
     fecha_salida = models.DateField('Fecha de salida', null=True, blank=True)
@@ -691,6 +814,7 @@ class CalculoLaboral(models.Model):
     incluir_horas_extras = models.BooleanField('Incluir horas extras', default=False)
     incluir_salarios_devengados = models.BooleanField('Incluir salarios devengados', default=False)
     incluir_dias_festivos = models.BooleanField('Incluir días festivos', default=False)
+    incluir_descanso_semanal = models.BooleanField('Incluir días de descanso semanal', default=False)
 
     # ─── Resultados existentes ──────────────────────────────────────
     aguinaldo = models.DecimalField('Aguinaldo proporcional', max_digits=12, decimal_places=2, default=0)
@@ -708,14 +832,26 @@ class CalculoLaboral(models.Model):
     # ─── Nuevos resultados ──────────────────────────────────────────
     indemnizacion_20dias = models.DecimalField('Indemnización 20 días por año', max_digits=12, decimal_places=2, default=0)
 
-    # Vacaciones vencidas (input manual de días)
-    dias_vacaciones_vencidos = models.PositiveIntegerField('Días de vacaciones vencidas', default=0,
-        help_text='Días de vacaciones de años anteriores que no se pagaron')
-    vacaciones_vencidas = models.DecimalField('Vacaciones vencidas', max_digits=12, decimal_places=2, default=0)
+    # Vacaciones de ciclos ANTERIORES al último año cumplido (input manual).
+    # El último año cumplido y el proporcional del ciclo en curso ya se
+    # calculan solos en el campo `vacaciones`.
+    dias_vacaciones_vencidos = models.PositiveIntegerField('Días de vacaciones de ciclos anteriores', default=0,
+        help_text='Días de vacaciones de ciclos ANTERIORES al último año cumplido que no se '
+                  'pagaron. El último año cumplido ya se incluye en el cálculo automático de '
+                  'vacaciones, así que aquí sólo van los años adicionales')
+    vacaciones_vencidas = models.DecimalField('Vacaciones de ciclos anteriores', max_digits=12, decimal_places=2, default=0)
 
-    # Horas extras (input manual de horas)
+    # Horas extras (arts. 66 y 68 LFT): por tipo, no un total con factor promedio
     horas_extra_cantidad = models.DecimalField('Cantidad de horas extra', max_digits=8, decimal_places=2, default=0,
-        help_text='Número total de horas extra trabajadas')
+        help_text='Número total de horas extra trabajadas. Si no captura el desglose, el motor '
+                  'las reparte contra los topes semanales del año (9 h al doble en 2026, más '
+                  '4 h al triple)')
+    horas_extra_normales = models.DecimalField('Horas extra al doble (art. 66)', max_digits=8, decimal_places=2,
+        default=0, null=True, blank=True,
+        help_text='Horas dentro del límite semanal del art. 66 LFT (9 h/semana en 2026): se pagan al doble')
+    horas_extra_excedentes = models.DecimalField('Horas extra excedentes (art. 68)', max_digits=8, decimal_places=2,
+        default=0, null=True, blank=True,
+        help_text='Horas que exceden el límite del art. 66 LFT (máx. 4 h/semana): se pagan al triple')
     horas_extras = models.DecimalField('Horas extras', max_digits=12, decimal_places=2, default=0)
 
     # Salarios devengados (input manual de monto)
@@ -724,8 +860,30 @@ class CalculoLaboral(models.Model):
 
     # Días festivos (input manual de días)
     dias_festivos_cantidad = models.PositiveIntegerField('Cantidad de días festivos', default=0,
-        help_text='Número de días festivos laborados no pagados')
+        help_text='Días de descanso obligatorio laborados y no pagados (arts. 74 y 75 LFT)')
     dias_festivos = models.DecimalField('Días festivos', max_digits=12, decimal_places=2, default=0)
+
+    # Días de descanso semanal laborados (arts. 69 y 73 LFT) — SON DISTINTOS
+    # de los días festivos: aquí no hay prima, sino el pago del día trabajado.
+    dias_descanso_semanal_cantidad = models.PositiveIntegerField(
+        'Días de descanso semanal laborados', default=0,
+        help_text='Días de descanso semanal en que se laboró sin pago (art. 73 LFT)')
+    descanso_semanal = models.DecimalField('Días de descanso semanal laborados',
+                                           max_digits=12, decimal_places=2, default=0)
+
+    # Salario integrado (arts. 84 y 89 LFT) — base de las indemnizaciones
+    salario_integrado_cuota_diaria = models.DecimalField(
+        'Cuota diaria (IMSS)', max_digits=10, decimal_places=2, default=0,
+        help_text='Parte de la cuota diaria que absorbe el patrón (art. 84 LFT)')
+    salario_integrado_gratificaciones = models.DecimalField(
+        'Gratificaciones y bonos', max_digits=10, decimal_places=2, default=0,
+        help_text='Bonos, comisiones, gratificaciones equivalentes (art. 84 LFT)')
+    salario_integrado_ayudas = models.DecimalField(
+        'Ayudas y prestaciones', max_digits=10, decimal_places=2, default=0,
+        help_text='Ayuda de transporte, despensa, vivienda, etc. (art. 84 LFT)')
+    salario_integrado_porcentaje = models.DecimalField(
+        '% de prestaciones integradas', max_digits=6, decimal_places=2, default=0,
+        help_text='Alternativa al desglose: porcentaje sobre el salario diario. 0 = usar el desglose')
 
     total = models.DecimalField('Total prestaciones', max_digits=12, decimal_places=2, default=0)
 

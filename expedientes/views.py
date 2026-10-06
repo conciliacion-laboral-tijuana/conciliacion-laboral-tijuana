@@ -7,6 +7,7 @@ from pathlib import Path
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
+from django.forms import CheckboxInput
 
 logger = logging.getLogger(__name__)
 
@@ -39,10 +40,12 @@ from .signals import registrar_movimiento
 from .whatsapp import (enviar_whatsapp, generar_deep_link, renderizar_plantilla,
                         MENSAJES_TEMPLATE)
 from .laboral_calculator import (calcular_desde_expediente, recalcular_calculo,
-                                 _aplicar_conceptos_excluidos)
+                                 _aplicar_conceptos_excluidos, datos_extra_de,
+                                 advertencias_accion as advertencias_accion_cliente)
 from .demanda_generator import generar_demanda_word, generar_demanda_html, html_a_docx, PLANTILLAS_INFO
 from .models import Machote
 from .marcadores import get_marcadores, get_datos_faltantes, get_completitud_stats, reemplazar_marcadores
+from core.laboral.calculators import CONCEPTOS_DISPONIBLES
 
 
 def _get_machotes_queryset():
@@ -1310,11 +1313,42 @@ def calculo_laboral(request, pk):
         cliente.salario and cliente.salario > 0,
     ])
 
+    # Desglose del cálculo paraExplain los datos en pantalla: periodo laboral,
+    # fracciones de cada concepto y topes aplicados. Es la misma salida que
+    # devuelve `calcular_todo()`, sin recalcular.
+    periodo = {}
+    if datos_completos:
+        desglose = calcular_desde_expediente(
+            expediente,
+            conceptos_seleccionados={
+                f'incluir_{c["key"]}': getattr(calculo, f'incluir_{c["key"]}', True)
+                for c in CONCEPTOS_DISPONIBLES
+            },
+            datos_extra=datos_extra_de(calculo),
+        )
+        if desglose.get('success'):
+            periodo = {
+                'aguinaldo': desglose['aguinaldo'],
+                'vacaciones': desglose['vacaciones'],
+                'horas_extras': dict(desglose['horas_extras'],
+                                     anio_normativo=desglose['detalles']['anio_normativo']),
+                'vacaciones_vencidas': desglose['vacaciones_vencidas'],
+                'prima_antiguedad': desglose['prima_antiguedad'],
+                'indemnizacion': desglose['indemnizacion'],
+                'indemnizacion_20dias': desglose['indemnizacion_20dias'],
+                'salario_diario': desglose['salario_diario'],
+                'salario_diario_integrado': desglose['salario_diario_integrado'],
+                'zona': desglose['zona'],
+                'salario_minimo_zona': desglose['detalles']['salario_minimo_zona'],
+                'laboral': desglose['periodo_laboral'],
+            }
+
     return render(request, 'expedientes/calculo_laboral.html', {
         'form': form,
         'expediente': expediente,
         'calculo': calculo,
         'config_legal': config_legal,
+        'periodo': periodo,
         'datos_completos': datos_completos,
         'simulacion_form': SimulacionForm(),
         'ESTADO_COLORS': ESTADO_COLORS,
@@ -1336,6 +1370,9 @@ def simulacion_rapida(request):
                 fecha_ingreso=form.cleaned_data['fecha_ingreso'],
                 fecha_salida=form.cleaned_data['fecha_salida'],
                 periodo_pago=form.cleaned_data['periodo_pago'],
+                zona=form.cleaned_data.get('zona_salarial') or 'frontera',
+                jornada=form.cleaned_data.get('jornada') or 'diurna',
+                tipo_despido=form.cleaned_data.get('tipo_despido') or None,
             )
             return render(request, 'expedientes/_simulacion_resultado.html', {
                 'resultado': resultado,
@@ -1415,6 +1452,19 @@ def demanda_editor(request, pk):
         messages.error(request, 'No tienes permiso para generar documentos legales.')
         return redirect('dashboard_asesor')
     expediente = get_object_or_404(get_expedientes_queryset(request.user), pk=pk)
+
+    # Validación de coherencia temporal antes de redactar la demanda: el motor
+    # ya devuelve success=False, pero conviene avisar al asesor con el motivo
+    # exacto en lugar de mostrar una tabla vacía.
+    cliente_editor = expediente.cliente
+    if (cliente_editor.fecha_ingreso and cliente_editor.fecha_salida
+            and cliente_editor.fecha_salida < cliente_editor.fecha_ingreso):
+        messages.error(
+            request,
+            'La fecha de salida es anterior a la fecha de ingreso. Corrige los datos '
+            'del cliente antes de generar la demanda.',
+        )
+        return redirect('demanda_asistente', pk=expediente.pk)
 
     try:
         contenido_html = generar_demanda_html(expediente)
@@ -1498,8 +1548,11 @@ WIZARD_PASOS = {
     },
     'despido': {
         'titulo': 'Despido, testigos y pruebas',
-        'descripcion': 'Circunstancias del despido, testigos y documentos disponibles (prueba documental).',
-        'campos': ['circunstancias_despido', 'testigos', 'documentos_prueba'],
+        'descripcion': 'Modalidad de la separación, circunstancias, testigos y documentos (prueba documental).',
+        'campos': ['modalidad_despido', 'hubo_documento_despido', 'despido_comunicado_por',
+                   'despido_lugar', 'despido_frase', 'despido_documento_motivo',
+                   'despido_otra_modalidad', 'lugar_trabajo', 'accion_preferida',
+                   'circunstancias_despido', 'testigos', 'documentos_prueba'],
     },
 }
 
@@ -1511,6 +1564,12 @@ CRITICOS_CLIENTE = [
     {'campo': 'fecha_ingreso', 'label': 'Fecha de ingreso'},
     {'campo': 'fecha_salida', 'label': 'Fecha de salida / despido'},
 ]
+
+
+def _es_booleano(form, campo) -> bool:
+    """¿El campo del formulario es booleano (checkbox)?"""
+    return bool(getattr(form.fields.get(campo), 'widget', None)) and \
+        isinstance(getattr(form.fields.get(campo), 'widget', None), CheckboxInput)
 
 
 def _verificar_datos_criticos(expediente):
@@ -1572,7 +1631,14 @@ def demanda_asistente(request, pk):
                       'empresa_razon_social', 'empresa_actividad', 'tipo_persona_citado',
                       'empresa_telefono', 'empresa_calle', 'empresa_numero',
                       'empresa_colonia', 'empresa_cp', 'empresa_referencias', 'como_supo',
-                      'circunstancias_despido', 'testigos', 'documentos_prueba'}
+                      'circunstancias_despido', 'testigos', 'documentos_prueba',
+                      # Campos estructurados de la narrativa del despido (art. 47 LFT)
+                      'modalidad_despido', 'despido_comunicado_por', 'despido_lugar',
+                      'despido_frase', 'despido_documento_motivo',
+                      'despido_otra_modalidad', 'lugar_trabajo',
+                      # Tiene valor por defecto en el modelo: si no viene en el
+                      # POST se conserva el actual (no es error de captura).
+                      'accion_preferida'}
 
         # ¿Vienen datos del acordeón en este POST? Si el formulario solo
         # trae la sección de revisión (tipo_despido), NO tocar el cliente.
@@ -1593,6 +1659,11 @@ def demanda_asistente(request, pk):
                 datos = {}
                 for campo in campos_acordeon:
                     raw = request.POST.get(campo, '')
+                    # Los campos booleanos se guardan siempre: si no vienen en
+                    # el POST es que el checkbox quedó desmarcado (no "vacío").
+                    if _es_booleano(form, campo):
+                        datos[campo] = campo in request.POST
+                        continue
                     if campo in form.fields and raw != '':
                         datos[campo] = form.fields[campo].clean(raw)
                 if datos:
@@ -1633,6 +1704,7 @@ def demanda_asistente(request, pk):
     form = ClienteForm(instance=cliente)
     calculo = calcular_desde_expediente(expediente)
     faltantes_criticos = _verificar_datos_criticos(expediente)
+    advertencias_accion = advertencias_accion_cliente(cliente)
 
     return render(request, 'expedientes/demanda_asistente.html', {
         'expediente': expediente,
@@ -1645,6 +1717,7 @@ def demanda_asistente(request, pk):
         'tipos_despido': Expediente.TIPO_DESPIDO_CHOICES,
         'calculo': calculo,
         'faltantes_criticos': faltantes_criticos,
+        'advertencias_accion': advertencias_accion,
         'ESTADO_COLORS': ESTADO_COLORS,
     })
 

@@ -27,11 +27,8 @@ django.setup()
 from django.db.models import Q
 
 from expedientes.models import Expediente, CalculoLaboral
-from expedientes.laboral_calculator import (
-    calcular_desde_expediente,
-    _aplicar_conceptos_excluidos,
-)
-from expedientes.demanda_generator import _conceptos_para_demanda
+from expedientes.laboral_calculator import _aplicar_conceptos_excluidos
+from expedientes.demanda_generator import _conceptos_para_demanda, calculo_para_demanda
 
 
 def _tiene_datos_completos(expediente) -> bool:
@@ -52,7 +49,9 @@ def verificar_calculos() -> dict:
     1. Datos completos del cliente (fechas + salario)
     2. Conceptos reclamados coherentes con el tipo de despido:
        - Renuncia voluntaria → NO debe reclamar indemnización (Art. 50 LFT)
-         ni prima de antigüedad (Art. 162 LFT)
+         ni prima de antigüedad antes de 15 años (Art. 162 LFT)
+       - Despido justificado → NO debe reclamar indemnización (Art. 46 y 50 LFT)
+         pero SÍ prima de antigüedad (Art. 162 LFT)
     3. El total del cálculo coincide con el CalculoLaboral guardado
 
     Returns:
@@ -102,11 +101,10 @@ def verificar_calculos() -> dict:
             resumen.append(item)
             continue
 
-        # Cálculo con los conceptos que la demanda reclama según tipo de despido
-        conceptos = _conceptos_para_demanda(tipo)
-        resultado = calcular_desde_expediente(
-            exp, conceptos_seleccionados=conceptos
-        )
+        # El cálculo que la demanda usa: el CalculoLaboral guardado (lo que el
+        # asesor aprobó) o, si no existe, el derivado del tipo de despido.
+        from expedientes.demanda_generator import calculo_para_demanda
+        resultado = calculo_para_demanda(exp, tipo)
 
         if not resultado.get('success'):
             problemas.append(
@@ -117,7 +115,7 @@ def verificar_calculos() -> dict:
 
         item['total_demanda'] = float(resultado['total'])
 
-        # ── Renuncia voluntaria: no debe reclamar conceptos que no proceden ──
+        # ── Procedencia por tipo de separación (arts. 46, 50 y 162 LFT) ───────
         if tipo == 'voluntario':
             if resultado['indemnizacion']['monto'] > 0:
                 problemas.append(
@@ -129,7 +127,21 @@ def verificar_calculos() -> dict:
                 problemas.append(
                     f'{exp.numero}: RENUNCIA VOLUNTARIA pero la demanda reclama '
                     f'prima de antigüedad (${resultado["prima_antiguedad"]["monto"]:,.2f}). '
-                    f'No procede (Art. 162 LFT).'
+                    f'Sólo procede con 15 años o más de servicios (Art. 162 fr. III LFT).'
+                )
+
+        if tipo == 'justificado':
+            if resultado['indemnizacion']['monto'] > 0:
+                problemas.append(
+                    f'{exp.numero}: DESPIDO JUSTIFICADO pero la demanda reclama '
+                    f'indemnización (${resultado["indemnizacion"]["monto"]:,.2f}). '
+                    f'No procede en la rescisión justificada (Arts. 46 y 50 LFT).'
+                )
+            if resultado['indemnizacion_20dias']['monto'] > 0:
+                problemas.append(
+                    f'{exp.numero}: DESPIDO JUSTIFICADO pero la demanda reclama '
+                    f'20 días por año (${resultado["indemnizacion_20dias"]["monto"]:,.2f}). '
+                    f'No procede (Art. 50 fr. II LFT).'
                 )
 
         # ── Total coincide con el CalculoLaboral guardado ────────────────

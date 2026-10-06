@@ -10,6 +10,8 @@ Autor: Conciliacion Laboral Tijuana - Módulo de Demandas
 """
 
 import re
+from decimal import Decimal
+from typing import Optional
 
 from docx import Document
 from docx.shared import Pt, Cm, RGBColor
@@ -21,7 +23,7 @@ from docx.oxml import parse_xml
 from django.utils import timezone
 
 from .models import Expediente
-from .laboral_calculator import calcular_desde_expediente, _conceptos_por_defecto
+from .laboral_calculator import calcular_desde_expediente, conceptos_por_tipo_despido
 
 
 # ─── Meses en español ──────────────────────────────────────────────────────
@@ -261,21 +263,71 @@ def _narrativa_despido(tipo_despido_key: str) -> str:
                           "el demandado dio por terminada la relación laboral de manera injustificada")
 
 
-def _conceptos_para_demanda(tipo_despido_key: str) -> dict:
+def _conceptos_para_demanda(tipo_despido_key: str, años_completos: int = 0) -> dict:
     """Selección de conceptos que se reclaman en la demanda según el tipo de despido.
 
-    Parte de los conceptos base del sistema (_conceptos_por_defecto) y
-    aplica excepciones legales por tipo de despido. En la renuncia voluntaria
-    el trabajador solo reclama prestaciones proporcionales adeudadas
-    (aguinaldo, vacaciones, prima vacacional); NO procede reclamar la
-    indemnización constitucional (Art. 50 LFT) ni la prima de antigüedad
-    (Art. 162 LFT).
+    Delega en `core.laboral.rules` (arts. 50 y 162 LFT), de modo que la demanda,
+    la pantalla de cálculo y el recálculo apliquen la MISMA regla:
+
+    - Despido injustificado / rescisión: 3 meses (art. 50 fr. III) + 20 días por
+      año (art. 50 fr. II) + prima de antigüedad (art. 162 fr. III).
+    - Despido justificado: sin indemnización del art. 50 (el art. 46 LFT excluye
+      la responsabilidad del patrón en la rescisión justificada), pero SÍ prima
+      de antigüedad (art. 162 fr. III: "se pagará a los que se separen por causa
+      justificada").
+    - Renuncia voluntaria: sin art. 50, y prima de antigüedad sólo con 15 años o
+      más de servicios (art. 162 fr. III).
+
+    Las prestaciones ordinarias (aguinaldo, vacaciones, prima vacacional, horas
+    extras) se reclaman en todos los casos.
     """
-    conceptos = _conceptos_por_defecto()
-    if tipo_despido_key == 'voluntario':
-        conceptos['incluir_prima_antiguedad'] = False
-        conceptos['incluir_indemnizacion'] = False
-    return conceptos
+    return conceptos_por_tipo_despido(tipo_despido_key, años_completos)
+
+
+def _años_completos_de(cliente) -> int:
+    """Años completos del cliente (para el umbral de 15 años del art. 162)."""
+    from core.laboral.periodo import construir_periodo
+
+    periodo = construir_periodo(cliente.fecha_ingreso, cliente.fecha_salida)
+    return periodo.años_completos if periodo else 0
+
+
+def calculo_para_demanda(expediente: Expediente,
+                         tipo_despido: Optional[str] = None) -> dict:
+    """Cálculo que la demanda debe usar, en este orden:
+
+    1. El `CalculoLaboral` guardado: es lo que el asesor revisó y aprobó en la
+       pantalla de Cálculo Laboral (conceptos marcados, horas extras por tipo,
+       días de vacaciones, salario integrado, etc.).  La demanda NO puede
+       calcular por su cuenta e inventarse un total distinto al que se le
+       mostró al cliente.
+    2. Si no existe todavía, se deriva del tipo de despido con las reglas de los
+       arts. 50 y 162 LFT.
+    """
+    from .laboral_calculator import CONCEPTOS_CALCULO, datos_extra_de
+    from .models import CalculoLaboral
+
+    tipo = tipo_despido or expediente.tipo_despido or 'injustificado'
+    calculo = CalculoLaboral.objects.filter(expediente=expediente).first()
+
+    if calculo is not None:
+        conceptos = {
+            f'incluir_{key}': getattr(calculo, f'incluir_{key}', True)
+            for key in CONCEPTOS_CALCULO
+        }
+        return calcular_desde_expediente(
+            expediente,
+            conceptos_seleccionados=conceptos,
+            datos_extra=datos_extra_de(calculo),
+            tipo_despido=tipo,
+        )
+
+    return calcular_desde_expediente(
+        expediente,
+        conceptos_seleccionados=_conceptos_para_demanda(
+            tipo, _años_completos_de(expediente.cliente)),
+        tipo_despido=tipo,
+    )
 
 
 def _texto_como_lista(valor: str | None) -> str:
@@ -290,49 +342,248 @@ def _texto_como_lista(valor: str | None) -> str:
     return "; ".join(f"{letras[i]}) {l}" for i, l in enumerate(lineas[:13])) + "."
 
 
-def _agregar_hechos(doc: Document, expediente: Expediente, tipo_despido: str = 'injustificado') -> None:
-    """Agrega la sección de HECHOS con narrativa legal."""
-    cliente = expediente.cliente
+ORDINALES = (
+    'PRIMERO', 'SEGUNDO', 'TERCERO', 'CUARTO', 'QUINTO', 'SEXTO', 'SEPTIMO',
+    'OCTAVO', 'NOVENO', 'DECIMO', 'DECIMO PRIMERO', 'DECIMO SEGUNDO',
+    'DECIMO TERCERO', 'DECIMO CUARTO', 'DECIMO QUINTO', 'DECIMO SEXTO',
+    'DECIMO SEPTIMO', 'DECIMO OCTAVO', 'DECIMO NOVENO', 'VIGESIMO',
+)
 
+
+def _ordinal(numero: int) -> str:
+    """Ordinal en mayúsculas para los HECHOS (PRIMERO, SEGUNDO, ...)."""
+    if 1 <= numero <= len(ORDINALES):
+        return ORDINALES[numero - 1]
+    return f'NUMERO {numero}'
+
+
+def _hecho_circunstancias(cliente) -> str:
+    """Redactado del hecho de separación según la modalidad capturada.
+
+    Cada modalidad tiene su propio redactado porque el artículo 47 LFT exige que
+    el patrón que despide entregue aviso escrito donde referencie claramente la
+    conducta y su fecha: si no hay documento, el patrono queda expuesto a que
+    la separación se presuma injustificada.
+    """
+    modalidad = (cliente.modalidad_despido or '').strip()
+
+    comun = []
+    lugar = (cliente.despido_lugar or '').strip()
+    quien = (cliente.despido_comunicado_por or '').strip()
+    frase = (cliente.despido_frase or '').strip()
+    motivo = (cliente.despido_documento_motivo or '').strip()
+    otra = (cliente.despido_otra_modalidad or '').strip()
+
+    if modalidad == 'verbal':
+        texto = ('El trabajador fue separado de su empleo mediante un despido '
+                 'verbal, sin que se le entregara documento alguno de la '
+                 'terminación de la relación laboral.')
+        if quien:
+            texto += f' La separación le fue comunicada por {quien}.'
+        if lugar:
+            texto += f' Los hechos ocurrieron en {lugar}.'
+        if frase:
+            texto += f' En dicho momento se le manifestó, en esencia, lo siguiente: \"{frase}\".'
+        texto += (' La falta de aviso escritoilibrium viola el artículo 47 de la Ley Federal '
+                  'del Trabajo, que obliga al patrón a entregar aviso escrito referenciando '
+                  'claramente la conducta que motiva la rescisión, por lo que la separación '
+                  'debe tenerse por injustificada.')
+        return texto
+
+    if modalidad == 'escrito':
+        texto = ('El trabajador recibió un documento mediante el cual la parte '
+                 'demandada comunicó la terminación de la relación laboral.')
+        if motivo:
+            texto += f' El documento señala como motivo: \"{motivo}\".'
+        else:
+            texto += (' El documento no consigna causa alguna que justifique la '
+                      'rescisión.')
+        if quien:
+            texto += f' La entrega fue feita por {quien}.'
+        if lugar:
+            texto += f' Los hechos ocurrieron en {lugar}.'
+        if frase:
+            texto += f' Al respecto, se le manifestó lo siguiente: \"{frase}\".'
+        return texto
+
+    if modalidad == 'acceso':
+        texto = ('El trabajador se presentó a su centro de trabajo en la fecha de '
+                 'terminación; sin embargo, se le impidió el acceso y se le negó '
+                 'la posibilidad de continuar prestando sus servicios.')
+        if quien:
+            texto += f' La negativa le fue comunicada por {quien}.'
+        if lugar:
+            texto += f' Los hechos ocurrieron en {lugar}.'
+        if frase:
+            texto += f' Se le manifestó lo siguiente: \"{frase}\".'
+        texto += (' La negativa de acceso a las instalaciones equivale a la '
+                  'separación, pues el acceso al centro de trabajo es '
+                  'indispensable para prestar el servicio.')
+        return texto
+
+    if modalidad == 'otro':
+        texto = 'Sobre la forma en que se produjo la separación, el actor manifiesta lo siguiente:'
+        texto += f' {otra}' if otra else ''
+        if lugar:
+            texto += f' Los hechos ocurrieron en {lugar}.'
+        return texto
+
+    # Sin modalidad capturada: se conserva la narrativa del tipo de despido, que
+    # es lo que siempre se ha usado.
+    return ''
+
+
+def html_escape(texto: str) -> str:
+    """Escapa el texto para insertarlo en el HTML de la demanda."""
+    return (str(texto)
+            .replace('&', '&amp;')
+            .replace('<', '&lt;')
+            .replace('>', '&gt;'))
+
+
+def construir_hechos(expediente: Expediente, calculo: dict,
+                     tipo_despido: str = 'injustificado') -> list:
+    """Lista de HECHOS numerados, en párrafos separados.
+
+    Fuente ÚNICA de la narrativa: la consumen tanto el generador DOCX como el
+    HTML, de modo que ambas salidas dicen exactamente lo mismo.
+    """
+    cliente = expediente.cliente
+    hechos = []
+
+    f_ingreso = _fecha_espanol(cliente.fecha_ingreso)
+    f_salida = _fecha_espanol(cliente.fecha_salida)
+    puesto = cliente.puesto or '[PUESTO DESEMPEÑADO]'
+    empresa = cliente.empresa_razon_social or cliente.empresa or '[EMPRESA DEMANDADA]'
+    folio = expediente.folio or '[FOLIO DE CONCILIACIÓN]'
+    f_tramite = _fecha_espanol(expediente.fecha_tramite)
+
+    # 1. Ingreso
+    ingreso = (f'El {f_ingreso}, el actor inició su relación laboral con el '
+               f'demandado {empresa}, desempeñando el puesto de {puesto}')
+    lugar_trabajo = (cliente.lugar_trabajo or '').strip()
+    if lugar_trabajo:
+        ingreso += f', en el centro de trabajo ubicado en {lugar_trabajo}'
+    ingreso += ', en la forma y términos convenidos.'
+    hechos.append(ingreso)
+
+    # 2. Salario: diario y diario integrado (arts. 84 y 89 LFT)
+    if calculo.get('success'):
+        sd = calculo['salario_diario']
+        sdi = calculo['salario_diario_integrado']
+        salario = (f'Durante la relación laboral el actor percibió un salario '
+                   f'diario de ${sd:,.2f}')
+        if sdi > sd:
+            salario += (f', que corresponde a un salario diario integrado de '
+                        f'${sdi:,.2f}, conforme a los artículos 84 y 89 de la Ley '
+                        f'Federal del Trabajo')
+            componentes = calculo.get('salario_integrado_componentes') or {}
+            detalle = ', '.join(f'{_nombre_componente(k)}: ${v:,.2f}'
+                                for k, v in componentes.items() if v)
+            if detalle:
+                salario += f' (incluye {detalle})'
+        else:
+            salario += ', y cuyo salario diario integrado es equivalente al '\
+                        'salario diario ordinario por no haber prestaciones '\
+                        'integrantes declaradas'
+        salario += '.'
+        hechos.append(salario)
+    elif cliente.salario:
+        hechos.append(
+            f'Durante la relación laboral el actor percibió un salario mensual '
+            f'de ${cliente.salario:,.2f}, pagaderos en la forma y términos convenidos.')
+
+    # 3. Jornada
+    jornada = (cliente.jornada or '').strip()
+    if jornada:
+        hechos.append(
+            f'La jornada laboral se desarrollaba en régimen {jornada}, con una '
+            f'jornada de {cliente.horas_semanales or 48} horas semanales.')
+
+    # 4. Antigüedad: la calcula el motor (aniversarios cumplidos), no días/365
+    if calculo.get('success'):
+        años = calculo['años_completos']
+        anios_txt = (f'{años} año' + ('' if años == 1 else 's') + ' completos')
+        if calculo['años_trabajados'] != float(años):
+            anios_txt += (f' ({calculo["años_trabajados"]} años al momento de '
+                          f'la terminación, contando la fracción del año en curso)')
+        hechos.append(
+            f'La relación laboral tuvo una duración de {anios_txt}, '
+            f'transcurridos entre el {f_ingreso} y el {f_salida}.')
+
+    # 5. Separación
+    hechos.append(
+        f'El {f_salida}, {_narrativa_despido(tipo_despido)}, violando en '
+        f'perjuicio del actor lo dispuesto por los artículos 46, 47 y 48 de la '
+        f'Ley Federal del Trabajo.')
+
+    # 6. Modalidad de la separación (redactado estructurado)
+    circunstancias = _hecho_circunstancias(cliente)
+    if circunstancias:
+        hechos.append(circunstancias)
+
+    # 7. Instancia conciliatoria
+    hechos.append(
+        f'El actor agotó la instancia conciliatoria ante el Centro de '
+        f'Conciliación Laboral, según consta en el expediente número {folio} '
+        f'de fecha {f_tramite}, sin que se lograra acuerdo conciliatorio alguno, '
+        f'por lo que se expidió la constancia de no conciliación correspondiente.')
+
+    # 8. Falta de pago
+    hechos.append(
+        'A la fecha de presentación de esta demanda, el demandado no ha '
+        'cubierto el pago de las prestaciones laborales que se reclaman, a '
+        'pesar de haber sido requerido para ello.')
+
+    # 9. Elección de acción (art. 48 LFT)
+    accion = (calculo or {}).get('accion') or {}
+    if accion.get('accion') == 'reinstalacion':
+        hechos.append(
+            'En atención a lo dispuesto por el artículo 48 de la Ley Federal '
+            'del Trabajo, el actor opta por la REINSTALACIÓN en el puesto que '
+            'venía desempeñando, por lo que no se reclama la indemnización '
+            'equivalente a tres meses de salario.')
+
+    # 10. Anotaciones libres del asesor
+    texto_libre = (cliente.circunstancias_despido or '').strip()
+    if texto_libre:
+        hechos.append(
+            f'Sobre las circunstancias de la separación, el actor manifiesta '
+            f'adicionalmente lo siguiente: {texto_libre}')
+
+    # 11. Testigos
+    testigos = _texto_como_lista(cliente.testigos)
+    if testigos:
+        hechos.append(
+            f'Los hechos anteriores podrán ser corroborados por las personas '
+            f'que oportunamente se señalarán como testigos: {testigos}')
+
+    # 12. Documentos entregados en la separación
+    if cliente.hubo_documento_despido:
+        hechos.append(
+            'La parte demandada entregó al trabajador documentación relacionada '
+            'con la terminación de la relación laboral, misma que será ofrecida '
+            'como prueba en lo que resulte conducente.')
+
+    # Numerar
+    return [f'{_ordinal(i)}.- {texto}' for i, texto in enumerate(hechos, start=1)]
+
+
+def _agregar_hechos(doc: Document, expediente: Expediente, calculo: dict,
+                    tipo_despido: str = 'injustificado') -> None:
+    """Agrega la sección de HECHOS (DOCX) desde la narrativa compartida."""
     p = doc.add_paragraph()
-    run = p.add_run("—  H E C H O S  —")
+    run = p.add_run('—  H E C H O S  —')
     run.bold = True
     run.font.size = SECTION_FONT_SIZE
     run.font.color.rgb = COLOR_PRIMARY
 
-    f_ingreso = _fecha_espanol(cliente.fecha_ingreso)
-    f_salida = _fecha_espanol(cliente.fecha_salida)
-    puesto = cliente.puesto or "[PUESTO DESEMPEÑADO]"
-    salario = f"${cliente.salario:,.2f}" if cliente.salario else "[SALARIO]"
-    empresa = cliente.empresa_razon_social or cliente.empresa or "[EMPRESA DEMANDADA]"
-    folio = expediente.folio or "[FOLIO DE CONCILIACIÓN]"
-    f_tramite = _fecha_espanol(expediente.fecha_tramite)
-    frase_despido = _narrativa_despido(tipo_despido)
+    for hecho in construir_hechos(expediente, calculo, tipo_despido):
+        p_hecho = doc.add_paragraph()
+        run_hecho = p_hecho.add_run(hecho)
+        run_hecho.font.size = BODY_FONT_SIZE
+        p_hecho.paragraph_format.space_after = Pt(6)
 
-    hechos = f"""
-PRIMERO.- El {f_ingreso}, el actor inició su relación laboral con el demandado {empresa}, desempeñando el puesto de {puesto}, con un salario de {salario} mensuales, pagaderos en la forma y términos convenidos.
-
-SEGUNDO.- El {f_salida}, {frase_despido}, violando en perjuicio del actor lo dispuesto por los artículos 46, 47 y 48 de la Ley Federal del Trabajo.
-
-TERCERO.- El actor agotó la instancia conciliatoria ante el Centro de Conciliación Laboral, según consta en el expediente número {folio} de fecha {f_tramite}, sin que se lograra acuerdo conciliatorio alguno, por lo que se expidió la constancia de no conciliación correspondiente.
-
-CUARTO.- A la fecha de presentación de esta demanda, el demandado no ha cubierto al actor el pago de las prestaciones laborales que se reclaman, a pesar de haber sido requerido para ello.
-"""
-
-    # Circunstancias del despido capturadas por el asesor (QUINTO)
-    circunstancias = (cliente.circunstancias_despido or '').strip()
-    if circunstancias:
-        hechos += f"\n\nQUINTO.- Respecto de los hechos que motivaron la terminación de la relación laboral, el actor manifiesta que: {circunstancias}"
-
-    # Testigos de los hechos (SEXTO)
-    testigos_txt = _texto_como_lista(cliente.testigos)
-    if testigos_txt:
-        hechos += ("\n\nSEXTO.- Los hechos anteriores podrán ser corroborados por las personas que "
-                   f"oportunamente se señalarán como testigos: {testigos_txt}")
-
-    p_hechos = doc.add_paragraph()
-    run_hechos = p_hechos.add_run(hechos.strip())
-    run_hechos.font.size = BODY_FONT_SIZE
     doc.add_paragraph()
 
 
@@ -370,6 +621,118 @@ def _agregar_pruebas(doc: Document, expediente: Expediente) -> None:
     doc.add_paragraph()
 
 
+def _filas_prestaciones(calculo: dict, expediente: Expediente) -> list:
+    """Renglones de la tabla de prestaciones: (concepto, fundamento, monto).
+
+    Se listan TODOS los conceptos con monto mayor a cero, para que la tabla
+    cuadre con el total del cálculo.  DOCX y HTML usan esta misma función, así
+    que ambas salidas muestran exactamente las mismas cifras.
+    """
+    if not calculo.get('success'):
+        filas = [
+            ("Aguinaldo Proporcional", "Art. 87 LFT", None),
+            ("Vacaciones", "Art. 76 LFT", None),
+            ("Prima Vacacional", "Art. 80 LFT", None),
+        ]
+        tipo = expediente.tipo_despido or 'injustificado'
+        if tipo != 'voluntario':
+            filas.append(("Prima de Antigüedad", "Art. 162 LFT", None))
+            filas.append(("Indemnización Constitucional (3 meses)", "Art. 50 LFT", None))
+        return filas
+
+    c = calculo
+    filas = [
+        ("Aguinaldo Proporcional", "Art. 87 LFT", c['aguinaldo']['monto']),
+        ("Vacaciones", _fundamento_vacaciones(c), c['vacaciones']['monto']),
+        ("Prima Vacacional", f"Art. 80 LFT ({_pct(c['prima_vacacional'])})",
+         c['prima_vacacional']['monto']),
+    ]
+    if c['vacaciones_vencidas']['monto'] > 0:
+        filas.append((
+            "Vacaciones de ciclos anteriores",
+            f"Art. 79 LFT ({c['vacaciones_vencidas']['dias']} días)",
+            c['vacaciones_vencidas']['monto'],
+        ))
+    if c['prima_antiguedad']['monto'] > 0:
+        tope = " (con tope)" if c['prima_antiguedad']['tope_aplicado'] else ""
+        filas.append((
+            "Prima de Antigüedad",
+            f"Art. 162 LFT{tope}",
+            c['prima_antiguedad']['monto'],
+        ))
+    if c['indemnizacion']['monto'] > 0:
+        filas.append((
+            "Indemnización Constitucional (3 meses)",
+            "Art. 50 fr. III LFT",
+            c['indemnizacion']['monto'],
+        ))
+    if c['indemnizacion_20dias']['monto'] > 0:
+        filas.append((
+            "Indemnización 20 días por año",
+            "Art. 50 fr. II LFT",
+            c['indemnizacion_20dias']['monto'],
+        ))
+    if c['horas_extras']['monto'] > 0:
+        filas.append((
+            "Horas Extras",
+            _fundamento_horas_extras(c),
+            c['horas_extras']['monto'],
+        ))
+    if c['salarios_devengados']['monto'] > 0:
+        filas.append(("Salarios Devengados", "Art. 48 LFT",
+                      c['salarios_devengados']['monto']))
+    if c['dias_festivos']['monto'] > 0:
+        filas.append((
+            "Días Festivos laborados",
+            f"Art. 74-75 LFT ({c['dias_festivos']['dias']} días)",
+            c['dias_festivos']['monto'],
+        ))
+    if c['descanso_semanal']['monto'] > 0:
+        filas.append((
+            "Días de Descanso Semanal laborados",
+            f"Art. 69 y 73 LFT ({c['descanso_semanal']['dias']} días)",
+            c['descanso_semanal']['monto'],
+        ))
+    return filas
+
+
+def _fundamento_vacaciones(calculo: dict) -> str:
+    """Fundamento con el desglose de días de vacaciones (arts. 76 y 81 LFT)."""
+    v = calculo['vacaciones']
+    partes = []
+    if v.get('dias_causadas_anteriores'):
+        partes.append(f"{_num(v['dias_causadas_anteriores'])} de años cumplidos")
+    if v.get('dias_proporcionales'):
+        partes.append(f"{_num(v['dias_proporcionales'])} proporcionales")
+    detalle = f" ({' + '.join(partes)} días)" if partes else ""
+    return f"Art. 76 y 81 LFT{detalle}"
+
+
+def _fundamento_horas_extras(calculo: dict) -> str:
+    """Fundamento con el desglose dobles/triples (arts. 66 y 68 LFT)."""
+    h = calculo['horas_extras']
+    if h.get('dobles') and h.get('triples'):
+        return (f"Art. 66 y 68 LFT ({_num(h['dobles'])} dobles + "
+                f"{_num(h['triples'])} excedentes)")
+    return "Art. 66-68 LFT"
+
+
+def _pct(concepto: dict) -> str:
+    try:
+        return f"{float(concepto.get('porcentaje', 0)):.0f}%"
+    except (TypeError, ValueError):
+        return "25%"
+
+
+def _num(valor) -> str:
+    """Número sin ceros sobrantes (12, 12.5, 12.45)."""
+    try:
+        d = Decimal(str(valor)).normalize()
+    except Exception:
+        return str(valor)
+    return format(d, 'f')
+
+
 def _agregar_prestaciones(doc: Document, expediente: Expediente, calculo: dict,
                           tipo_despido: str = 'injustificado') -> None:
     """Agrega la sección de PRESTACIONES RECLAMADAS con tabla de montos."""
@@ -389,37 +752,15 @@ def _agregar_prestaciones(doc: Document, expediente: Expediente, calculo: dict,
 
     # Construir filas de la tabla
     rows = [("PRESTACIÓN", "FUNDAMENTO", "IMPORTE")]
+    for concepto, fundamento, monto in _filas_prestaciones(calculo, expediente):
+        rows.append((concepto, fundamento, f"${monto:,.2f}" if monto is not None else "—"))
 
     if calculo.get('success'):
-        c = calculo
-        rows.append(("Aguinaldo Proporcional", "Art. 87 LFT",
-                     f"${c['aguinaldo']['monto']:,.2f}"))
-        rows.append(("Vacaciones Proporcionales",
-                     f"Art. 76 LFT ({c['vacaciones']['dias_segun_antiguedad']} días)",
-                     f"${c['vacaciones']['monto']:,.2f}"))
-        rows.append(("Prima Vacacional (25%)", "Art. 80 LFT",
-                     f"${c['prima_vacacional']['monto']:,.2f}"))
-        # En renuncia voluntaria no procede prima de antigüedad ni
-        # indemnización constitucional (Art. 50 LFT)
-        if c['prima_antiguedad']['monto'] > 0:
-            tope = " (con tope)" if c['prima_antiguedad']['tope_aplicado'] else ""
-            rows.append(("Prima de Antigüedad", f"Art. 162 LFT{tope}",
-                         f"${c['prima_antiguedad']['monto']:,.2f}"))
-        if c['indemnizacion']['monto'] > 0:
-            rows.append(("Indemnización Constitucional (3 meses)", "Art. 50 LFT",
-                         f"${c['indemnizacion']['monto']:,.2f}"))
-        rows.append(("", "TOTAL:", f"${c['total']:,.2f}"))
+        rows.append(("", "TOTAL:", f"${calculo['total']:,.2f}"))
+    elif expediente.monto_reclamado:
+        rows.append(("", "MONTO RECLAMADO:", f"${expediente.monto_reclamado:,.2f}"))
     else:
-        rows.append(("Aguinaldo Proporcional", "Art. 87 LFT", "—"))
-        rows.append(("Vacaciones Proporcionales", "Art. 76 LFT", "—"))
-        rows.append(("Prima Vacacional (25%)", "Art. 80 LFT", "—"))
-        if tipo_despido != 'voluntario':
-            rows.append(("Prima de Antigüedad", "Art. 162 LFT", "—"))
-            rows.append(("Indemnización Constitucional (3 meses)", "Art. 50 LFT", "—"))
-        if expediente.monto_reclamado:
-            rows.append(("", "MONTO RECLAMADO:", f"${expediente.monto_reclamado:,.2f}"))
-        else:
-            rows.append(("", "MONTO RECLAMADO:", "—"))
+        rows.append(("", "MONTO RECLAMADO:", "—"))
 
     tabla = doc.add_table(rows=len(rows), cols=3)
     tabla.alignment = WD_TABLE_ALIGNMENT.CENTER
@@ -454,7 +795,41 @@ def _agregar_prestaciones(doc: Document, expediente: Expediente, calculo: dict,
             elif i % 2 == 0:
                 _celda_sombreada(celda, COLOR_ALT_ROW)
 
+    # Base de cálculo: el salario diario y el diario integrado (art. 89 LFT)
+    # deben quedar asentados en la demanda.
+    if calculo.get('success'):
+        p_base = doc.add_paragraph()
+        run_base = p_base.add_run(_texto_base_salarial(calculo))
+        run_base.font.size = TABLE_FONT_SIZE
+
     doc.add_paragraph()
+
+
+def _texto_base_salarial(calculo: dict) -> str:
+    """Renglón con el salario diario y el diario integrado (art. 89 LFT)."""
+    sd = calculo['salario_diario']
+    sdi = calculo['salario_diario_integrado']
+    texto = (f"Salario diario: ${sd:,.2f}. Salario diario integrado: ${sdi:,.2f} "
+             f"(arts. 84 y 89 de la Ley Federal del Trabajo).")
+    if sdi > sd:
+        componentes = calculo.get('salario_integrado_componentes') or {}
+        detalle = ', '.join(
+            f"{_nombre_componente(k)}: ${v:,.2f}"
+            for k, v in componentes.items() if v
+        )
+        if detalle:
+            texto += f" Incluye {detalle}."
+    return texto
+
+
+def _nombre_componente(clave: str) -> str:
+    return {
+        'cuota_diaria': 'cuota diaria',
+        'gratificaciones': 'gratificaciones',
+        'ayudas': 'ayudas y prestaciones',
+        'comisiones': 'comisiones',
+        'prestaciones_especie': 'prestaciones en especie',
+    }.get(clave, clave)
 
 
 def _agregar_derecho(doc: Document, tipo_despido: str = 'injustificado') -> None:
@@ -476,6 +851,51 @@ def _agregar_derecho(doc: Document, tipo_despido: str = 'injustificado') -> None
     doc.add_paragraph()
 
 
+def _puntos_petitorios(calculo: dict, expediente: Expediente) -> list:
+    """Lista de petitorios.
+
+    El artículo 48 LFT es una ELECCIÓN: si el actor optó por la reinstalación,
+    el petitorio pide la reinstalación y NO la indemnización de tres meses.
+    """
+    accion = (calculo or {}).get('accion') or {}
+    if accion.get('accion') == 'reinstalacion' and accion.get('procede'):
+        total_str = f"${calculo['total']:,.2f}"
+        return [
+            "PRIMERO.- Se declare que existió una relación laboral entre el "
+            "actor y el demandado, en los términos que acreditan.",
+            "SEGUNDO.- Se condene al demandado a la REINSTALACIÓN del actor en "
+            "el puesto que venía desempeñando, con las prestaciones que "
+            "correspondan conforme a la Ley Federal del Trabajo.",
+            f"TERCERO.- Se condene al demandado al pago de {total_str} por "
+            f"concepto de las prestaciones laborales detalladas en el cuerpo "
+            f"de esta demanda.",
+            "CUARTO.- Se ordene el pago de los salarios caídos que se sigan "
+            "generando desde la fecha de la separación hasta que se cumpla la "
+            "sentencia.",
+            "QUINTO.- Se condene al demandado al pago de los gastos y costas "
+            "que se originen con motivo del presente juicio.",
+        ]
+
+    if (calculo or {}).get('success') and calculo['total'] > 0:
+        total_str = f"${calculo['total']:,.2f}"
+    elif expediente.monto_reclamado:
+        total_str = f"${expediente.monto_reclamado:,.2f}"
+    else:
+        total_str = "la cantidad que resulte"
+
+    return [
+        "PRIMERO.- Se declare que existió una relación laboral entre el "
+        "actor y el demandado.",
+        f"SEGUNDO.- Se condene al demandado al pago de {total_str} por "
+        f"concepto de las prestaciones laborales detalladas en el cuerpo de "
+        f"esta demanda.",
+        "TERCERO.- Se ordene el pago de los salarios caídos que se sigan "
+        "generando hasta la fecha en que se cumpla la sentencia.",
+        "CUARTO.- Se condene al demandado al pago de los gastos y costas que "
+        "se originen con motivo del presente juicio.",
+    ]
+
+
 def _agregar_puntos_petitorios(doc: Document, expediente: Expediente, calculo: dict) -> None:
     """Agrega los PUNTOS PETITORIOS."""
     p = doc.add_paragraph()
@@ -484,25 +904,11 @@ def _agregar_puntos_petitorios(doc: Document, expediente: Expediente, calculo: d
     run.font.size = SECTION_FONT_SIZE
     run.font.color.rgb = COLOR_PRIMARY
 
-    if calculo.get('success') and calculo['total'] > 0:
-        total_str = f"${calculo['total']:,.2f}"
-    elif expediente.monto_reclamado:
-        total_str = f"${expediente.monto_reclamado:,.2f}"
-    else:
-        total_str = "la cantidad que resulte"
-
-    petitorios = [
-        "PRIMERO.- Se declare que existió una relación laboral entre el actor y el demandado.",
-        f"SEGUNDO.- Se condene al demandado al pago de {total_str} por concepto de las prestaciones laborales detalladas en el cuerpo de esta demanda.",
-        "TERCERO.- Se ordene el pago de los salarios caídos que se sigan generando hasta la fecha en que se cumpla la sentencia.",
-        "CUARTO.- Se condene al demandado al pago de los gastos y costas que se originen con motivo del presente juicio.",
-    ]
-
-    for pet in petitorios:
-        p = doc.add_paragraph()
-        run = p.add_run(f"  {pet}")
-        run.font.size = BODY_FONT_SIZE
-        p.paragraph_format.space_after = Pt(4)
+    for pet in _puntos_petitorios(calculo, expediente):
+        p_pet = doc.add_paragraph()
+        run_pet = p_pet.add_run(f"  {pet}")
+        run_pet.font.size = BODY_FONT_SIZE
+        p_pet.paragraph_format.space_after = Pt(4)
 
     doc.add_paragraph()
 
@@ -597,15 +1003,12 @@ def generar_demanda_word(expediente: Expediente, desde_cero=True,
 
     if desde_cero:
         tipo_despido = tipo_despido_override or expediente.tipo_despido or 'injustificado'
-        calculo = calcular_desde_expediente(
-            expediente,
-            conceptos_seleccionados=_conceptos_para_demanda(tipo_despido),
-        )
+        calculo = calculo_para_demanda(expediente, tipo_despido)
         _agregar_encabezado_tribunal(doc)
         _agregar_materia(doc, expediente)
         _agregar_actor(doc, expediente)
         _agregar_demandado(doc, expediente)
-        _agregar_hechos(doc, expediente, tipo_despido)
+        _agregar_hechos(doc, expediente, calculo, tipo_despido)
         _agregar_prestaciones(doc, expediente, calculo, tipo_despido)
         _agregar_derecho(doc, tipo_despido)
         _agregar_pruebas(doc, expediente)
@@ -734,10 +1137,7 @@ def generar_demanda_html(expediente: Expediente, tipo_despido_override: str | No
     """
     cliente = expediente.cliente
     tipo_despido = tipo_despido_override or expediente.tipo_despido or 'injustificado'
-    calculo = calcular_desde_expediente(
-        expediente,
-        conceptos_seleccionados=_conceptos_para_demanda(tipo_despido),
-    )
+    calculo = calculo_para_demanda(expediente, tipo_despido)
     hoy = timezone.now()
     asesor = expediente.asesor.get_full_name() or expediente.asesor.username
     ahora_str = hoy.strftime('%d/%m/%Y %H:%M')
@@ -755,56 +1155,76 @@ def generar_demanda_html(expediente: Expediente, tipo_despido_override: str | No
 
     # ─── Prestaciones ───
     prestaciones_rows = ""
+    for concepto, fundamento, monto in _filas_prestaciones(calculo, expediente):
+        importe = (f'<td style="text-align:right">${monto:,.2f}</td>'
+                   if monto is not None
+                   else '<td style="text-align:right">—</td>')
+        prestaciones_rows += (
+            f'<tr><td>{concepto}</td><td>{fundamento}</td>{importe}</tr>\n'
+        )
+
     if calculo.get('success'):
-        c = calculo
-        filas = [
-            ("Aguinaldo Proporcional", "Art. 87 LFT", c['aguinaldo']['monto']),
-            ("Vacaciones Proporcionales",
-             f"Art. 76 LFT ({c['vacaciones']['dias_segun_antiguedad']} días)",
-             c['vacaciones']['monto']),
-            ("Prima Vacacional (25%)", "Art. 80 LFT", c['prima_vacacional']['monto']),
-        ]
-        # En renuncia voluntaria no procede prima de antigüedad ni
-        # indemnización constitucional (Art. 50 LFT)
-        if c['prima_antiguedad']['monto'] > 0:
-            tope = " (con tope)" if c['prima_antiguedad']['tope_aplicado'] else ""
-            filas.append(("Prima de Antigüedad", f"Art. 162 LFT{tope}",
-                          c['prima_antiguedad']['monto']))
-        if c['indemnizacion']['monto'] > 0:
-            filas.append(("Indemnización Constitucional (3 meses)", "Art. 50 LFT",
-                          c['indemnizacion']['monto']))
-        for nombre, fundamento, monto in filas:
-            prestaciones_rows += (
-                f'<tr><td>{nombre}</td><td>{fundamento}</td>'
-                f'<td style="text-align:right">${monto:,.2f}</td></tr>\n'
-            )
         prestaciones_rows += (
             '<tr style="font-weight:bold;border-top:2px solid #000"><td></td>'
             '<td style="text-align:right">TOTAL:</td>'
-            f'<td style="text-align:right">${c["total"]:,.2f}</td></tr>'
+            f'<td style="text-align:right">${calculo["total"]:,.2f}</td></tr>'
         )
-    else:
-        total_str = f"${expediente.monto_reclamado:,.2f}" if expediente.monto_reclamado else "—"
-        filas = [
-            ("Aguinaldo Proporcional", "Art. 87 LFT"),
-            ("Vacaciones Proporcionales", "Art. 76 LFT"),
-            ("Prima Vacacional (25%)", "Art. 80 LFT"),
-        ]
-        if tipo_despido != 'voluntario':
-            filas.append(("Prima de Antigüedad", "Art. 162 LFT"))
-            filas.append(("Indemnización Constitucional (3 meses)", "Art. 50 LFT"))
-        for nombre, fundamento in filas:
-            prestaciones_rows += (
-                f'<tr><td>{nombre}</td><td>{fundamento}</td>'
-                '<td style="text-align:right">—</td></tr>\n'
-            )
+        texto_base_salarial = _texto_base_salarial(calculo)
+    elif expediente.monto_reclamado:
         prestaciones_rows += (
             '<tr style="font-weight:bold;border-top:2px solid #000"><td></td>'
             '<td style="text-align:right">MONTO RECLAMADO:</td>'
-            f'<td style="text-align:right">{total_str}</td></tr>'
+            f'<td style="text-align:right">${expediente.monto_reclamado:,.2f}</td></tr>'
         )
+        texto_base_salarial = ''
+    else:
+        prestaciones_rows += (
+            '<tr style="font-weight:bold;border-top:2px solid #000"><td></td>'
+            '<td style="text-align:right">MONTO RECLAMADO:</td>'
+            '<td style="text-align:right">—</td></tr>'
+        )
+        texto_base_salarial = ''
 
-    total_petitorio = f"${calculo['total']:,.2f}" if calculo.get('success') and calculo['total'] > 0 else (f"${expediente.monto_reclamado:,.2f}" if expediente.monto_reclamado else "la cantidad que resulte")
+
+    # Petitorios: misma lista que el DOCX (_puntos_petitorios)
+    petitorios_html = "\n".join(
+        f"<p>{html_escape(p)}</p>"
+        for p in _puntos_petitorios(calculo, expediente)
+    )
+
+    # PRUEBAS (misma lista que el DOCX: documental, testimonial, instrumental,
+    # presuncional).  Solo se ofrece la TESTIMONIAL si hay testigos capturados.
+    pruebas_items_html = []
+    documentos_texto = _texto_como_lista(cliente.documentos_prueba)
+    n = 1
+    if documentos_texto:
+        pruebas_items_html.append(
+            f"<p>{n}. <strong>DOCUMENTAL.</strong> Consistente en los "
+            f"documentos siguientes: {html_escape(documentos_texto)}.</p>"
+        )
+        n += 1
+    if (cliente.testigos or '').strip():
+        pruebas_items_html.append(
+            f"<p>{n}. <strong>TESTIMONIAL.</strong> A cargo de las personas que "
+            f"oportunamente se señalarán, respecto de los hechos controvertidos.</p>"
+        )
+        n += 1
+    pruebas_items_html.append(
+        f"<p>{n}. <strong>INSTRUMENTAL DE ACTUACIONES</strong>, consistente en todo "
+        f"lo actuado que favorezca a los intereses de la parte actora.</p>"
+    )
+    n += 1
+    pruebas_items_html.append(
+        f"<p>{n}. <strong>PRESUNCIONAL LEGAL Y HUMANA</strong>, en todo aquello que "
+        f"beneficie a los intereses de la parte actora.</p>"
+    )
+    pruebas_html = "\n".join(pruebas_items_html)
+
+    # HECHOS: misma narrativa que el DOCX (construir_hechos)
+    hechos_html = "\n\n".join(
+        f"<p>{html_escape(h)}</p>" for h in
+        construir_hechos(expediente, calculo, tipo_despido)
+    )
 
     # ─── Datos actor ───
     actor_direccion = cliente.direccion_completa
@@ -866,60 +1286,7 @@ def generar_demanda_html(expediente: Expediente, tipo_despido_override: str | No
 
 <h3 style="color:#1F2937;">—  H E C H O S  —</h3>
 
-<p><strong>PRIMERO.-</strong> El {f_ingreso}, el actor inició su relación laboral con el demandado {empresa}, desempeñando el puesto de {puesto}, con un salario de {salario} mensuales, pagaderos en la forma y términos convenidos.</p>
-
-<p><strong>SEGUNDO.-</strong> El {f_salida}, {frase_despido}, violando en perjuicio del actor lo dispuesto por los artículos 46, 47 y 48 de la Ley Federal del Trabajo.</p>
-
-<p><strong>TERCERO.-</strong> El actor agotó la instancia conciliatoria ante el Centro de Conciliación Laboral, según consta en el expediente número {folio} de fecha {f_tramite}, sin que se lograra acuerdo conciliatorio alguno, por lo que se expidió la constancia de no conciliación correspondiente.</p>
-
-<p><strong>CUARTO.-</strong> A la fecha de presentación de esta demanda, el demandado no ha cubierto al actor el pago de las prestaciones laborales que se reclaman, a pesar de haber sido requerido para ello.</p>
-"""
-
-    # Circunstancias del despido capturadas por el asesor (QUINTO)
-    circunstancias_html = (cliente.circunstancias_despido or '').strip()
-    if circunstancias_html:
-        html += (f"\n<p><strong>QUINTO.-</strong> Respecto de los hechos que motivaron la terminación de la "
-                 f"relación laboral, el actor manifiesta que: {circunstancias_html}</p>\n")
-
-    # Testigos de los hechos (SEXTO)
-    testigos_html = _texto_como_lista(cliente.testigos)
-    if testigos_html:
-        html += ("\n<p><strong>SEXTO.-</strong> Los hechos anteriores podrán ser corroborados por las personas que "
-                 f"oportunamente se señalarán como testigos: {testigos_html}</p>\n")
-
-    # Sección de PRUEBAS (documental, testimonial, instrumental, presuncional)
-    pruebas_items_html = []
-    documentos_html = _texto_como_lista(cliente.documentos_prueba)
-    n = 1
-    if documentos_html:
-        pruebas_items_html.append(f"<p><strong>{n}. DOCUMENTAL.</strong> Consistente en los documentos siguientes: {documentos_html}.</p>")
-        n += 1
-    if (cliente.testigos or '').strip():
-        pruebas_items_html.append(f"<p><strong>{n}. TESTIMONIAL.</strong> A cargo de las personas que oportunamente se señalarán, respecto de los hechos controvertidos.</p>")
-        n += 1
-    pruebas_items_html.append(f"<p><strong>{n}. INSTRUMENTAL DE ACTUACIONES.</strong> Consistente en todo lo actuado que favorezca a los intereses del trabajador.</p>")
-    n += 1
-    pruebas_items_html.append(f"<p><strong>{n}. PRESUNCIONAL LEGAL Y HUMANA.</strong> En todo aquello que beneficie a los intereses de la parte actora.</p>")
-    pruebas_html = "\n".join(pruebas_items_html)
-
-    html += f"""
-
-<h3 style="color:#1F2937;">—  P R E S T A C I O N E S   R E C L A M A D A S  —</h3>
-
-<p>Con fundamento en lo dispuesto por la Ley Federal del Trabajo, se reclaman las siguientes prestaciones:</p>
-
-<table style="width:100%;border-collapse:collapse;margin:15px 0;">
-    <thead>
-        <tr style="background:#1F2937;color:white;">
-            <th style="padding:6px 8px;border:1px solid #ccc;text-align:left;">PRESTACIÓN</th>
-            <th style="padding:6px 8px;border:1px solid #ccc;text-align:center;">FUNDAMENTO</th>
-            <th style="padding:6px 8px;border:1px solid #ccc;text-align:right;">IMPORTE</th>
-        </tr>
-    </thead>
-    <tbody>
-{prestaciones_rows}
-    </tbody>
-</table>
+{hechos_html}
 
 <h3 style="color:#1F2937;">—  F U N D A M E N T O S   D E   D E R E C H O  —</h3>
 
@@ -931,10 +1298,7 @@ def generar_demanda_html(expediente: Expediente, tipo_despido_override: str | No
 
 <h3 style="color:#1F2937;">—  P U N T O S   P E T I T O R I O S  —</h3>
 
-<p><strong>PRIMERO.-</strong> Se declare que existió una relación laboral entre el actor y el demandado.</p>
-<p><strong>SEGUNDO.-</strong> Se condene al demandado al pago de {total_petitorio} por concepto de las prestaciones laborales detalladas en el cuerpo de esta demanda.</p>
-<p><strong>TERCERO.-</strong> Se ordene el pago de los salarios caídos que se sigan generando hasta la fecha en que se cumpla la sentencia.</p>
-<p><strong>CUARTO.-</strong> Se condene al demandado al pago de los gastos y costas que se originen con motivo del presente juicio.</p>
+{petitorios_html}
 
 <h3 style="color:#1F2937;">—  F I R M A  —</h3>
 

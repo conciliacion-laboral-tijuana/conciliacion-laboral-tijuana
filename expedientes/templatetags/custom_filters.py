@@ -21,8 +21,16 @@ def intcomma(value):
 
 @register.filter(name='get_item')
 def get_item(dictionary, key):
-    """Obtiene un valor de un diccionario por clave."""
-    return dictionary.get(key, '')
+    """Obtiene un valor de un diccionario por clave.
+
+    Tolera valores que no son diccionarios (por ejemplo, cuando se encadena
+    `a|get_item:'x'|get_item:'y'` y la primera clave no existe): devuelve la
+    cadena vacía en vez de romper el render de la página completa.
+    """
+    try:
+        return dictionary.get(key, '')
+    except AttributeError:
+        return ''
 
 
 @register.filter(name='div')

@@ -13,9 +13,14 @@ class ClienteForm(forms.ModelForm):
                    'empresa', 'empresa_actividad', 'empresa_telefono', 'empresa_razon_social',
                    'empresa_calle', 'empresa_numero', 'empresa_colonia', 'empresa_cp', 'empresa_referencias',
                    'empresa_curp', 'empresa_rfc', 'tipo_persona_citado',
-                   'puesto', 'salario', 'periodo_pago', 'horas_semanales', 'jornada',
+'puesto', 'salario', 'periodo_pago', 'horas_semanales', 'jornada',
+                   'zona_salarial',
                    'fecha_ingreso', 'fecha_salida', 'tipo_despido',
                    'circunstancias_despido', 'testigos', 'documentos_prueba',
+                   'modalidad_despido', 'hubo_documento_despido',
+                   'despido_comunicado_por', 'despido_lugar', 'despido_frase',
+                   'despido_documento_motivo', 'despido_otra_modalidad',
+                   'lugar_trabajo', 'accion_preferida',
                    'como_supo', 'oficina',
                    'asesoria_gratuita_ofrecida', 'asesoria_gratuita_agendada', 'fecha_asesoria_gratuita']
         widgets = {
@@ -226,10 +231,16 @@ class CalculoLaboralForm(forms.ModelForm):
             'incluir_indemnizacion_20dias',
             'incluir_vacaciones_vencidas', 'incluir_horas_extras',
             'incluir_salarios_devengados', 'incluir_dias_festivos',
+            'incluir_descanso_semanal',
             # Campos de entrada para conceptos
             'dias_vacaciones_vencidos', 'horas_extra_cantidad',
+            'horas_extra_normales', 'horas_extra_excedentes',
             'salarios_devengados', 'dias_festivos_cantidad',
+            'dias_descanso_semanal_cantidad',
             'dias_vacaciones_override',
+            # Salario integrado (arts. 84 y 89 LFT)
+            'salario_integrado_cuota_diaria', 'salario_integrado_gratificaciones',
+            'salario_integrado_ayudas', 'salario_integrado_porcentaje',
         ]
         widgets = {
             'periodo_pago': forms.Select(attrs={
@@ -251,6 +262,7 @@ class CalculoLaboralForm(forms.ModelForm):
             'incluir_horas_extras': forms.CheckboxInput(attrs={'class': 'w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 concepto-checkbox', 'data-concepto': 'horas_extras'}),
             'incluir_salarios_devengados': forms.CheckboxInput(attrs={'class': 'w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 concepto-checkbox', 'data-concepto': 'salarios_devengados'}),
             'incluir_dias_festivos': forms.CheckboxInput(attrs={'class': 'w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 concepto-checkbox', 'data-concepto': 'dias_festivos'}),
+            'incluir_descanso_semanal': forms.CheckboxInput(attrs={'class': 'w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 concepto-checkbox', 'data-concepto': 'descanso_semanal'}),
             # Inputs para conceptos semi-automáticos
             'dias_vacaciones_vencidos': forms.NumberInput(attrs={
                 'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent',
@@ -260,6 +272,18 @@ class CalculoLaboralForm(forms.ModelForm):
             'horas_extra_cantidad': forms.NumberInput(attrs={
                 'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent',
                 'placeholder': '0 horas',
+                'min': '0',
+                'step': '0.5',
+            }),
+            'horas_extra_normales': forms.NumberInput(attrs={
+                'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent',
+                'placeholder': 'Al doble (art. 66)',
+                'min': '0',
+                'step': '0.5',
+            }),
+            'horas_extra_excedentes': forms.NumberInput(attrs={
+                'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent',
+                'placeholder': 'Al triple (art. 68)',
                 'min': '0',
                 'step': '0.5',
             }),
@@ -279,14 +303,49 @@ class CalculoLaboralForm(forms.ModelForm):
                 'placeholder': 'auto',
                 'min': '0',
             }),
+            'dias_descanso_semanal_cantidad': forms.NumberInput(attrs={
+                'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent',
+                'placeholder': '0 días',
+                'min': '0',
+            }),
+            'salario_integrado_cuota_diaria': forms.NumberInput(attrs={
+                'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent',
+                'placeholder': '$0.00',
+                'min': '0',
+                'step': '0.01',
+            }),
+            'salario_integrado_gratificaciones': forms.NumberInput(attrs={
+                'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent',
+                'placeholder': '$0.00',
+                'min': '0',
+                'step': '0.01',
+            }),
+            'salario_integrado_ayudas': forms.NumberInput(attrs={
+                'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent',
+                'placeholder': '$0.00',
+                'min': '0',
+                'step': '0.01',
+            }),
+            'salario_integrado_porcentaje': forms.NumberInput(attrs={
+                'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent',
+                'placeholder': '0 %',
+                'min': '0',
+                'step': '0.01',
+            }),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Hacer que los campos de entrada no sean requeridos (dependen del checkbox)
         for field_name in ['dias_vacaciones_vencidos', 'horas_extra_cantidad',
+                            'horas_extra_normales', 'horas_extra_excedentes',
                             'salarios_devengados', 'dias_festivos_cantidad',
-                            'dias_vacaciones_override']:
+                            'dias_descanso_semanal_cantidad',
+                            'dias_vacaciones_override',
+                            'salario_integrado_cuota_diaria',
+                            'salario_integrado_gratificaciones',
+                            'salario_integrado_ayudas',
+                            'salario_integrado_porcentaje']:
             self.fields[field_name].required = False
 
         # En renuncia voluntaria la demanda no reclama indemnización constitucional
@@ -358,6 +417,38 @@ class SimulacionForm(forms.Form):
         label='Periodo de pago',
         choices=[('mensual', 'Mensual'), ('quincenal', 'Quincenal'), ('semanal', 'Semanal'), ('diario', 'Diario')],
         initial='mensual',
+        widget=forms.Select(attrs={
+            'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent',
+        })
+    )
+    zona_salarial = forms.ChoiceField(
+        label='Zona salarial',
+        choices=[('frontera', 'Zona Libre de la Frontera Norte'),
+                 ('general', 'Resto del país')],
+        initial='frontera',
+        help_text='Define el salario mínimo y el tope de la prima de antigüedad '
+                  '(arts. 485/486 LFT)',
+        widget=forms.Select(attrs={
+            'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent',
+        })
+    )
+    jornada = forms.ChoiceField(
+        label='Jornada',
+        choices=[('diurna', 'Diurna (8 h)'), ('nocturna', 'Nocturna (7 h)'),
+                 ('mixta', 'Mixta (7.5 h)')],
+        initial='diurna',
+        widget=forms.Select(attrs={
+            'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent',
+        })
+    )
+    tipo_despido = forms.ChoiceField(
+        label='Tipo de despido',
+        required=False,
+        choices=[('injustificado', 'Despido injustificado'),
+                 ('justificado', 'Despido justificado'),
+                 ('voluntario', 'Renuncia voluntaria'),
+                 ('rescision', 'Rescisión')],
+        help_text='Determina qué indemnizaciones proceden (arts. 50 y 162 LFT)',
         widget=forms.Select(attrs={
             'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent',
         })

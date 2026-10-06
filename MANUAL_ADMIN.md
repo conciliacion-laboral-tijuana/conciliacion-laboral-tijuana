@@ -103,17 +103,45 @@ Los valores legales del cálculo laboral viven en **Configuraciones Legales**
 
 ### 3.1 Qué parámetros se configuran
 
-| Parámetro | Uso | Valor de referencia (2024) |
+| Parámetro | Uso | Valor de referencia (2026) |
 |-----------|-----|---------------------------|
-| **UMA diaria** | Base para topes y cálculos | $108.57 |
-| **Salario mínimo general** | Cálculos y topes | $248.93 |
-| **Salario mínimo frontera (ZLF)** | Zona Libre Frontera Norte | $374.89 |
-| **Días de aguinaldo** | Aguinaldo proporcional | 15 |
-| **% prima vacacional** | Prima sobre vacaciones | 25% |
-| **Días por año (prima antigüedad)** | Prima de antigüedad | 12 |
-| **Tipo de tope** | 2× UMA / 2× SM / 2× SM frontera | UMA |
+| **UMA diaria** | Referencia (NO es el tope de la prima de antigüedad) | $117.31 |
+| **Salario mínimo general** | Piso y topes del art. 486 en el resto del país | $315.04 |
+| **Salario mínimo frontera (ZLFN)** | Piso y topes en Tijuana, Mexicali, Cd. Juárez… | $440.87 |
+| **Días de aguinaldo** | Aguinaldo proporcional (art. 87) | 15 |
+| **% prima vacacional** | Prima sobre vacaciones (art. 80) | 25% |
+| **Días por año (prima antigüedad)** | Prima de antigüedad (art. 162 fr. I) | 12 |
+| **Años para prima en renuncia** | Umbral del art. 162 fr. III | 15 |
+| **Vacaciones antes de un año** | Criterio con menos de un año de servicios | proporcional |
+| **Tipo de tope** | **Doble del salario mínimo del área** (arts. 485/486) | SM frontera |
 | **Múltiplo del tope** | Multiplicador del tope | 2 |
-| **Días de indemnización** | Indemnización constitucional | 90 |
+| **Días de indemnización** | Indemnización constitucional (art. 50 fr. III) | 90 |
+| **Días por año (20 días)** | Indemnización del art. 50 fr. II | 20 |
+| **Modo de salario integrado** | Base de las indemnizaciones (arts. 84/89) | por conceptos |
+| **% prestaciones integradas** | Alternativa al desglose del integrado | 0 |
+
+> ⚠️ **El tope de la prima de antigüedad NO es 2 × UMA.** Los artículos 485 y 486 LFT lo
+> fijan en el **doble del salario mínimo del área geográfica** donde se prestó el trabajo.
+> Con los valores de 2026 eso da **$881.74 en la Zona Libre de la Frontera Norte** y
+> **$630.08** en el resto del país, frente a $234.62 que se obtendría con 2 × UMA. Tijuana
+> está en la ZLFN, así que la zona por defecto del cliente es `frontera`.
+
+### 3.1b Topes graduales de la jornada (no se editan aquí)
+
+La reforma del DOF 01-05-2026.reduce la jornada **de forma gradual hasta 2030**, así que esos
+topes no son un parámetro sino una tabla por año en el código
+(`core/laboral/rules.py`), porque no dependen de una decisión del despacho:
+
+| Año | Jornada ordinaria máx. | Horas al doble máx./semana |
+|-----|------------------------|---------------------------|
+| 2026 | 48 | 9 |
+| 2027 | 46 | 9 |
+| 2028 | 44 | 10 |
+| 2029 | 42 | 11 |
+| 2030 | 40 | 12 |
+
+Lo que exceda las horas al doble se paga al triple (art. 68) con un máximo de 4 h/semana, y
+ordinaria + extraordinaria nunca puede pasar de 12 h diarias.
 
 ### 3.2 Cómo actualizarla (ej. al inicio de cada año)
 
@@ -132,6 +160,44 @@ valores vigentes). El modelo `CalculoLaboral.recalcular()` hace lo mismo por pro
 
 > ⚠️ **No** cambies estos valores sin confirmar el dato oficial. Un error en la UMA o el
 > salario mínimo altera **todos** los cálculos del despacho.
+
+---
+
+## 3.4 Acción preferida y modalidad del despido
+
+Estos dos datos **no** están en Configuraciones Legales: son de cada cliente y se capturan en el
+**acordeón de demanda**, sección 4.
+
+### Modalidad de la separación
+
+Determina el redactado del hecho de la separación en la demanda:
+
+| Opción | Cuándo se usa |
+|--------|---------------|
+| Despido verbal (sin documento) | No le entregaron nada por escrito. **El art. 47 LFT presume la separación injustificada** aunque el patrón alegue una causa |
+| Despido notificado por documento | Le entregaron un aviso o carta |
+| Se le impidió el acceso | Se presentó a trabajar y no lo dejaron entrar |
+| Otra modalidad | Cualquier otro caso |
+
+> 💡 Marca **"Se entregó documento de terminación"** sólo si realmente hubo aviso escrito. El
+> redactado del despacho verbal invoca precisamente la falta de aviso escrito.
+
+### Acción preferida (art. 48 LFT)
+
+Es una **elección del trabajador**, no una prestación adicional:
+
+| Opción | Efecto |
+|--------|--------|
+| Indemnización (3 meses de salario integrado) | Se reclama en el total y en el segundo petitorio |
+| Reinstalación en el puesto que desempeñaba | Los 3 meses **salen del total** y el petitorio pide reinstalación + salarios caídos |
+
+Si se elige reinstalación pero **no procede**, la pantalla muestra un aviso y el sistema mantiene
+la indemnización:
+
+- **Menos de un año de antigüedad** → art. 49 fr. I LFT.
+- **Despido justificado o renuncia voluntaria** → art. 46 LFT (sin responsabilidad del patrón).
+
+Nunca marques ambas ni ninguna: siempre es una de las dos.
 
 ---
 

@@ -97,34 +97,66 @@ class SolicitudConciliacionAdmin(admin.ModelAdmin):
 
 @admin.register(LegalConfig)
 class LegalConfigAdmin(admin.ModelAdmin):
-    list_display = ['nombre', 'activo', 'uma_diaria', 'aguinaldo_dias', 'created_at']
+    list_display = ['nombre', 'activo', 'uma_diaria', 'salario_minimo_frontera',
+                    'aguinaldo_dias', 'created_at']
     list_filter = ['activo']
     readonly_fields = ['created_at', 'updated_at']
     fieldsets = [
         ('General', {'fields': ['nombre', 'activo']}),
-        ('UMA y Salario Mínimo', {'fields': ['uma_diaria', 'salario_minimo', 'salario_minimo_frontera']}),
-        ('Aguinaldo', {'fields': ['aguinaldo_dias']}),
-        ('Prima Vacacional', {'fields': ['prima_vacacional_porcentaje']}),
-        ('Prima de Antigüedad', {'fields': ['prima_antiguedad_dias_por_ano', 'tope_prima_tipo', 'tope_prima_multiplo']}),
-        ('Indemnización', {'fields': ['indemnizacion_dias']}),
+        ('UMA y Salario Mínimo', {
+            'description': 'Valores oficiales CONASAMI/INEGI. El tope de la prima de '
+                           'antigüedad se mide con el salario mínimo del ÁREA, no con la UMA.',
+            'fields': ['uma_diaria', 'salario_minimo', 'salario_minimo_frontera'],
+        }),
+        ('Aguinaldo (art. 87 LFT)', {'fields': ['aguinaldo_dias']}),
+        ('Prima Vacacional (art. 80 LFT)', {'fields': ['prima_vacacional_porcentaje']}),
+        ('Prima de Antigüedad (arts. 162, 485 y 486 LFT)', {
+            'description': 'El tope legal es el DOBLE del salario mínimo del área '
+                           'geográfica donde se prestó el trabajo (Tijuana = Zona Libre de '
+                           'la Frontera Norte).',
+            'fields': ['prima_antiguedad_dias_por_ano',
+                       'prima_antiguedad_anios_voluntaria',
+                       'tope_prima_tipo', 'tope_prima_multiplo'],
+        }),
+        ('Vacaciones (art. 76 LFT)', {'fields': ['vacaciones_antes_de_un_ano']}),
+        ('Indemnizaciones (art. 50 LFT)', {
+            'fields': ['indemnizacion_dias', 'indemnizacion_20dias_dias_por_ano'],
+        }),
+        ('Salario integrado (arts. 84 y 89 LFT)', {
+            'description': 'Base de las indemnizaciones: cuota diaria y parte proporcional '
+                           'de las prestaciones que integran el salario.',
+            'fields': ['salario_integrado_modo', 'salario_integrado_porcentaje'],
+        }),
         ('Metadatos', {'fields': ['created_at', 'updated_at']}),
     ]
 
 
 @admin.register(CalculoLaboral)
 class CalculoLaboralAdmin(admin.ModelAdmin):
-    list_display = ['expediente', 'total', 'salario_diario', 'dias_trabajados', 'años_trabajados', 'recalculado_en']
-    list_filter = ['tope_salarial_aplicado', 'created_at']
+    list_display = ['expediente', 'total', 'salario_diario', 'salario_diario_integrado',
+                    'dias_trabajados', 'años_trabajados', 'recalculado_en']
+    list_filter = ['tope_salarial_aplicado', 'zona_salarial', 'created_at']
     search_fields = ['expediente__numero', 'expediente__cliente__nombre']
-    readonly_fields = ['salario_diario', 'dias_trabajados', 'años_trabajados',
+    readonly_fields = ['salario_diario', 'salario_diario_integrado', 'zona_salarial',
+                        'dias_trabajados', 'años_trabajados',
                         'aguinaldo', 'vacaciones', 'prima_vacacional', 'prima_antiguedad',
                         'indemnizacion', 'total', 'recalculado_en', 'created_at', 'updated_at']
     autocomplete_fields = ['expediente']
     fieldsets = [
         ('Expediente', {'fields': ['expediente']}),
-        ('Datos del Cálculo', {'fields': ['salario_mensual', 'salario_diario', 'periodo_pago',
+        ('Datos del Cálculo', {'fields': ['salario_mensual', 'salario_diario',
+                                           'salario_diario_integrado', 'periodo_pago',
+                                           'zona_salarial',
                                            'fecha_ingreso', 'fecha_salida',
                                            'dias_trabajados', 'años_trabajados']}),
+        ('Salario integrado (arts. 84 y 89 LFT)', {
+            'description': 'Desglose de lo que integra el salario para el cálculo de las '
+                           'indemnizaciones. Si capturas un porcentaje, manda sobre el desglose.',
+            'fields': ['salario_integrado_cuota_diaria',
+                       'salario_integrado_gratificaciones',
+                       'salario_integrado_ayudas',
+                       'salario_integrado_porcentaje'],
+        }),
         ('Resultados', {'fields': ['aguinaldo', 'vacaciones', 'dias_vacaciones',
                                     'prima_vacacional', 'prima_antiguedad',
                                     'tope_salarial_aplicado', 'indemnizacion', 'total']}),

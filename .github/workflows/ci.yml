@@ -38,6 +38,21 @@ jobs:
         # manifest de collectstatic que exige CompressedManifestStaticFilesStorage)
         run: uv run python manage.py test expedientes.tests --settings=config.settings_test --verbosity 2
 
+      - name: Run tests del motor jurídico (core/laboral)
+        # Batería de casos por antigüedad, zona salarial, topes y jornada:
+        # 3 meses, 11 meses, 1 año, 1a6m, 5 años, 10 años, bajo/sobre tope,
+        # frontera vs. general, horas extras dobles/triples y procedencia
+        # por tipo de despido (arts. 46, 50, 66, 68, 76, 80, 84, 87, 89,
+        # 162, 485 y 486 LFT).
+        run: uv run python manage.py test expedientes.tests_motor --settings=config.settings_test --verbosity 2
+
+      - name: Run tests de la narrativa de la demanda
+        # Modalidades de la separación (verbal / documento / acceso / otra) con
+        # el efecto del art. 47 LFT, coherencia DOCX vs. HTML, y la acción
+        # preferida del art. 48 LFT (reinstalación vs. indemnización, con los
+        # límites del art. 49).
+        run: uv run python manage.py test expedientes.tests_demanda --settings=config.settings_test --verbosity 2
+
       - name: Verify demandas cálculos (script CLI)
         # El script usa la BD de desarrollo por defecto (sqlite); se ejecutan
         # las migraciones primero para que las tablas existan.

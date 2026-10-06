@@ -186,48 +186,185 @@ When an asesor can't attend a hearing (schedule conflict, etc.):
 
 ### 5.1 Configurable legal rules (`LegalConfig`)
 
-All legal parameters are stored in the database and editable from the Django admin —
+All legal parameters live in a `ReglasLegales` object (`core/laboral/rules.py`), which is
+built from the `LegalConfig` row stored in the database and editable from the Django admin —
 **no code changes needed when the law changes**:
 
-- **UMA** daily value, general minimum wage, **northern border zone (ZLF) minimum wage**.
+- **UMA** daily value (2026: $117.31), general minimum wage ($315.04) and **northern border
+  zone (ZLFN) minimum wage** ($440.87 — Tijuana is in the ZLFN).
 - **Aguinaldo** days (min. legal 15).
 - **Vacation premium %** (min. 25%).
-- **Seniority premium:** days per year (12) + salary cap type (2× UMA / 2× SM / 2× ZLF SM)
-  and multiplier.
-- **Constitutional severance days** (3 months = 90).
+- **Seniority premium:** days per year (12) + **the cap is 2 × the minimum wage of the
+  geographic area** (Arts. 485/486 LFT) — `frontera` $881.74 / `general` $630.08. It is
+  **not** 2 × UMA ($234.62), which was the previous error.
+- **Constitutional severance** days (3 months = 90) and **20 days per year** (Art. 50 fr. II).
+- **Vacations before the first anniversary** criterion (proportional / none).
+- **Integrated wage mode** (by Art. 84 concepts or by percentage).
+- **Seniority years required for a voluntary resignation** (15, Art. 162 fr. III LFT).
 - Only one config can be *active* at a time; saving one deactivates the others.
 
-### 5.2 Vacation table (LFT 2023 reform)
+`LegalConfig.to_reglas()` is the bridge: the admin form is the source of truth and the
+engine never hard-codes a legal figure.
 
-The system implements the current Mexican vacation table (year 1 → 12 days, +2 per year up
-to 20, then +2 every 5 years), extrapolating beyond the table when needed.
+### 5.1b Gradual tables (reform DOF 01-05-2026)
+
+The reduction of the working day is **gradual**, so it is modelled per year instead of as a
+single constant:
+
+| Year | Max. ordinary weekly hours (Art. 59 + transitorio Segundo) | Max. double-rate overtime per week (Art. 66 + transitorio Cuarto) |
+|------|--------------------------------|------------------------------------------------------|
+| 2026 | 48 | 9 |
+| 2027 | 46 | 9 |
+| 2028 | 44 | 10 |
+| 2029 | 42 | 11 |
+| 2030 | 40 | 12 |
+
+Overtime beyond the Art. 66 limit is paid at triple (Art. 68) and is capped at **4 extra hours
+per week**; ordinary + overtime may never exceed 12 hours per day.
+
+### 5.2 Labor-relationship period model (`PeriodoLaboral`)
+
+Every concept no longer shares a single "days worked" figure. `core/laboral/periodo.py`
+decomposes the relationship into the period each article requires:
+
+```
+RELACIÓN LABORAL
+├── antigüedad exacta (aniversarios cumplidos, bisiesto-aware) + fracción del ciclo
+├── aniversario vigente / próximo aniversario
+├── días del AÑO CALENDARIO en curso  → aguinaldo (art. 87)
+├── ciclos de vacaciones (uno por año de servicio) → art. 76 y 81
+│   ├── derecho del último año cumplido, no disfrutado
+│   └── proporcional del ciclo en curso
+└── semanas trabajadas → topes de horas extra (arts. 66 y 68)
+```
+
+Consequences:
+
+- **Aguinaldo** is proportional to the days worked **in the current calendar year**, not to
+  the whole seniority (Art. 87: "conforme al tiempo que hubieren trabajado"). A worker with
+  5 years dismissed on 15 Sep 2026 gets 258/365 of the bonus, not 5 years of it.
+- **Vacations** are calculated by anniversary cycle: the entitlement of the last completed
+  year **plus** the proportional part of the year in progress. The proportional factor is
+  applied **once** (the previous engine applied it twice, squaring the days).
+- **Seniority** is measured by completed anniversaries, not `days / 365`, so leap years do
+  not distort the result and a termination exactly on the anniversary yields an exact figure.
+
+### 5.3 Vacation table (LFT 2022 reform)
+
+| Years of service | 1 | 2 | 3 | 4 | 5 | 6-10 | 11-15 | 16-20 | 21-25 | 26-30 |
+|---|---|---|---|---|---|-------|-------|-------|-------|-------|
+| Days | 12 | 14 | 16 | 18 | 20 | 22 | 24 | 26 | 28 | 30 |
+
+Below the first anniversary the entitlement is 0 under the majority criterion (Art. 76
+requires "más de un año de servicios"); the `proporcional` criterion is also available and
+configurable per case.
 
 ### 5.3 Concepts calculated
 
-| Concept | Article | Type |
-|---------|---------|------|
-| Aguinaldo proporcional | Art. 87 LFT | automatic |
-| Vacaciones proporcionales | Art. 76 LFT | automatic |
-| Prima vacacional | Art. 80 LFT | automatic |
-| Prima de antigüedad (with cap flag) | Art. 162 LFT | automatic |
-| Indemnización constitucional (90 days) | Art. 50 LFT | automatic |
-| Indemnización 20 días por año | Art. 50-II LFT | automatic |
-| Vacaciones vencidas (manual days) | Art. 76 LFT | semi-auto |
-| Horas extras (manual hours) | Art. 66-68 LFT | semi-auto |
-| Salarios devengados (manual amount) | Art. 48 LFT | manual |
-| Días festivos (manual days) | Art. 75 LFT | semi-auto |
+| Concept | Article | Type | Base |
+|---------|---------|------|------|
+| Aguinaldo proporcional | Art. 87 LFT | automatic | días del año calendario en curso |
+| Vacaciones (año cumplido + proporcional) | Art. 76 y 81 LFT | automatic | ciclo de aniversario |
+| Prima vacacional | Art. 80 LFT | automatic | 25% de las vacaciones |
+| Prima de antigüedad (con piso y tope de zona) | Art. 162, 485, 486 LFT | automática por tipo de despido | salario diario con piso/techo del área |
+| Indemnización constitucional (90 días) | Art. 50 fr. III LFT | automática por tipo de despido | **salario diario integrado** |
+| Indemnización 20 días por año | Art. 50 fr. II LFT | automática por tipo de despido | **salario diario integrado** |
+| Vacaciones de ciclos anteriores (días manuales) | Art. 79 LFT | semi-auto | salario diario |
+| Horas extras: dobles + excedentes | Art. 66 y 68 LFT | semi-auto | valor hora por jornada (art. 61) |
+| Salarios devengados (monto manual) | Art. 48 LFT | manual | — |
+| Días festivos laborados | Art. 74-75 LFT | semi-auto | 3 × salario diario |
+| Días de descanso semanal laborados | Art. 69 y 73 LFT | semi-auto | 2 × salario diario |
+
+### 5.4 Daily wage vs. integrated wage (Arts. 84 and 89 LFT)
+
+The engine keeps the two bases apart, because the law does:
+
+- **Salario diario** = salary ÷ 30 / 15 / 7 / 1 (Art. 89). Base for holidays, bonuses,
+  vacations, overtime.
+- **Salario diario integrado** = daily wage + the proportional part of the Art. 84 concepts
+  (cuota diaria, gratificaciones, ayudas, comisiones, prestaciones en especie). Base for the
+  **severance payments** (90 days and 20 days per year).
+
+Both figures appear in the calculation screen and are stated in the demand
+("Salario diario: $X · Salario diario integrado: $Y"). Seniority premium uses its own base
+(piso/techo of the minimum wage of the area, Arts. 485/486) — never the UMA.
+
+### 5.5 Overtime is structured, never an average factor
+
+A single hour total carries no legal information: the double-rate limit is weekly and depends
+on the year, and everything above it is paid at triple. The engine therefore receives
+`horas_extra_normales` (Art. 66) and `horas_extra_excedentes` (Art. 68). When only a total is
+captured, it is split against that year's weekly caps (9 + 4 h in 2026) instead of applying
+the old blanket 2.5× factor. The hourly value follows the day length of the shift
+(8 / 7 / 7.5 h, Art. 61 LFT).
+
+### 5.6 Entitlement by type of termination (Arts. 46, 50 and 162 LFT)
+
+Severance is not an automatic allowance; `ReglasLegales.restricciones_por_tipo()` decides it
+from the type of termination, and the demand, the screen and the recalculation all share that
+single rule:
+
+| Termination | 90 days (Art. 50 fr. III) | 20 days/year (Art. 50 fr. II) | Prima de antigüedad (Art. 162) |
+|-------------|---------------------------|-------------------------------|--------------------------------|
+| Despido injustificado | ✔ | ✔ | ✔ |
+| Rescisión (arts. 51-52) | ✔ | ✔ | ✔ |
+| Despido justificado | ✘ (art. 46) | ✘ | ✔ (fr. III) |
+| Renuncia voluntaria | ✘ | ✘ | ✔ sólo con 15 años o más |
+
+Ordinary benefits (holiday bonus, vacations, vacation premium, overtime) are owed in every
+case.
+
+### 5.7 Dismissal narrative (Art. 47 LFT)
+
+The FACTS section is built from **structured fields** captured in the accordion rather than one
+free-text box. Each dismissal modality has its own wording, because the form of the separation
+carries legal consequence:
+
+| Modality | Wording | Legal note |
+|----------|---------|-----------|
+| `verbal` | Verbal dismissal with no document; quotes who communicated it, where, and the exact words | Without written notice the separation is presumed unjustified (Art. 47 LFT) |
+| `escrito` | Receipt of the termination document; quotes the stated reason | If the document states no cause, the facts say so |
+| `acceso` | Showed up at the workplace and was denied access | Denial of access is equivalent to separation |
+| `otro` | Free-text explanation from the advisor | — |
+
+`construir_hechos()` is the **single source** of the narrative, shared by the DOCX and the HTML
+generators so both outputs say exactly the same thing.
+
+### 5.8 Preferred action (Arts. 48 and 49 LFT)
+
+Art. 48 LFT gives the worker a **choice** between reinstatement in the position held and the
+three-month severance. These are not cumulative benefits: they are mutually exclusive actions.
+`Cliente.accion_preferida` captures the choice and `ReglasLegales.accion_posible()` resolves it:
+
+| Situation | Outcome |
+|-----------|---------|
+| `reinstalacion`, 1+ year, unjustified dismissal or rescission | **Proceeds**: the three-month severance leaves the total and the prayer asks for reinstatement + back wages |
+| `reinstalacion`, under 1 year | **Does not proceed** (Art. 49 I LFT): the severance stays and the engine explains why |
+| `reinstalacion`, justified dismissal or voluntary resignation | **Does not proceed** (Art. 46 LFT) |
+| `indemnizacion` | Always proceeds when the termination creates employer liability |
+
+When reinstatement is chosen but does not proceed, the accordion shows a warning
+(`advertencias_accion`) before the demand is generated, so the advisor does not file an
+impossible action.
 
 ### 5.4 Per-case calculation (`CalculoLaboral`)
 
 - One calculation per expediente, storing a **snapshot of inputs** for history.
-- **Checkboxes** let the advisor choose which concepts to include (defaults sensible).
+- **Checkboxes** let the advisor choose which concepts to include (5 base concepts on by
+  default). Concepts that depend on the cause of termination are forced on/off by law.
 - **Manual override** for vacation days actually owed (when some years were already paid
   or enjoyed) — shown with an *override applied* flag.
-- Shows daily wage, days worked, years of service, per-concept breakdown with legal
-  references, applied-cap warnings, and **total**.
+- Captures for the **integrated wage** components, **overtime split** (double/excess) and
+  **weekly-rest days worked**.
+- Shows daily wage, integrated daily wage, days worked, exact seniority, the calendar-year
+  basis of the holiday bonus, the vacation cycle breakdown, the applied floor/cap, and the
+  **total**.
 - **Auto-recalculation** when client/case data or legal rules change (`recalcular`).
 - **Quick simulation** (`simulacion-rapida`) — instant estimate for a prospect without
-  creating a case: enter salary + dates and get the full breakdown.
+  creating a case: enter salary + dates + zone + shift + termination type and get the full
+  breakdown.
+- The **demand uses the stored calculation**, so the amount claimed always matches the amount
+  the client was shown on screen.
 
 ---
 

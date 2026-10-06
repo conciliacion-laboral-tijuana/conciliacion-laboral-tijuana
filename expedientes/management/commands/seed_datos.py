@@ -577,17 +577,25 @@ class Command(BaseCommand):
         # ─── ✅ LegalConfig por defecto ─────────────────────────────────────
         if not LegalConfig.objects.exists():
             LegalConfig.objects.create(
-                nombre='Configuración Legal 2024',
+                nombre='Configuración Legal 2026',
                 activo=True,
-                uma_diaria=Decimal('108.57'),
-                salario_minimo=Decimal('248.93'),
-                salario_minimo_frontera=Decimal('374.89'),
+                # CONASAMI (dic 2025) e INEGI (ene 2026, vigente desde 1-feb-2026)
+                uma_diaria=Decimal('117.31'),
+                salario_minimo=Decimal('315.04'),
+                salario_minimo_frontera=Decimal('440.87'),
                 aguinaldo_dias=15,
                 prima_vacacional_porcentaje=Decimal('25.00'),
                 prima_antiguedad_dias_por_ano=12,
-                tope_prima_tipo='uma',
-                tope_prima_multiplo=2,
+                prima_antiguedad_anios_voluntaria=15,
+                vacaciones_antes_de_un_ano='proporcional',
                 indemnizacion_dias=90,
+                indemnizacion_20dias_dias_por_ano=20,
+                # Arts. 485/486 LFT: el tope es el doble del salario mínimo del
+                # ÁREA, no 2 × UMA
+                tope_prima_tipo='salario_minimo_frontera',
+                tope_prima_multiplo=2,
+                salario_integrado_modo='explicit',
+                salario_integrado_porcentaje=Decimal('0.00'),
             )
 
         # ─── Notas en algunos expedientes ──────────────────────────────────

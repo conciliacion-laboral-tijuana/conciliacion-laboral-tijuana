@@ -18,6 +18,10 @@
                 <dt class="text-green-700">Antigüedad:</dt>
                 <dd class="font-semibold text-green-900">{{ resultado.años_trabajados|floatformat:2 }} años</dd>
             </div>
+            <div class="flex justify-between">
+                <dt class="text-green-700" title="Base de las indemnizaciones (arts. 84 y 89 LFT)">Salario diario integrado:</dt>
+                <dd class="font-semibold text-purple-800">${{ resultado.salario_diario_integrado|floatformat:2|intcomma }}</dd>
+            </div>
             <hr class="border-green-200 my-1.5">
             <div class="flex justify-between">
                 <dt class="text-green-700">{% svg 'calendar' %} Aguinaldo:</dt>
@@ -47,7 +51,7 @@
             {% endif %}
             {% if resultado.desglose.vacaciones_vencidas > 0 %}
             <div class="flex justify-between">
-                <dt class="text-green-700">{% svg 'calendar' %} Vacaciones vencidas:</dt>
+                <dt class="text-green-700">{% svg 'calendar' %} Vacaciones de ciclos anteriores:</dt>
                 <dd class="font-medium text-green-800">${{ resultado.desglose.vacaciones_vencidas|floatformat:2|intcomma }}</dd>
             </div>
             {% endif %}
@@ -67,6 +71,12 @@
             <div class="flex justify-between">
                 <dt class="text-green-700">{% svg 'sparkle' %} Días festivos:</dt>
                 <dd class="font-medium text-green-800">${{ resultado.desglose.dias_festivos|floatformat:2|intcomma }}</dd>
+            </div>
+            {% endif %}
+            {% if resultado.desglose.descanso_semanal > 0 %}
+            <div class="flex justify-between">
+                <dt class="text-green-700">{% svg 'clock' %} Descanso semanal laborado:</dt>
+                <dd class="font-medium text-green-800">${{ resultado.desglose.descanso_semanal|floatformat:2|intcomma }}</dd>
             </div>
             {% endif %}
             <hr class="border-green-300 my-1.5">

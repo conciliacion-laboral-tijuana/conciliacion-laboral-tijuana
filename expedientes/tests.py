@@ -842,8 +842,8 @@ class FlujoCompletoDemandaTests(TestCase):
 
         # Las prestaciones proporcionales SÍ se reclaman
         self.assertIn('AGUINALDO PROPORCIONAL', etiquetas_filas)
-        self.assertIn('VACACIONES PROPORCIONALES', etiquetas_filas)
-        self.assertIn('PRIMA VACACIONAL (25%)', etiquetas_filas)
+        self.assertIn('VACACIONES', etiquetas_filas)
+        self.assertIn('PRIMA VACACIONAL', etiquetas_filas)
         self.assertIn('TOTAL', ' '.join(fundamentos), 'La tabla debe cerrar con TOTAL')
 
         # NO se reclama prima de antigüedad ni indemnización (por concepto ni artículo)
