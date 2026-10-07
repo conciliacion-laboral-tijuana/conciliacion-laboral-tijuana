@@ -76,6 +76,7 @@ urlpatterns = [
     path('expedientes/<int:pk>/solicitud/', views.solicitud_conciliacion, name='solicitud_conciliacion'),
     # Asistente paso a paso para llenar la demanda
     path('expedientes/<int:pk>/demanda/asistente/', views.demanda_asistente, name='demanda_asistente'),
+    path('expedientes/<int:pk>/demanda/vista-previa/', views.demanda_vista_previa, name='demanda_vista_previa'),
     # Guardar el editor actual como machote
     path('expedientes/<int:pk>/demanda/guardar-machote/', views.demanda_guardar_machote, name='demanda_guardar_machote'),
     path('expedientes/<int:pk>/demanda/', views.demanda_editor, name='demanda_editor'),

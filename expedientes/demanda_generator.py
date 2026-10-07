@@ -10,7 +10,7 @@ Autor: Conciliacion Laboral Tijuana - Módulo de Demandas
 """
 
 import re
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from typing import Optional
 
 from docx import Document
@@ -32,6 +32,45 @@ MESES_ES = [
     "", "enero", "febrero", "marzo", "abril", "mayo", "junio",
     "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
 ]
+
+
+def importe_en_letras(monto) -> str:
+    """MXN amounts with the same rounded cents used in the document."""
+    unidades = ('cero', 'un', 'dos', 'tres', 'cuatro', 'cinco', 'seis', 'siete',
+                'ocho', 'nueve', 'diez', 'once', 'doce', 'trece', 'catorce',
+                'quince', 'dieciséis', 'diecisiete', 'dieciocho', 'diecinueve',
+                'veinte', 'veintiún', 'veintidós', 'veintitrés', 'veinticuatro',
+                'veinticinco', 'veintiséis', 'veintisiete', 'veintiocho', 'veintinueve')
+    decenas = ('', '', '', 'treinta', 'cuarenta', 'cincuenta', 'sesenta',
+               'setenta', 'ochenta', 'noventa')
+    centenas = ('', 'ciento', 'doscientos', 'trescientos', 'cuatrocientos',
+                'quinientos', 'seiscientos', 'setecientos', 'ochocientos', 'novecientos')
+
+    def numero(n):
+        if n < 30:
+            return unidades[n]
+        if n < 100:
+            return decenas[n // 10] + (' y ' + unidades[n % 10] if n % 10 else '')
+        if n == 100:
+            return 'cien'
+        if n < 1000:
+            return centenas[n // 100] + (' ' + numero(n % 100) if n % 100 else '')
+        if n < 1000000:
+            return ('mil' if n // 1000 == 1 else numero(n // 1000) + ' mil') + (
+                ' ' + numero(n % 1000) if n % 1000 else '')
+        return ('un millón' if n // 1000000 == 1 else numero(n // 1000000) + ' millones') + (
+            ' ' + numero(n % 1000000) if n % 1000000 else '')
+
+    valor = Decimal(str(monto)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+    entero = int(abs(valor))
+    centavos = int((abs(valor) - entero) * 100)
+    moneda = 'peso' if entero == 1 else ('de pesos' if entero and entero % 1000000 == 0 else 'pesos')
+    return f"{'menos ' if valor < 0 else ''}{numero(entero)} {moneda} {centavos:02d}/100 M.N."
+
+
+def _importe_demanda(monto):
+    valor = Decimal(str(monto)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+    return f'${valor:,.2f} ({importe_en_letras(valor)})'
 
 
 # ─── Plantillas de Demanda (tipos de despido) ──────────────────────────────
@@ -753,7 +792,7 @@ def _agregar_prestaciones(doc: Document, expediente: Expediente, calculo: dict,
     # Construir filas de la tabla
     rows = [("PRESTACIÓN", "FUNDAMENTO", "IMPORTE")]
     for concepto, fundamento, monto in _filas_prestaciones(calculo, expediente):
-        rows.append((concepto, fundamento, f"${monto:,.2f}" if monto is not None else "—"))
+        rows.append((concepto, fundamento, _importe_demanda(monto) if monto is not None else "—"))
 
     if calculo.get('success'):
         rows.append(("", "TOTAL:", f"${calculo['total']:,.2f}"))
@@ -1156,7 +1195,7 @@ def generar_demanda_html(expediente: Expediente, tipo_despido_override: str | No
     # ─── Prestaciones ───
     prestaciones_rows = ""
     for concepto, fundamento, monto in _filas_prestaciones(calculo, expediente):
-        importe = (f'<td style="text-align:right">${monto:,.2f}</td>'
+        importe = (f'<td style="text-align:right">{_importe_demanda(monto)}</td>'
                    if monto is not None
                    else '<td style="text-align:right">—</td>')
         prestaciones_rows += (
@@ -1228,19 +1267,19 @@ def generar_demanda_html(expediente: Expediente, tipo_despido_override: str | No
 
     # ─── Datos actor ───
     actor_direccion = cliente.direccion_completa
-    actor_items = [f"<strong>{cliente.nombre}</strong>"]
+    actor_items = [f"<strong>{html_escape(cliente.nombre)}</strong>"]
     if actor_direccion:
-        actor_items.append(f"Domicilio: {actor_direccion}")
+        actor_items.append(f"Domicilio: {html_escape(actor_direccion)}")
     if cliente.curp:
-        actor_items.append(f"CURP: {cliente.curp}")
+        actor_items.append(f"CURP: {html_escape(cliente.curp)}")
     if cliente.rfc:
-        actor_items.append(f"RFC: {cliente.rfc}")
+        actor_items.append(f"RFC: {html_escape(cliente.rfc)}")
     if cliente.telefono:
-        actor_items.append(f"Teléfono: {cliente.telefono}")
+        actor_items.append(f"Teléfono: {html_escape(cliente.telefono)}")
 
     # ─── Datos demandado ───
     razon_social = cliente.empresa_razon_social or cliente.empresa
-    demandado_items = [f"<strong>{razon_social or '—'}</strong>"]
+    demandado_items = [f"<strong>{html_escape(razon_social or '—')}</strong>"]
     partes_dir = []
     if cliente.empresa_calle:
         partes_dir.append(cliente.empresa_calle)
@@ -1251,13 +1290,15 @@ def generar_demanda_html(expediente: Expediente, tipo_despido_override: str | No
     if cliente.empresa_cp:
         partes_dir.append(f"CP {cliente.empresa_cp}")
     if partes_dir:
-        demandado_items.append(f"Domicilio: {', '.join(partes_dir)}")
+        demandado_items.append(f"Domicilio: {html_escape(', '.join(partes_dir))}")
     if cliente.empresa_telefono:
-        demandado_items.append(f"Teléfono: {cliente.empresa_telefono}")
+        demandado_items.append(f"Teléfono: {html_escape(cliente.empresa_telefono)}")
     if cliente.empresa_actividad:
-        demandado_items.append(f"Actividad: {cliente.empresa_actividad}")
+        demandado_items.append(f"Actividad: {html_escape(cliente.empresa_actividad)}")
 
     html = f"""
+<h2 style="text-align:center;">ESCRITO INICIAL DE DEMANDA</h2>
+<p style="text-align:center;">{html_escape(PLANTILLAS_INFO.get(tipo_despido, {}).get('nombre', tipo_despido))}</p>
 <h2 style="text-align:center;color:#1F2937;">TRIBUNAL LABORAL COMPETENTE</h2>
 <p style="text-align:center;color:#6B7280;">TIJUANA, BAJA CALIFORNIA</p>
 <hr style="border:none;border-top:1px solid #1D4ED8;width:70%;margin:10px auto;">
@@ -1265,7 +1306,7 @@ def generar_demanda_html(expediente: Expediente, tipo_despido_override: str | No
 <table style="width:100%;border-collapse:collapse;margin:15px 0;">
     <tr><td style="background:#F3F4F6;padding:5px 8px;border:1px solid #ccc;font-weight:bold;">MATERIA:</td><td style="padding:5px 8px;border:1px solid #ccc;font-weight:bold;color:#1D4ED8;">LABORAL</td></tr>
     <tr><td style="background:#F3F4F6;padding:5px 8px;border:1px solid #ccc;font-weight:bold;">TIPO DE JUICIO:</td><td style="padding:5px 8px;border:1px solid #ccc;font-weight:bold;color:#1D4ED8;">ORDINARIO LABORAL</td></tr>
-    <tr><td style="background:#F3F4F6;padding:5px 8px;border:1px solid #ccc;font-weight:bold;">N° EXPEDIENTE CONCILIACIÓN:</td><td style="padding:5px 8px;border:1px solid #ccc;font-weight:bold;color:#1D4ED8;">{expediente.folio or '—'}</td></tr>
+    <tr><td style="background:#F3F4F6;padding:5px 8px;border:1px solid #ccc;font-weight:bold;">N° EXPEDIENTE CONCILIACIÓN:</td><td style="padding:5px 8px;border:1px solid #ccc;font-weight:bold;color:#1D4ED8;">{html_escape(expediente.folio or '—')}</td></tr>
 </table>
 
 <h3 style="color:#1F2937;">—  A C T O R  —</h3>
@@ -1283,6 +1324,13 @@ def generar_demanda_html(expediente: Expediente, tipo_despido_override: str | No
         html += f"<p style='margin:2px 0;'>{item}</p>\n"
 
     html += f"""
+
+<h3 style="color:#1F2937;">—  P R E S T A C I O N E S  —</h3>
+<table style="width:100%;border-collapse:collapse;">
+<thead><tr><th>Prestación</th><th>Fundamento</th><th>Importe</th></tr></thead>
+<tbody>{prestaciones_rows}</tbody>
+</table>
+<p>{html_escape(texto_base_salarial)}</p>
 
 <h3 style="color:#1F2937;">—  H E C H O S  —</h3>
 
@@ -1306,14 +1354,14 @@ def generar_demanda_html(expediente: Expediente, tipo_despido_override: str | No
 
 <br>
 <p style="text-align:center;">________________________________________</p>
-<p style="text-align:center;font-weight:bold;font-size:14px;">{cliente.nombre}</p>
+<p style="text-align:center;font-weight:bold;font-size:14px;">{html_escape(cliente.nombre)}</p>
 <p style="text-align:center;color:#6B7280;">Actor</p>
 
 <br>
-<p style="text-align:right;font-size:10px;color:#6B7280;">Asesor jurídico: {asesor}</p>
+<p style="text-align:right;font-size:10px;color:#6B7280;">Asesor jurídico: {html_escape(asesor)}</p>
 
 <hr style="border:none;border-top:1px solid #ccc;width:70%;margin:10px auto;">
-<p style="text-align:center;font-size:9px;color:#6B7280;">Documento generado el {ahora_str} por {asesor} | Exp: {expediente.numero} | Sistema de Gestión Laboral</p>
+<p style="text-align:center;font-size:9px;color:#6B7280;">Documento generado el {ahora_str} por {html_escape(asesor)} | Exp: {html_escape(expediente.numero)} | Sistema de Gestión Laboral</p>
 """
 
     return html

@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load custom_filters svg_tags %}
+{% load custom_filters svg_tags static %}
 {% block title %}Acordeón de Demanda - {{ expediente.numero }}{% endblock %}
 
 {% block content %}
@@ -15,10 +15,14 @@
   .acordeon-flecha { transition: transform .2s ease; }
   .acordeon-seccion.abierta .acordeon-flecha { transform: rotate(180deg); }
   @keyframes acordeonFade { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+  .demanda-layout { display:grid; grid-template-columns:minmax(0, 1fr); gap:24px; }
+  .demanda-preview { min-width:0; border:1px solid #e5e7eb; border-radius:12px; background:white; padding:16px; }
+  .demanda-preview iframe { width:100%; height:70vh; border:1px solid #e5e7eb; background:white; margin-top:12px; }
+  @media (min-width:1100px) { .demanda-layout { grid-template-columns:minmax(0, 1fr) minmax(0, 1fr); } .demanda-preview { position:sticky; top:24px; align-self:start; } }
   .campo-error { border-color: #ef4444 !important; background: #fef2f2; }
 </style>
 
-<div class="max-w-4xl mx-auto pb-10">
+<div class="max-w-7xl mx-auto pb-10">
   <!-- Header -->
   <div class="flex items-center justify-between mb-5">
     <div>
@@ -26,7 +30,7 @@
       <p class="text-gray-500 text-sm">
         Expediente: <strong>{{ expediente.numero }}</strong> — {{ expediente.cliente.nombre }}
       </p>
-      <p class="text-gray-400 text-xs mt-0.5">Despliega cada sección, llénala y guarda. Todo queda en una sola página; al final se genera la demanda con cálculos automáticos.</p>
+      <p class="text-gray-400 text-xs mt-0.5">Completa la hoja de datos y consulta la demanda en vivo. Los cambios válidos se guardan como borrador; revisa el documento antes de descargarlo.</p>
     </div>
     <a href="{% url 'expediente_detail' expediente.pk %}"
        class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm flex items-center gap-1.5">
@@ -34,7 +38,8 @@
     </a>
   </div>
 
-  <form method="post" action="{% url 'demanda_asistente' expediente.pk %}" id="acordeonForm">
+  <div class="demanda-layout">
+  <form method="post" action="{% url 'demanda_asistente' expediente.pk %}" id="acordeonForm" data-preview-url="{% url 'demanda_vista_previa' expediente.pk %}">
     {% csrf_token %}
     <input type="hidden" name="seccion_abierta" id="seccion_abierta" value="{{ seccion_abierta }}">
 
@@ -198,7 +203,7 @@
     </div>
 
     <!-- ─── 4. Despido, testigos y pruebas ────────────────────────── -->
-    {% include 'expedientes/_acordeon_header.html' with sec_id='despidio' num=4 titulo=pasos_info|get_item:'despido'|get_item:'titulo' descripcion=pasos_info|get_item:'despido'|get_item:'descripcion' completa=cliente.modalidad_despido %}
+    {% include 'expedientes/_acordeon_header.html' with sec_id='despido' num=4 titulo=pasos_info|get_item:'despido'|get_item:'titulo' descripcion=pasos_info|get_item:'despido'|get_item:'descripcion' completa=cliente.modalidad_despido %}
     <div class="acordeon-body">
       <div class="p-6 space-y-5">
 
@@ -222,8 +227,8 @@
           </div>
 
           <label class="flex items-center gap-2 text-sm text-gray-700">
-            <input type="checkbox" name="hubo_documento_despidio" value="on" class="rounded border-gray-300 text-blue-600"
-                   {% if cliente.hubo_documento_despidio %}checked{% endif %}>
+            <input type="checkbox" name="hubo_documento_despido" value="on" class="rounded border-gray-300 text-blue-600"
+                   {% if cliente.hubo_documento_despido %}checked{% endif %}>
             Se entregó documento de terminación (aviso escrito)
           </label>
         </div>
@@ -238,18 +243,18 @@
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Quién comunicó la separación</label>
             <input type="text" name="despido_comunicado_por" class="input w-full"
-                   placeholder="Nombre de quien se la comunicó" value="{{ cliente.despidio_comunicado_por }}">
+                   placeholder="Nombre de quien se la comunicó" value="{{ cliente.despido_comunicado_por }}">
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Dónde ocurrió</label>
             <input type="text" name="despido_lugar" class="input w-full"
-                   placeholder="Oficina, caseta o lugar físico" value="{{ cliente.despidio_lugar }}">
+                   placeholder="Oficina, caseta o lugar físico" value="{{ cliente.despido_lugar }}">
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Motivo en el documento</label>
-            <input type="text" name="despidio_documento_motivo" class="input w-full"
+            <input type="text" name="despido_documento_motivo" class="input w-full"
                    placeholder="Causa que consigna el documento (si hubo)"
-                   value="{{ cliente.despidio_documento_motivo }}">
+                   value="{{ cliente.despido_documento_motivo }}">
           </div>
         </div>
 
@@ -292,7 +297,7 @@
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Circunstancias del despido (texto libre)</label>
           <textarea name="circunstancias_despido" rows="5" class="input w-full"
-                    placeholder="Anotaciones adicionales. Se suman al redactado estructurado como último hecho de la demanda.">{{ cliente.circunstancias_despidio }}</textarea>
+                    placeholder="Anotaciones adicionales. Se suman al redactado estructurado como último hecho de la demanda.">{{ cliente.circunstancias_despido }}</textarea>
           <p class="text-xs text-gray-400 mt-1">Opcional: la narración principal ya se arma con los campos de arriba.</p>
         </div>
         <div>
@@ -342,7 +347,7 @@
             <label class="flex items-center gap-2 p-3 border rounded-lg cursor-pointer transition-colors
                           {% if expediente.tipo_despido == key %}border-blue-500 bg-blue-50{% else %}border-gray-200 hover:border-blue-300{% endif %}">
               <input type="radio" name="tipo_despido" value="{{ key }}"
-                     {% if expediente.tipo_despido == key %}checked{% endif %}
+                     {% if expediente.tipo_despido == key or not expediente.tipo_despido and key == 'injustificado' %}checked{% endif %}
                      class="accent-blue-600">
               <span class="text-sm text-gray-800">{{ label }}</span>
             </label>
@@ -410,7 +415,7 @@
     <!-- ══════════════ BARRA DE ACCIONES (fija) ══════════════ -->
     <div class="sticky bottom-0 mt-6 pt-3 pb-2 bg-gray-50/95 backdrop-blur border-t border-gray-200 -mx-1 px-1">
       <div class="flex items-center justify-between gap-3">
-        <p class="text-xs text-gray-500 hidden sm:block">Guardado automático al pulsar <strong>Guardar datos</strong>. {% if errores %}<span class="text-red-600 font-medium">Hay campos con error.</span>{% endif %}</p>
+        <p class="text-xs text-gray-500 hidden sm:block">Borrador con guardado automático. También puedes pulsar <strong>Guardar datos</strong>. {% if errores %}<span class="text-red-600 font-medium">Hay campos con error.</span>{% endif %}</p>
         <div class="flex items-center gap-2 ml-auto">
           <button type="submit" name="accion" value="guardar"
                   class="px-5 py-2.5 border border-blue-600 text-blue-700 rounded-lg hover:bg-blue-50 transition-colors text-sm font-semibold flex items-center gap-1.5">
@@ -424,6 +429,16 @@
       </div>
     </div>
   </form>
+  <aside class="demanda-preview" aria-label="Vista previa de demanda">
+    <h2 class="text-lg font-bold">Demanda en vivo</h2>
+    <p class="text-xs text-gray-500">Borrador para revisión del abogado. Las correcciones del editor final se conservan por separado.</p>
+    <p id="demanda-preview-status" role="status" aria-live="polite" class="text-sm mt-2">Cargando vista previa…</p>
+    <ul id="demanda-preview-errors" class="text-sm text-red-700 mt-2"></ul>
+    <p id="demanda-calculo-aviso" class="text-sm text-amber-800 mt-2" hidden>Los datos cambiaron respecto al último cálculo guardado. Revisa y recalcula las prestaciones antes de finalizar.</p>
+    <a href="{% url 'calculo_laboral' expediente.pk %}" class="text-sm text-blue-700 underline" id="demanda-calculo-link">Revisar calculadora y prestaciones</a>
+    <iframe id="demanda-preview-frame" title="Borrador de la demanda" sandbox="" referrerpolicy="no-referrer"></iframe>
+  </aside>
+  </div>
 
   <p class="text-center text-xs text-gray-400 mt-4">
     Después de generar, podrás <strong>editar cualquier parte</strong> de la demanda y <strong>guardarla como machote</strong> en la librería.
@@ -486,4 +501,5 @@
   });
 })();
 </script>
+<script src="{% static 'js/demanda_live.js' %}" defer></script>
 {% endblock %}
