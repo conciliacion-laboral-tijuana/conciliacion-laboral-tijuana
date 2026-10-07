@@ -1,4 +1,5 @@
 import logging
+from decimal import Decimal
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 from django.core.mail import send_mail
@@ -122,7 +123,9 @@ def recalcular_calculos_al_cambiar_cliente(sender, instance, created,
     if created:
         return  # Aún no hay expedientes asociados
     # Si el guardado solo tocó otros campos (p. ej. teléfono), no recalcular
-    if update_fields and not (update_fields & {'fecha_ingreso', 'fecha_salida', 'salario'}):
+    if update_fields and not (update_fields & {
+            'fecha_ingreso', 'fecha_salida', 'salario', 'zona_salarial',
+            'jornada', 'horas_semanales', 'periodo_pago', 'accion_preferida'}):
         return
 
     from .laboral_calculator import recalcular_calculo, _aplicar_conceptos_excluidos
@@ -132,10 +135,22 @@ def recalcular_calculos_al_cambiar_cliente(sender, instance, created,
         if calculo is None:
             continue
         try:
+            anterior = (calculo.salario_mensual, calculo.fecha_ingreso,
+                        calculo.fecha_salida, calculo.salario_diario,
+                        calculo.salario_diario_integrado, calculo.total)
             # Mantener alineados los conceptos excluidos con la demanda
             # (p. ej. renuncia voluntaria) y recalcular con datos actuales
             _aplicar_conceptos_excluidos(calculo, expediente)
             recalcular_calculo(calculo)
+            actual = (calculo.salario_mensual, calculo.fecha_ingreso,
+                      calculo.fecha_salida, calculo.salario_diario,
+                      calculo.salario_diario_integrado, calculo.total)
+            def normalizar(valores):
+                return tuple(Decimal(str(v)).quantize(Decimal('0.01'))
+                             if i in (0, 3, 4, 5) else v
+                             for i, v in enumerate(valores))
+            if normalizar(anterior) != normalizar(actual):
+                calculo.requiere_revision = True
             calculo.save()
         except Exception:
             logger.exception(

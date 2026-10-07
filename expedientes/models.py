@@ -889,6 +889,7 @@ class CalculoLaboral(models.Model):
 
     # Metadatos
     recalculado_en = models.DateTimeField('Último recálculo', null=True, blank=True)
+    requiere_revision = models.BooleanField('Revisar prestaciones tras cambios de datos', default=False)
     notas = models.TextField('Notas del cálculo', blank=True,
                               help_text='Anotaciones del asesor sobre este cálculo')
     created_at = models.DateTimeField(auto_now_add=True)

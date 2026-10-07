@@ -397,6 +397,11 @@
         var delta = JSON.parse(saved);
         if (delta && delta.ops) {
           quill.setContents(delta);
+          var avisoBorrador = document.createElement('p');
+          avisoBorrador.setAttribute('role', 'status');
+          avisoBorrador.className = 'p-3 mb-3 bg-amber-50 text-amber-800 border border-amber-200 rounded';
+          avisoBorrador.textContent = 'Se recuperó tu borrador editado. Revisa sus nombres, hechos y cantidades frente a los datos actuales antes de descargar.';
+          document.getElementById('demanda-editor').before(avisoBorrador);
         }
       }
     } catch(e) {}

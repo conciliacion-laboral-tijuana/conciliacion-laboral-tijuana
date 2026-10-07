@@ -2,11 +2,13 @@ import json
 import logging
 import re
 import threading
+from decimal import Decimal
 from datetime import datetime, timedelta
 from pathlib import Path
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import ValidationError
 from django.forms import CheckboxInput
 
 logger = logging.getLogger(__name__)
@@ -42,7 +44,7 @@ from .whatsapp import (enviar_whatsapp, generar_deep_link, renderizar_plantilla,
 from .laboral_calculator import (calcular_desde_expediente, recalcular_calculo,
                                  _aplicar_conceptos_excluidos, datos_extra_de,
                                  advertencias_accion as advertencias_accion_cliente)
-from .demanda_generator import generar_demanda_word, generar_demanda_html, html_a_docx, PLANTILLAS_INFO
+from .demanda_generator import generar_demanda_word, generar_demanda_html, html_a_docx, PLANTILLAS_INFO, calculo_para_demanda
 from .models import Machote
 from .marcadores import get_marcadores, get_datos_faltantes, get_completitud_stats, reemplazar_marcadores
 from core.laboral.calculators import CONCEPTOS_DISPONIBLES
@@ -1281,6 +1283,7 @@ def calculo_laboral(request, pk):
             # y recalcular con los parámetros actualizados
             _aplicar_conceptos_excluidos(calculo, expediente)
             recalcular_calculo(calculo)
+            calculo.requiere_revision = False
             calculo.save()
 
             registrar_movimiento(
@@ -1590,6 +1593,91 @@ def _verificar_datos_criticos(expediente):
     return faltantes
 
 
+def _calculo_demanda_pendiente(expediente, resultado):
+    """Compare the current engine output with the last saved calculation."""
+    calculo = CalculoLaboral.objects.filter(expediente=expediente).first()
+    if calculo is None or not resultado.get('success'):
+        return False
+    if calculo.requiere_revision:
+        return True
+    cliente = expediente.cliente
+    if (calculo.salario_mensual != cliente.salario
+            or calculo.fecha_ingreso != cliente.fecha_ingreso
+            or calculo.fecha_salida != cliente.fecha_salida
+            or calculo.zona_salarial != cliente.zona_salarial):
+        return True
+    for concepto in CONCEPTOS_DISPONIBLES:
+        key = concepto['key']
+        monto = resultado.get(key, {}).get('monto', 0)
+        if abs(Decimal(str(monto)) - Decimal(str(getattr(calculo, key, 0)))) > Decimal('0.01'):
+            return True
+    return abs(Decimal(str(resultado['total'])) - calculo.total) > Decimal('0.01')
+
+
+def _validar_captura_demanda(post, expediente):
+    cliente = expediente.cliente
+    form = ClienteForm(instance=cliente)
+    errores, datos = {}, {}
+    campos = [campo for paso in WIZARD_PASOS.values() for campo in paso['campos']]
+    for campo in campos:
+        if campo not in post and not _es_booleano(form, campo):
+            continue
+        try:
+            valor = form.fields[campo].clean(post.get(campo, ''))
+            datos[campo] = valor
+            setattr(cliente, campo, valor)
+        except ValidationError as exc:
+            errores[campo] = getattr(exc, 'messages', [str(exc)])
+    tipo = post.get('tipo_despido') or expediente.tipo_despido or 'injustificado'
+    if tipo not in dict(Expediente.TIPO_DESPIDO_CHOICES):
+        errores['tipo_despido'] = ['Selecciona un tipo de despido válido.']
+    else:
+        expediente.tipo_despido = tipo
+    if (cliente.fecha_ingreso and cliente.fecha_salida
+            and cliente.fecha_salida < cliente.fecha_ingreso):
+        errores['fecha_salida'] = ['La salida no puede ser anterior al ingreso.']
+    if cliente.salario is not None and cliente.salario <= 0:
+        errores['salario'] = ['El salario debe ser mayor que cero.']
+    # Model validation includes uniqueness; never overwrite another client's CURP.
+    if not errores:
+        try:
+            cliente.full_clean(exclude=[f.name for f in cliente._meta.fields if f.name not in datos])
+        except ValidationError as exc:
+            errores.update(getattr(exc, 'message_dict', {'datos': getattr(exc, 'messages', [str(exc)])}))
+    return errores, datos
+
+
+@login_required
+@require_POST
+def demanda_vista_previa(request, pk):
+    """Render unsaved capture data; persist only explicit draft-save requests."""
+    if not _puede_generar_documentos(request):
+        return JsonResponse({'error': 'No tienes permiso para generar documentos.'}, status=403)
+    expediente = get_object_or_404(get_expedientes_queryset(request.user), pk=pk)
+    cliente = expediente.cliente
+    errores, datos = _validar_captura_demanda(request.POST, expediente)
+    if errores:
+        return JsonResponse({'errores': errores, 'guardado': False}, status=422)
+    resultado = calculo_para_demanda(expediente)
+    pendiente = _calculo_demanda_pendiente(expediente, resultado)
+    guardar = request.POST.get('guardar_borrador') == '1'
+    if guardar:
+        from django.db import transaction
+        with transaction.atomic():
+            if datos:
+                cliente.save(update_fields=list(datos))
+            expediente.save(update_fields=['tipo_despido'])
+            if pendiente:
+                CalculoLaboral.objects.filter(expediente=expediente).update(requiere_revision=True)
+    return JsonResponse({
+        'html': generar_demanda_html(expediente),
+        'guardado': guardar,
+        'calculo_pendiente': pendiente,
+        'faltantes': [f['label'] for f in _verificar_datos_criticos(expediente)],
+        'calculo_error': resultado.get('error', '') if not resultado.get('success') else '',
+    })
+
+
 @login_required
 def demanda_asistente(request, pk):
     """
@@ -1624,52 +1712,14 @@ def demanda_asistente(request, pk):
         for info in WIZARD_PASOS.values():
             campos_acordeon.extend(info['campos'])
 
-        # Campos opcionales del modelo (vacío en el POST = conservar el valor
-        # actual; algunos tienen default y no aceptan cadena vacía)
-        opcionales = {'rfc', 'telefono', 'whatsapp', 'email', 'fecha_nacimiento', 'genero',
-                      'puesto', 'periodo_pago', 'horas_semanales', 'jornada',
-                      'empresa_razon_social', 'empresa_actividad', 'tipo_persona_citado',
-                      'empresa_telefono', 'empresa_calle', 'empresa_numero',
-                      'empresa_colonia', 'empresa_cp', 'empresa_referencias', 'como_supo',
-                      'circunstancias_despido', 'testigos', 'documentos_prueba',
-                      # Campos estructurados de la narrativa del despido (art. 47 LFT)
-                      'modalidad_despido', 'despido_comunicado_por', 'despido_lugar',
-                      'despido_frase', 'despido_documento_motivo',
-                      'despido_otra_modalidad', 'lugar_trabajo',
-                      # Tiene valor por defecto en el modelo: si no viene en el
-                      # POST se conserva el actual (no es error de captura).
-                      'accion_preferida'}
-
-        # ¿Vienen datos del acordeón en este POST? Si el formulario solo
-        # trae la sección de revisión (tipo_despido), NO tocar el cliente.
         postea_acordeon = any(c in request.POST for c in campos_acordeon)
-
         if postea_acordeon:
-            for campo in campos_acordeon:
-                raw = request.POST.get(campo, '')
-                # Si es opcional y viene vacío, no validar (conserva su valor)
-                if campo in opcionales and raw.strip() == '':
-                    continue
-                try:
-                    form.fields[campo].clean(raw)
-                except Exception as e:
-                    errores[campo] = list(e.messages) if hasattr(e, 'messages') else [str(e)]
-
-            if not errores:
-                datos = {}
-                for campo in campos_acordeon:
-                    raw = request.POST.get(campo, '')
-                    # Los campos booleanos se guardan siempre: si no vienen en
-                    # el POST es que el checkbox quedó desmarcado (no "vacío").
-                    if _es_booleano(form, campo):
-                        datos[campo] = campo in request.POST
-                        continue
-                    if campo in form.fields and raw != '':
-                        datos[campo] = form.fields[campo].clean(raw)
-                if datos:
-                    for campo, valor in datos.items():
-                        setattr(cliente, campo, valor)
+            errores, datos = _validar_captura_demanda(request.POST, expediente)
+            if not errores and datos:
+                from django.db import transaction
+                with transaction.atomic():
                     cliente.save(update_fields=list(datos))
+                    expediente.save(update_fields=['tipo_despido'])
 
         if accion == 'finalizar':
             # Guardar tipo de despido y generar la demanda
@@ -1680,7 +1730,11 @@ def demanda_asistente(request, pk):
 
             if not errores:
                 faltantes = _verificar_datos_criticos(expediente)
-                if faltantes:
+                pendiente = _calculo_demanda_pendiente(expediente, calculo_para_demanda(expediente))
+                if pendiente:
+                    messages.error(request, 'Las prestaciones cambiaron. Revisa y recalcula en la calculadora antes de finalizar.')
+                    seccion_abierta = 'revision'
+                elif faltantes:
                     for f in faltantes:
                         messages.error(request, f'Falta: {f["label"]}. Completa el dato para generar la demanda.')
                     seccion_abierta = 'revision'
@@ -1702,7 +1756,7 @@ def demanda_asistente(request, pk):
 
     # ─── Formulario y contexto del acordeón ─────────────────────────
     form = ClienteForm(instance=cliente)
-    calculo = calcular_desde_expediente(expediente)
+    calculo = calculo_para_demanda(expediente)
     faltantes_criticos = _verificar_datos_criticos(expediente)
     advertencias_accion = advertencias_accion_cliente(cliente)
 

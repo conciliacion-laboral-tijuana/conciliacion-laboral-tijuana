@@ -19,6 +19,7 @@ from datetime import date
 from decimal import Decimal
 
 from django.test import TestCase
+from django.urls import reverse
 
 from accounts.models import UserProfile
 from django.contrib.auth.models import User
@@ -77,6 +78,137 @@ class BaseDemanda(TestCase):
         cliente = self._cliente(**kwargs_cliente)
         expediente = self._expediente(cliente, tipo)
         return construir_hechos(expediente, calcular_desde_expediente(expediente), tipo)
+
+
+class DemandaEnVivoTests(BaseDemanda):
+    def setUp(self):
+        self.asesor.profile.puede_generar_documentos = True
+        self.asesor.profile.save()
+        self.client.force_login(self.asesor)
+        self.persona = self._cliente()
+        self.expediente = self._expediente(self.persona)
+        self.url = reverse('demanda_vista_previa', args=[self.expediente.pk])
+
+    def test_preview_uses_capture_without_writing_and_contains_prestaciones(self):
+        response = self.client.post(self.url, {'nombre': 'Nombre nuevo', 'salario': '24000'})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('Nombre nuevo', response.json()['html'])
+        self.assertIn('P R E S T A C I O N E S', response.json()['html'])
+        self.assertIn('$72,000.00', response.json()['html'])
+        self.persona.refresh_from_db()
+        self.assertEqual(self.persona.nombre, 'Cliente Narrativa')
+        self.assertEqual(self.persona.salario, Decimal('18000'))
+
+    def test_draft_save_persists_and_clears_optional_text(self):
+        self.persona.testigos = 'Testigo anterior'
+        self.persona.save()
+        response = self.client.post(self.url, {
+            'guardar_borrador': '1', 'nombre': 'Nombre guardado', 'testigos': '',
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()['guardado'])
+        self.persona.refresh_from_db()
+        self.assertEqual(self.persona.nombre, 'Nombre guardado')
+        self.assertEqual(self.persona.testigos, '')
+
+    def test_invalid_dates_do_not_save_any_capture_fields(self):
+        response = self.client.post(self.url, {
+            'guardar_borrador': '1', 'nombre': 'No guardar', 'fecha_salida': '2020-01-01',
+        })
+        self.assertEqual(response.status_code, 422)
+        self.assertIn('fecha_salida', response.json()['errores'])
+        self.persona.refresh_from_db()
+        self.assertEqual(self.persona.nombre, 'Cliente Narrativa')
+
+    def test_duplicate_curp_does_not_save(self):
+        otra = self._cliente()
+        response = self.client.post(self.url, {'guardar_borrador': '1', 'curp': otra.curp})
+        self.assertEqual(response.status_code, 422)
+        self.assertIn('curp', response.json()['errores'])
+
+    def test_recalculation_warning_survives_auto_recalculation(self):
+        from expedientes.laboral_calculator import recalcular_calculo
+        calculo = CalculoLaboral.objects.create(expediente=self.expediente)
+        recalcular_calculo(calculo)
+        calculo.save()
+        total = calculo.total
+        unchanged = self.client.post(self.url, {})
+        self.assertFalse(unchanged.json()['calculo_pendiente'])
+        response = self.client.post(self.url, {'salario': '24000', 'guardar_borrador': '1'})
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()['calculo_pendiente'])
+        calculo.refresh_from_db()
+        self.assertNotEqual(calculo.total, total)
+        self.assertTrue(calculo.requiere_revision)
+        self.assertTrue(self.client.post(self.url, {}).json()['calculo_pendiente'])
+
+    def test_document_permission_and_case_assignment_are_enforced(self):
+        self.asesor.profile.puede_generar_documentos = False
+        self.asesor.profile.save()
+        self.assertEqual(self.client.post(self.url, {}).status_code, 403)
+        self.asesor.profile.puede_generar_documentos = True
+        self.asesor.profile.save()
+        other = User.objects.create_user(username='otro_asesor')
+        self.expediente.asesor = other
+        self.expediente.save()
+        self.assertEqual(self.client.post(self.url, {}).status_code, 404)
+
+    def test_assistant_has_sandboxed_live_preview_and_correct_capture_names(self):
+        response = self.client.get(reverse('demanda_asistente', args=[self.expediente.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'sandbox=""')
+        self.assertContains(response, 'demanda_live.js')
+        self.assertContains(response, 'name="hubo_documento_despido"')
+        self.assertNotContains(response, 'name="hubo_documento_despidio"')
+        self.assertContains(response, 'value="2021-09-15"')
+
+    def test_captured_markup_is_escaped_in_generated_document(self):
+        response = self.client.post(self.url, {'nombre': '<script>alert(1)</script>'})
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn('<script>', response.json()['html'])
+        self.assertIn('&lt;script&gt;', response.json()['html'])
+
+    def test_draft_save_without_changes_does_not_require_new_review(self):
+        from expedientes.laboral_calculator import recalcular_calculo
+        calculo = CalculoLaboral.objects.create(expediente=self.expediente)
+        recalcular_calculo(calculo)
+        calculo.save()
+        self.client.post(self.url, {'salario': '18000', 'guardar_borrador': '1'})
+        calculo.refresh_from_db()
+        self.assertFalse(calculo.requiere_revision)
+
+    def test_review_is_required_before_finalizing_and_cleared_in_calculator(self):
+        from django.forms.models import model_to_dict
+        from expedientes.forms import CalculoLaboralForm
+        from expedientes.laboral_calculator import recalcular_calculo
+        calculo = CalculoLaboral.objects.create(expediente=self.expediente)
+        recalcular_calculo(calculo)
+        calculo.requiere_revision = True
+        calculo.save()
+        response = self.client.post(reverse('demanda_asistente', args=[self.expediente.pk]), {
+            'accion': 'finalizar', 'tipo_despido': 'injustificado',
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Las prestaciones cambiaron')
+        fields = CalculoLaboralForm().fields
+        data = {k: v if v is not None else '' for k, v in model_to_dict(calculo).items() if k in fields}
+        response = self.client.post(reverse('calculo_laboral', args=[self.expediente.pk]), data)
+        self.assertEqual(response.status_code, 302)
+        calculo.refresh_from_db()
+        self.assertFalse(calculo.requiere_revision)
+
+    def test_amounts_have_consistent_spanish_words_and_cents(self):
+        from expedientes.demanda_generator import importe_en_letras
+        for amount, expected in [
+            ('36729.90', 'treinta y seis mil setecientos veintinueve pesos 90/100 M.N.'),
+            ('1.01', 'un peso 01/100 M.N.'),
+            ('21.00', 'veintiún pesos 00/100 M.N.'),
+            ('100.00', 'cien pesos 00/100 M.N.'),
+            ('1000000.00', 'un millón de pesos 00/100 M.N.'),
+            ('0.00', 'cero pesos 00/100 M.N.'),
+        ]:
+            with self.subTest(amount=amount):
+                self.assertEqual(importe_en_letras(Decimal(amount)), expected)
 
 
 class NarrativaModalidadTests(BaseDemanda):
