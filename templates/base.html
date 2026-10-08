@@ -641,7 +641,11 @@
                 <a href="{% url 'superadmin_dashboard' %}">Superadmin</a>
             </li>
             {% endif %}
-            {% if user.profile.rol == 'superadmin' or user.is_staff %}
+            {% if user.profile.rol == 'abogada' %}
+            <li class="{% if request.resolver_match.url_name == 'expediente_list' and request.GET.estado == 'demanda' %}active{% endif %}">
+                <a href="{% url 'expediente_list' %}?estado=demanda">Generador Demandas</a>
+            </li>
+            {% elif user.profile.rol == 'superadmin' or user.is_staff %}
             <li>
                 <a href="{% url 'admin:index' %}">Admin</a>
             </li>

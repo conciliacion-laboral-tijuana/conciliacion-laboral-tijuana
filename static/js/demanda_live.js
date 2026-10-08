@@ -48,10 +48,22 @@
           '<style>body{font:14px Georgia,serif;padding:24px;line-height:1.6;overflow-wrap:anywhere}table{width:100%;border-collapse:collapse}td,th{border:1px solid #ddd;padding:6px}h3{margin-top:24px}</style>' +
           '</head><body>' + result.html + '</body></html>';
         warning.hidden = !result.calculo_pendiente;
-        showErrors((result.faltantes || []).map(label => 'Pendiente: ' + label)
+        const pendienteErrores = result.errores
+          ? Object.entries(result.errores).flatMap(([campo, msgs]) =>
+              msgs.map(msg => campo + ': ' + msg))
+          : [];
+        showErrors(pendienteErrores
+          .concat((result.faltantes || []).map(label => 'Pendiente: ' + label))
           .concat(result.calculo_error ? [result.calculo_error] : []));
-        status.textContent = result.guardado ? 'Borrador guardado. Vista previa actualizada.' : 'Vista previa actualizada.';
-        if (result.guardado) changed = false;
+        if (pendienteErrores.length) {
+          status.textContent = result.guardado
+            ? 'Guardado parcial: revisa los campos señalados.'
+            : 'Cambios sin guardar. Corrige los campos señalados.';
+          changed = !result.guardado;
+        } else {
+          status.textContent = result.guardado ? 'Borrador guardado. Vista previa actualizada.' : 'Vista previa actualizada.';
+          if (result.guardado) changed = false;
+        }
       } catch (error) {
         status.textContent = 'Cambios sin guardar. ' + error.message;
       }

@@ -197,8 +197,9 @@ class Cliente(models.Model):
     )
     oficina = models.CharField(
         'Oficina que atendió', max_length=30,
-        choices=OFICINA_CHOICES,
-        help_text='¿Cuál oficina atendió al cliente?'
+        choices=OFICINA_CHOICES, blank=True,
+        help_text='¿Cuál oficina atendió al cliente? Opcional: si no se sabe aún, '
+                  'se puede dejar vacío y completar después.'
     )
 
     # Asesoría gratuita

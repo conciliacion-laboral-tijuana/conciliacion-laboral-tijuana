@@ -1615,6 +1615,13 @@ def _calculo_demanda_pendiente(expediente, resultado):
 
 
 def _validar_captura_demanda(post, expediente):
+    """Valida el accordion y devuelve (errores, datos) con lo que SÍ es guardable.
+
+    `datos` contiene únicamente los campos válidos que pueden persistirse.  Un
+    campo inválido ya no descarta el resto: se reporta en `errores` y se excluye
+    de `datos`, de modo que la fecha de nacimiento (o cualquier otro dato) se
+    guarda aunque un campo vecino venga mal capturado.
+    """
     cliente = expediente.cliente
     form = ClienteForm(instance=cliente)
     errores, datos = {}, {}
@@ -1636,14 +1643,29 @@ def _validar_captura_demanda(post, expediente):
     if (cliente.fecha_ingreso and cliente.fecha_salida
             and cliente.fecha_salida < cliente.fecha_ingreso):
         errores['fecha_salida'] = ['La salida no puede ser anterior al ingreso.']
+        # No persistir un par de fechas incoherente.
+        datos.pop('fecha_ingreso', None)
+        datos.pop('fecha_salida', None)
     if cliente.salario is not None and cliente.salario <= 0:
         errores['salario'] = ['El salario debe ser mayor que cero.']
-    # Model validation includes uniqueness; never overwrite another client's CURP.
-    if not errores:
-        try:
-            cliente.full_clean(exclude=[f.name for f in cliente._meta.fields if f.name not in datos])
-        except ValidationError as exc:
-            errores.update(getattr(exc, 'message_dict', {'datos': getattr(exc, 'messages', [str(exc)])}))
+        datos.pop('salario', None)
+
+    # Validación del modelo (unicidad de CURP, etc.) limitada a lo que trae el
+    # POST.  Cada campo que falle se aparta de `datos` en vez de bloquear todo.
+    try:
+        cliente.full_clean(exclude=[f.name for f in cliente._meta.fields
+                                    if f.name not in datos])
+    except ValidationError as exc:
+        detalle = getattr(exc, 'message_dict', None)
+        if detalle is None:
+            # Error sin campo asociado (regla de modelo): no se puede atribuir a
+            # un dato concreto, así que no se guarda nada.
+            errores['__all__'] = getattr(exc, 'messages', [str(exc)])
+            datos.clear()
+        else:
+            for campo, msgs in detalle.items():
+                errores[campo] = msgs
+                datos.pop(campo, None)
     return errores, datos
 
 
@@ -1656,8 +1678,6 @@ def demanda_vista_previa(request, pk):
     expediente = get_object_or_404(get_expedientes_queryset(request.user), pk=pk)
     cliente = expediente.cliente
     errores, datos = _validar_captura_demanda(request.POST, expediente)
-    if errores:
-        return JsonResponse({'errores': errores, 'guardado': False}, status=422)
     resultado = calculo_para_demanda(expediente)
     pendiente = _calculo_demanda_pendiente(expediente, resultado)
     guardar = request.POST.get('guardar_borrador') == '1'
@@ -1669,13 +1689,19 @@ def demanda_vista_previa(request, pk):
             expediente.save(update_fields=['tipo_despido'])
             if pendiente:
                 CalculoLaboral.objects.filter(expediente=expediente).update(requiere_revision=True)
-    return JsonResponse({
+    respuesta = {
         'html': generar_demanda_html(expediente),
         'guardado': guardar,
         'calculo_pendiente': pendiente,
         'faltantes': [f['label'] for f in _verificar_datos_criticos(expediente)],
         'calculo_error': resultado.get('error', '') if not resultado.get('success') else '',
-    })
+    }
+    if errores:
+        # Se guardó lo válido y se reportan los campos que no se aplicaron, para
+        # que el asesor sepa exactamente qué falta sin perder el resto del captura.
+        respuesta['errores'] = errores
+        respuesta['guardado'] = guardar and bool(datos)
+    return JsonResponse(respuesta)
 
 
 @login_required
@@ -1715,7 +1741,10 @@ def demanda_asistente(request, pk):
         postea_acordeon = any(c in request.POST for c in campos_acordeon)
         if postea_acordeon:
             errores, datos = _validar_captura_demanda(request.POST, expediente)
-            if not errores and datos:
+            # Se persiste lo válido aunque haya campos con error: antes un solo
+            # campo inválido descartaba toda la captura (p. ej. la fecha de
+            # nacimiento nunca se guardaba).
+            if datos:
                 from django.db import transaction
                 with transaction.atomic():
                     cliente.save(update_fields=list(datos))
@@ -1751,6 +1780,13 @@ def demanda_asistente(request, pk):
                 seccion_abierta = 'revision'
         elif postea_acordeon and not errores:
             messages.success(request, '✅ Datos guardados. Puedes continuar con otra sección.')
+        elif postea_acordeon and errores and datos:
+            campos = ', '.join(sorted(errores))
+            messages.warning(
+                request,
+                f'✅ Se guardó lo válido, pero estos campos no se aplicaron: {campos}. '
+                'Corrígelos para completar la demanda.'
+            )
         elif errores:
             messages.error(request, 'Corrige los campos marcados en rojo.')
 

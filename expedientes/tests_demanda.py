@@ -111,20 +111,53 @@ class DemandaEnVivoTests(BaseDemanda):
         self.assertEqual(self.persona.nombre, 'Nombre guardado')
         self.assertEqual(self.persona.testigos, '')
 
-    def test_invalid_dates_do_not_save_any_capture_fields(self):
+    def test_invalid_dates_block_only_the_coherent_dates(self):
+        # Una salida anterior al ingreso es incoherente: se rechaza el par de
+        # fechas, pero el resto de la captura sí se guarda (antes se perdía todo,
+        # incluida la fecha de nacimiento).
         response = self.client.post(self.url, {
-            'guardar_borrador': '1', 'nombre': 'No guardar', 'fecha_salida': '2020-01-01',
+            'guardar_borrador': '1', 'nombre': 'Nombre valido',
+            'fecha_nacimiento': '1990-02-03',
+            'fecha_ingreso': '2022-05-10', 'fecha_salida': '2020-01-01',
         })
-        self.assertEqual(response.status_code, 422)
+        self.assertEqual(response.status_code, 200)
         self.assertIn('fecha_salida', response.json()['errores'])
+        self.assertTrue(response.json()['guardado'])
         self.persona.refresh_from_db()
-        self.assertEqual(self.persona.nombre, 'Cliente Narrativa')
+        # Lo válido se persistió…
+        self.assertEqual(self.persona.nombre, 'Nombre valido')
+        self.assertEqual(self.persona.fecha_nacimiento, date(1990, 2, 3))
+        # …y las fechas incoherentes NO se aplicaron.
+        self.assertEqual(self.persona.fecha_ingreso, date(2021, 9, 15))
+        self.assertEqual(self.persona.fecha_salida, date(2026, 9, 15))
 
     def test_duplicate_curp_does_not_save(self):
         otra = self._cliente()
-        response = self.client.post(self.url, {'guardar_borrador': '1', 'curp': otra.curp})
-        self.assertEqual(response.status_code, 422)
+        response = self.client.post(self.url, {
+            'guardar_borrador': '1', 'curp': otra.curp,
+            'fecha_nacimiento': '1988-09-10',
+        })
+        self.assertEqual(response.status_code, 200)
         self.assertIn('curp', response.json()['errores'])
+        # La CURP duplicada nunca pisa la de otro cliente, pero el resto del
+        # cambio sí se guarda.
+        self.persona.refresh_from_db()
+        self.assertNotEqual(self.persona.curp, otra.curp)
+        self.assertEqual(self.persona.fecha_nacimiento, date(1988, 9, 10))
+
+    def test_birth_date_saves_even_when_office_is_missing(self):
+        # Regresión: `oficina` era el único campo con choices sin blank=True ni
+        # default, así que dejarlo vacío bloqueaba el guardado completo del
+        # accordion y la fecha de nacimiento nunca se aplicaba.
+        self.persona.oficina = ''
+        self.persona.save()
+        response = self.client.post(self.url, {
+            'guardar_borrador': '1', 'oficina': '', 'fecha_nacimiento': '1979-04-04',
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn('oficina', response.json().get('errores', {}))
+        self.persona.refresh_from_db()
+        self.assertEqual(self.persona.fecha_nacimiento, date(1979, 4, 4))
 
     def test_recalculation_warning_survives_auto_recalculation(self):
         from expedientes.laboral_calculator import recalcular_calculo
