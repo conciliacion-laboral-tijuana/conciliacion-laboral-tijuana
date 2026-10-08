@@ -530,8 +530,8 @@ class FlujoCompletoDemandaTests(TestCase):
         machote.refresh_from_db()
         self.assertEqual(machote.nombre, 'Machote Nombre Nuevo')
 
-    def test_modal_renombrar_compartido_en_catalogo_y_dashboard(self):
-        """El modal compartido (partial) aparece tanto en el catálogo como en el dashboard de la abogada."""
+    def test_modal_renombrar_en_catalogo_y_portal_abogada_sencillo(self):
+        """El catálogo conserva el modal; el portal de abogados solo prepara demandas."""
         from expedientes.models import Machote
 
         machote = Machote.objects.create(
@@ -559,18 +559,9 @@ class FlujoCompletoDemandaTests(TestCase):
         resp = self.client.get(reverse('dashboard_abogada'))
         self.assertEqual(resp.status_code, 200)
         body = resp.content.decode('utf-8', errors='replace')
-        self.assertIn('modal-renombrar', body, 'El dashboard debe incluir el modal compartido')
-        self.assertIn('abrirRenombrar', body, 'El dashboard debe incluir el JS del modal')
-        self.assertContains(
-            resp,
-            reverse('machote_renombrar', args=[machote.pk]),
-            msg_prefix='El dashboard debe renderizar el botón Renombrar en la fila del machote',
-        )
-        self.assertIn(
-            f'name="next" value="{reverse("dashboard_abogada")}"',
-            body,
-            'El modal del dashboard debe regresar al propio dashboard (request.path)',
-        )
+        self.assertNotIn('modal-renombrar', body)
+        self.assertNotIn('abrirRenombrar', body)
+        self.assertContains(resp, 'Crear demanda')
 
     def test_renombrar_machote_regresa_a_pagina_origen(self):
         """Renombrar desde el catálogo vuelve al catálogo y desde el dashboard vuelve al dashboard."""

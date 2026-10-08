@@ -487,6 +487,7 @@
             <img src="{% static 'img/logo.png' %}" alt="Conciliacion Laboral Tijuana" class="logo-topbar">
         </a>
 
+        {% if user.profile.rol != "abogada" %}
         <!-- Búsqueda Global -->
         <a href="{% url 'busqueda_global' %}?q="
            class="flex items-center justify-center text-gray-400 hover:text-white transition-colors px-2 py-0.5"
@@ -557,6 +558,7 @@
             </div>
         </div>
 
+        {% endif %}
         <span class="flex items-center gap-1 ml-2" style="font-size: 11px; color: #9ca3af;">
             <span style="color: #d1d5db;">{{ user.get_full_name|default:user.username }}</span>
             <span style="padding: 0 4px; font-size: 9px; font-weight: 600; background: #374151; color: #93c5fd; border-radius: 2px;">
@@ -564,6 +566,7 @@
             </span>
         </span>
 
+        {% if user.profile.rol != "abogada" %}
         <a href="{% url 'ajustes' %}"
            class="flex items-center justify-center text-gray-400 hover:text-white transition-colors px-2 py-0.5 ml-1"
            style="font-size: 11px;"
@@ -578,6 +581,7 @@
             <i class="fas fa-key" style="font-size: 10px;"></i>
         </a>
 
+        {% endif %}
         <form method="post" action="{% url 'logout' %}" class="inline ml-1">
             {% csrf_token %}
             <button type="submit"
@@ -591,6 +595,9 @@
     <!-- Apple-style Navigation Menu -->
     <div class="max-w-7xl mx-auto px-3" style="padding-top: 8px; padding-bottom: 8px;">
         <ul id="appleNav">
+            {% if user.profile.rol == 'abogada' %}
+            <li class="{% if request.resolver_match.url_name == 'dashboard_abogada' or request.resolver_match.url_name == 'demanda_asistente' or request.resolver_match.url_name == 'demanda_editor' %}active{% endif %}"><a href="{% url 'dashboard_abogada' %}">Crear demanda</a></li>
+            {% else %}
             <li class="{% if request.resolver_match.url_name == 'expediente_list' %}active{% endif %}">
                 <a href="{% url 'expediente_list' %}">Expedientes</a>
             </li>
@@ -656,6 +663,7 @@
                     <i class="fas fa-search" style="font-size: 11px; margin-right: 4px;"></i> Buscar
                 </a>
             </li>
+            {% endif %}
         </ul>
     </div>
     {% endif %}

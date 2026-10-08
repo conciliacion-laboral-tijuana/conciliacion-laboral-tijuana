@@ -162,8 +162,8 @@ class ExpedienteForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
-        # Solo mostrar asesores en el campo asesor
-        self.fields['asesor'].queryset = User.objects.filter(profile__rol='asesor')
+        # Mostrar asesores y abogados que pueden tener expedientes asignados
+        self.fields['asesor'].queryset = User.objects.filter(profile__rol__in=['asesor', 'abogada'])
         self.fields['asesor'].label_from_instance = lambda obj: obj.get_full_name() or obj.username
 
         # Si el usuario es asesor, solo puede asignarse a sí mismo
@@ -480,3 +480,8 @@ class WhatsAppMessageForm(forms.ModelForm):
                 'id': 'whatsapp-via',
             }),
         }
+
+
+class NuevaDemandaForm(forms.Form):
+    nombre = forms.CharField(label='Nombre completo del cliente', max_length=200,
+                             widget=forms.TextInput(attrs={'class': 'input'}))

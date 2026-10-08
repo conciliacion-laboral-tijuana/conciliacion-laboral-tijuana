@@ -271,56 +271,38 @@ class DashboardAdminView(LoginRequiredMixin, StaffRequiredMixin, TemplateView):
 
 
 class DashboardAbogadaView(LoginRequiredMixin, TemplateView):
-    """
-    Dashboard exclusivo para la abogada.
-
-    Objeto principal: TODAS las demandas (expedientes en estado 'demanda').
-    Además muestra el estado de todos los clientes, una calculadora libre
-    (no ligada a ningún expediente) y los machotes a la mano.
-    """
+    """Entrada sencilla al asistente de demandas para el equipo jurídico."""
     template_name = 'expedientes/dashboard_abogada.html'
 
     def get(self, request, *args, **kwargs):
         if not hasattr(request.user, 'profile') or request.user.profile.rol != 'abogada':
-            return redirect('dashboard_admin')
+            return redirect('dashboard_redirect')
         return super().get(request, *args, **kwargs)
+
+    def post(self, request, *args, **kwargs):
+        if not hasattr(request.user, 'profile') or request.user.profile.rol != 'abogada':
+            return HttpResponse('No tienes permiso para acceder a esta sección.', status=403)
+        from .forms import NuevaDemandaForm
+        from django.db import transaction
+        form = NuevaDemandaForm(request.POST)
+        if form.is_valid():
+            with transaction.atomic():
+                cliente = Cliente.objects.create(nombre=form.cleaned_data['nombre'], created_by=request.user)
+                expediente = Expediente.objects.create(cliente=cliente, asesor=request.user)
+            return redirect('demanda_asistente', pk=expediente.pk)
+        return self.render_to_response(self.get_context_data(nueva_demanda_form=form))
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        user = self.request.user
-
-        # ── Demandas: objeto principal ────────────────────────────────
-        demandas = Expediente.objects.filter(estado='demanda').select_related(
-            'cliente', 'asesor'
-        ).order_by('-created_at')
-        context['demandas'] = demandas
-        context['total_demandas'] = demandas.count()
-
-        # Monto total reclamado en demandas
-        context['monto_demandas'] = demandas.aggregate(
-            total=Sum('monto_reclamado')
-        )['total'] or 0
-
-        # ── Clientes: estado de todos ─────────────────────────────────
-        context['total_clientes'] = Cliente.objects.count()
-        context['clientes'] = Cliente.objects.select_related().order_by('-created_at')[:15]
-
-        # Estado agregado por estado de expediente (para el resumen)
-        context['clientes_por_estado'] = {
-            key: Expediente.objects.filter(estado=key).count()
-            for key, label in Expediente.ESTADO_CHOICES
-        }
-
-        # ── Calculadora libre (no ligada a ningún expediente) ────────
-        context['simulacion_form'] = SimulacionForm()
-
-        # ── Machotes a la mano ───────────────────────────────────────
-        machotes = _get_machotes_queryset()
-        context['machotes'] = machotes
-        context['machotes_demanda'] = machotes.filter(categoria='demanda')[:6]
-        context['total_machotes'] = machotes.count()
-
-        context['ESTADO_COLORS'] = ESTADO_COLORS
+        from .forms import NuevaDemandaForm
+        context.setdefault('nueva_demanda_form', NuevaDemandaForm())
+        qs = get_expedientes_queryset(self.request.user)
+        query = self.request.GET.get('q', '').strip()
+        if query:
+            qs = qs.filter(Q(numero__icontains=query) | Q(cliente__nombre__icontains=query))
+        from django.core.paginator import Paginator
+        context['expedientes'] = Paginator(qs.order_by('-created_at'), 20).get_page(self.request.GET.get('page'))
+        context['q'] = query
         return context
 
 

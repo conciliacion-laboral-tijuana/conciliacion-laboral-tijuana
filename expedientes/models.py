@@ -353,7 +353,7 @@ class Expediente(models.Model):
     numero = models.CharField('Número de expediente', max_length=20, unique=True, editable=False)
     cliente = models.ForeignKey(Cliente, on_delete=models.PROTECT, verbose_name='Cliente')
     asesor = models.ForeignKey(User, on_delete=models.PROTECT, verbose_name='Asesor asignado',
-                                limit_choices_to={'profile__rol': 'asesor'})
+                                limit_choices_to={'profile__rol__in': ['asesor', 'abogada']})
     estado = models.CharField('Estado', max_length=20, choices=ESTADO_CHOICES, default='nuevo')
 
     # Montos
