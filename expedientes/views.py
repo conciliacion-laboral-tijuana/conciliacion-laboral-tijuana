@@ -741,14 +741,8 @@ class ClienteCreateView(LoginRequiredMixin, CreateView):
         )
         messages.success(self.request, f'✅ Cliente {cliente.nombre} registrado. Expediente {expediente.numero} creado.')
 
-        # Redirect directly to automatic conciliation submission (POST)
-        # This skips the confirmation page and starts the automation immediately
-        from django.test import RequestFactory
-        # Simulate a POST request to enviar_conciliacion_automation with modo=automatico
-        post_request = self.request.POST.copy()
-        post_request['modo'] = 'automatico'
-        self.request._post = post_request
-        return enviar_conciliacion_automation(self.request, pk=expediente.pk)
+        # Redirigir al detalle del expediente recién creado
+        return redirect('expediente_detail', pk=expediente.pk)
 
     def get_success_url(self):
         # No se usa porque form_valid ya hace redirect
@@ -1554,7 +1548,7 @@ WIZARD_PASOS = {
 CRITICOS_CLIENTE = [
     {'campo': 'nombre', 'label': 'Nombre completo del cliente'},
     {'campo': 'curp', 'label': 'CURP'},
-    {'campo': 'salario', 'label': 'Salario mensual'},
+    {'campo': 'salario', 'label': 'Salario'},
     {'campo': 'fecha_ingreso', 'label': 'Fecha de ingreso'},
     {'campo': 'fecha_salida', 'label': 'Fecha de salida / despido'},
 ]

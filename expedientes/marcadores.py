@@ -49,7 +49,7 @@ FIELD_METADATA = {
     'email_cliente': {'label': 'Email', 'section': 'Cliente', 'source': 'cliente.email'},
     'direccion_cliente': {'label': 'Dirección del cliente', 'section': 'Cliente', 'source': 'cliente.direccion_completa'},
     'puesto_trabajador': {'label': 'Puesto', 'section': 'Empleo', 'source': 'cliente.puesto'},
-    'salario_mensual': {'label': 'Salario mensual', 'section': 'Empleo', 'source': 'cliente.salario'},
+    'salario': {'label': 'Salario', 'section': 'Empleo', 'source': 'cliente.salario'},
     'fecha_ingreso': {'label': 'Fecha de ingreso', 'section': 'Empleo', 'source': 'cliente.fecha_ingreso'},
     'fecha_despido': {'label': 'Fecha de despido/salida', 'section': 'Empleo', 'source': 'cliente.fecha_salida'},
     'periodo_pago': {'label': 'Periodo de pago', 'section': 'Empleo', 'source': 'solicitud.periodo_pago'},
@@ -97,10 +97,10 @@ def get_marcadores(expediente: Expediente, calculo: Dict[str, Any] | None = None
 
     # ─── Salarios ─────────────────────────────────────────────────────
     if cliente.salario:
-        salario_mensual = f"${cliente.salario:,.2f}"
+        salario = f"${cliente.salario:,.2f}"
         salario_diario = f"${float(cliente.salario) / 30:,.2f}"
     else:
-        salario_mensual = "[SALARIO MENSUAL]"
+        salario = "[SALARIO]"
         salario_diario = "[SALARIO DIARIO]"
 
     # ─── Monto total (de cálculo o del expediente) ────────────────────
@@ -180,7 +180,7 @@ def get_marcadores(expediente: Expediente, calculo: Dict[str, Any] | None = None
         'email_cliente': cliente.email or '[EMAIL]',
         'direccion_cliente': direccion_cliente,
         'puesto_trabajador': cliente.puesto or '[PUESTO]',
-        'salario_mensual': salario_mensual,
+        'salario': salario,
         'salario_diario': salario_diario,
         'periodo_pago': periodo_pago,
         'fecha_ingreso': fecha_ingreso,
@@ -209,7 +209,7 @@ def get_marcadores(expediente: Expediente, calculo: Dict[str, Any] | None = None
         'cargo_representante': '[CARGO DEL REPRESENTANTE]',
 
         # Alias cortos (para compatibilidad con machotes importados)
-        'salario': salario_mensual,
+        'salario': salario,
         'curp': cliente.curp or '[CURP]',
         'rfc': cliente.rfc or '[RFC]',
         'telefono': cliente.telefono or '[TELÉFONO]',
@@ -327,8 +327,8 @@ def get_datos_faltantes(expediente: Expediente,
             'edit_url': f'/clientes/{cliente.pk}/editar/',
         },
         {
-            'key': 'salario_mensual',
-            'label': 'Salario mensual',
+            'key': 'salario',
+            'label': 'Salario',
             'section': 'Empleo',
             'status': 'completo' if cliente.salario and cliente.salario > 0 else 'incompleto',
             'value': f"${cliente.salario:,.2f}" if cliente.salario else None,

@@ -91,7 +91,7 @@ class Cliente(models.Model):
 
     # Datos laborales
     puesto = models.CharField('Puesto', max_length=100, blank=True)
-    salario = models.DecimalField('Salario mensual', max_digits=10, decimal_places=2, null=True, blank=True)
+    salario = models.DecimalField('Salario', max_digits=10, decimal_places=2, null=True, blank=True)
     periodo_pago = models.CharField('Periodo de pago', max_length=10, choices=PERIODO_PAGO_CHOICES,
                                      default='mensual', help_text='¿Cada cuándo le pagan?')
     horas_semanales = models.PositiveIntegerField('Horas semanales', null=True, blank=True, default=40,
