@@ -88,9 +88,12 @@
     if (submitting) return;
     submitting = true;
     clearTimeout(timer);
+    const submitter = event.submitter;
     if (pending) await pending;
     nativeSubmit = true;
-    form.requestSubmit(event.submitter);
+    // Browsers ignore a reentrant requestSubmit during the first submit event.
+    // Resume in a separate task, preserving which action the lawyer chose.
+    setTimeout(() => form.requestSubmit(submitter), 0);
   });
   window.addEventListener('beforeunload', function (event) {
     if (changed && !submitting) {

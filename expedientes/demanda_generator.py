@@ -347,6 +347,19 @@ def calculo_para_demanda(expediente: Expediente,
     from .models import CalculoLaboral
 
     tipo = tipo_despido or expediente.tipo_despido or 'injustificado'
+    from .hoja_prestaciones import hoja_de, resultado_vigente
+    hoja = hoja_de(expediente)
+    if hoja or getattr(expediente, '_constructor_calculos', False):
+        from core.laboral.calculators import _resultado_vacio
+        resultado = resultado_vigente(expediente, hoja, aprobado=True)
+        if tipo == (expediente.tipo_despido or 'injustificado') and resultado:
+            return resultado
+        error = ('Este tipo de separación requiere un nuevo cálculo aprobado.'
+                 if tipo != (expediente.tipo_despido or 'injustificado')
+                 else 'Valida y aprueba las prestaciones antes de incorporarlas a la demanda.')
+        pendiente = _resultado_vacio(error)
+        pendiente['constructor_pendiente'] = True
+        return pendiente
     calculo = CalculoLaboral.objects.filter(expediente=expediente).first()
 
     if calculo is not None:
@@ -367,6 +380,20 @@ def calculo_para_demanda(expediente: Expediente,
             tipo, _años_completos_de(expediente.cliente)),
         tipo_despido=tipo,
     )
+
+
+def _desglose_hoja_html(calculo):
+    if not calculo.get('hoja_desglose'):
+        return ''
+    partes = ['<h4>Desglose de prestaciones por periodos</h4>']
+    for row in calculo['hoja_desglose']:
+        if not row['bruto'] and not row['pagado']:
+            continue
+        partes.append(
+            f'<p><strong>{html_escape(row["concepto"])}</strong> · {html_escape(row["periodo"])}. '
+            f'{html_escape(row["formula"])}. Calculado: {_importe_demanda(row["bruto"])}; '
+            f'pagado: {_importe_demanda(row["pagado"])}; saldo reclamado: {_importe_demanda(row["pendiente"])}.</p>')
+    return '\n'.join(partes)
 
 
 def _texto_como_lista(valor: str | None) -> str:
@@ -538,6 +565,18 @@ def construir_hechos(expediente: Expediente, calculo: dict,
         hechos.append(
             f'La jornada laboral se desarrollaba en régimen {jornada}, con una '
             f'jornada de {cliente.horas_semanales or 48} horas semanales.')
+
+    if cliente.imss_confirmado and cliente.tuvo_imss:
+        imss = 'Durante la relación laboral, el trabajador manifiesta que estuvo dado de alta ante el IMSS.'
+        if cliente.imss_salario_inferior:
+            imss += ' Manifiesta que fue registrado con un salario inferior al que realmente percibía.'
+        if cliente.imss_salario_diario is not None:
+            imss += f' El salario diario registrado fue de {_importe_demanda(cliente.imss_salario_diario)}.'
+        if cliente.imss_documento:
+            imss += f' Como fuente de esta información se señala: {cliente.imss_documento}.'
+        hechos.append(imss)
+    if calculo.get('horas_extras', {}).get('por_semana'):
+        hechos.append('Las horas extraordinarias reclamadas corresponden exclusivamente a las semanas y días detallados en el desglose de prestaciones; no se presume un horario extraordinario constante durante toda la relación laboral.')
 
     # 4. Antigüedad: la calcula el motor (aniversarios cumplidos), no días/365
     if calculo.get('success'):
@@ -736,7 +775,9 @@ def _filas_prestaciones(calculo: dict, expediente: Expediente) -> list:
 
 
 def _fundamento_vacaciones(calculo: dict) -> str:
-    """Fundamento con el desglose de días de vacaciones (arts. 76 y 81 LFT)."""
+    """Fundamento con días o saldos revisados por aniversario."""
+    if calculo.get('vacaciones', {}).get('por_periodos'):
+        return 'Arts. 76, 79 y 81 LFT (saldos revisados por aniversario)'
     v = calculo['vacaciones']
     partes = []
     if v.get('dias_causadas_anteriores'):
@@ -796,7 +837,7 @@ def _agregar_prestaciones(doc: Document, expediente: Expediente, calculo: dict,
 
     if calculo.get('success'):
         rows.append(("", "TOTAL:", f"${calculo['total']:,.2f}"))
-    elif expediente.monto_reclamado:
+    elif expediente.monto_reclamado and not calculo.get('constructor_pendiente'):
         rows.append(("", "MONTO RECLAMADO:", f"${expediente.monto_reclamado:,.2f}"))
     else:
         rows.append(("", "MONTO RECLAMADO:", "—"))
@@ -842,6 +883,9 @@ def _agregar_prestaciones(doc: Document, expediente: Expediente, calculo: dict,
         run_base.font.size = TABLE_FONT_SIZE
 
     doc.add_paragraph()
+
+    if calculo.get('hoja_desglose'):
+        html_a_docx(_desglose_hoja_html(calculo), doc)
 
 
 def _texto_base_salarial(calculo: dict) -> str:
@@ -915,9 +959,9 @@ def _puntos_petitorios(calculo: dict, expediente: Expediente) -> list:
             "que se originen con motivo del presente juicio.",
         ]
 
-    if (calculo or {}).get('success') and calculo['total'] > 0:
+    if (calculo or {}).get('success'):
         total_str = f"${calculo['total']:,.2f}"
-    elif expediente.monto_reclamado:
+    elif expediente.monto_reclamado and not calculo.get('constructor_pendiente'):
         total_str = f"${expediente.monto_reclamado:,.2f}"
     else:
         total_str = "la cantidad que resulte"
@@ -1047,10 +1091,10 @@ def generar_demanda_word(expediente: Expediente, desde_cero=True,
         _agregar_materia(doc, expediente)
         _agregar_actor(doc, expediente)
         _agregar_demandado(doc, expediente)
-        _agregar_hechos(doc, expediente, calculo, tipo_despido)
         _agregar_prestaciones(doc, expediente, calculo, tipo_despido)
-        _agregar_derecho(doc, tipo_despido)
+        _agregar_hechos(doc, expediente, calculo, tipo_despido)
         _agregar_pruebas(doc, expediente)
+        _agregar_derecho(doc, tipo_despido)
         _agregar_puntos_petitorios(doc, expediente, calculo)
         _agregar_firma(doc, expediente)
         _agregar_pie_generacion(doc, expediente)
@@ -1209,7 +1253,7 @@ def generar_demanda_html(expediente: Expediente, tipo_despido_override: str | No
             f'<td style="text-align:right">${calculo["total"]:,.2f}</td></tr>'
         )
         texto_base_salarial = _texto_base_salarial(calculo)
-    elif expediente.monto_reclamado:
+    elif expediente.monto_reclamado and not calculo.get('constructor_pendiente'):
         prestaciones_rows += (
             '<tr style="font-weight:bold;border-top:2px solid #000"><td></td>'
             '<td style="text-align:right">MONTO RECLAMADO:</td>'
@@ -1224,6 +1268,8 @@ def generar_demanda_html(expediente: Expediente, tipo_despido_override: str | No
         )
         texto_base_salarial = ''
 
+
+    desglose_html = _desglose_hoja_html(calculo)
 
     # Petitorios: misma lista que el DOCX (_puntos_petitorios)
     petitorios_html = "\n".join(
@@ -1331,18 +1377,19 @@ def generar_demanda_html(expediente: Expediente, tipo_despido_override: str | No
 <tbody>{prestaciones_rows}</tbody>
 </table>
 <p>{html_escape(texto_base_salarial)}</p>
+{desglose_html}
 
 <h3 style="color:#1F2937;">—  H E C H O S  —</h3>
 
 {hechos_html}
 
-<h3 style="color:#1F2937;">—  F U N D A M E N T O S   D E   D E R E C H O  —</h3>
-
-{_fundamentos_derecho_html(tipo_despido)}
-
 <h3 style="color:#1F2937;">—  P R U E B A S  —</h3>
 
 {pruebas_html}
+
+<h3 style="color:#1F2937;">—  F U N D A M E N T O S   D E   D E R E C H O  —</h3>
+
+{_fundamentos_derecho_html(tipo_despido)}
 
 <h3 style="color:#1F2937;">—  P U N T O S   P E T I T O R I O S  —</h3>
 

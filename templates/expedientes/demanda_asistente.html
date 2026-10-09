@@ -148,6 +148,19 @@
     </div>
     </div>
 
+    <div class="card p-4 mb-4 space-y-3">
+      <h3 class="font-semibold">Registro ante el IMSS</h3>
+      <input type="hidden" name="imss_present" value="1">
+      <label class="flex gap-2">{{ form.imss_confirmado }} Confirmé si el trabajador estuvo dado de alta</label>
+      <label class="flex gap-2">{{ form.tuvo_imss }} ¿El trabajador estuvo dado de alta en el IMSS?</label>
+      <div id="imss-detalles" class="space-y-3">
+        <label class="flex gap-2">{{ form.imss_salario_inferior }} ¿Fue registrado con un salario inferior al real?</label>
+        <div><label for="id_imss_salario_diario">Salario diario registrado</label>{{ form.imss_salario_diario }}{% for e in errores.imss_salario_diario %}<p class="text-red-700">{{ e }}</p>{% endfor %}</div>
+        <div><label for="id_imss_documento">Documento o fuente del registro</label>{{ form.imss_documento }}</div>
+        <p class="text-xs text-gray-600">Esta sección se incorpora a los hechos cuando se confirma el alta. La afirmación sobre salario inferior depende de su propia casilla.</p>
+      </div>
+    </div>
+
     <!-- ─── 3. Empresa / Patrón (demandado) ───────────────────────── -->
     {% include 'expedientes/_acordeon_header.html' with sec_id='empresa' num=3 titulo=pasos_info|get_item:'empresa'|get_item:'titulo' descripcion=pasos_info|get_item:'empresa'|get_item:'descripcion' completa=cliente.empresa %}
     <div class="acordeon-body">
@@ -317,7 +330,9 @@
     </div>
 
 <!-- ─── 5. Revisión final: tipo de despido, cálculo y firma ──── -->
-    {% include 'expedientes/_acordeon_header.html' with sec_id='revision' num=5 titulo='Revisión final' descripcion='Tipo de despido, cálculo automático y verificación de la firma.' completa=expediente.tipo_despido %}
+    {% include 'expedientes/_hoja_prestaciones.html' %}
+
+    {% include 'expedientes/_acordeon_header.html' with sec_id='revision' num=6 titulo='Revisión final' descripcion='Tipo de despido, importes revisados y verificación de la firma.' completa=expediente.tipo_despido %}
     <div class="acordeon-body">
       <div class="p-6 space-y-5">
         <!-- Datos críticos -->
@@ -353,44 +368,10 @@
             </label>
             {% endfor %}
           </div>
-          <p class="text-xs text-gray-400 mt-1.5">El tipo de despido define los conceptos que se reclaman (los cálculos se ajustan automáticamente).</p>
+          <p class="text-xs text-gray-400 mt-1.5">El tipo de despido define los conceptos que se reclaman (un cambio requiere recalcular y aprobar las prestaciones).</p>
         </div>
 
-        <!-- Cálculo automático -->
-        <div>
-          <h3 class="text-sm font-semibold text-gray-700 mb-2">{% svg 'calculator' %} Cálculo automático</h3>
-          {% if calculo and calculo.success %}
-          <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
-            <table class="w-full text-sm">
-              <thead class="bg-gray-800 text-white">
-                <tr>
-                  <th class="px-4 py-2 text-left font-medium">Prestación</th>
-                  <th class="px-4 py-2 text-right font-medium">Importe</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-gray-100">
-                <tr><td class="px-4 py-2 text-gray-700">Aguinaldo proporcional</td><td class="px-4 py-2 text-right font-medium">${{ calculo.aguinaldo.monto|floatformat:2 }}</td></tr>
-                <tr><td class="px-4 py-2 text-gray-700">Vacaciones ({{ calculo.vacaciones.dias_segun_antiguedad }} días)</td><td class="px-4 py-2 text-right font-medium">${{ calculo.vacaciones.monto|floatformat:2 }}</td></tr>
-                <tr><td class="px-4 py-2 text-gray-700">Prima vacacional 25%</td><td class="px-4 py-2 text-right font-medium">${{ calculo.prima_vacacional.monto|floatformat:2 }}</td></tr>
-                {% if calculo.prima_antiguedad.monto %}
-                <tr><td class="px-4 py-2 text-gray-700">Prima de antigüedad</td><td class="px-4 py-2 text-right font-medium">${{ calculo.prima_antiguedad.monto|floatformat:2 }}</td></tr>
-                {% endif %}
-                {% if calculo.indemnizacion.monto %}
-                <tr><td class="px-4 py-2 text-gray-700">Indemnización constitucional (90 días)</td><td class="px-4 py-2 text-right font-medium">${{ calculo.indemnizacion.monto|floatformat:2 }}</td></tr>
-                {% endif %}
-                <tr class="bg-blue-50">
-                  <td class="px-4 py-2 font-bold text-gray-800">TOTAL</td>
-                  <td class="px-4 py-2 text-right font-bold text-blue-700">${{ calculo.total|floatformat:2 }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          {% else %}
-          <div class="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700">
-            {% svg 'warning' %} No se pudo calcular: faltan salario o fechas. Completa las secciones anteriores.
-          </div>
-          {% endif %}
-        </div>
+        <p class="text-sm text-gray-600">Revisa los importes en la sección «Hoja de prestaciones por periodos». La demanda usa únicamente el cálculo vigente aprobado.</p>
 
         <!-- Firma (nombre arriba y abajo) -->
         <div>
@@ -431,11 +412,11 @@
   </form>
   <aside class="demanda-preview" aria-label="Vista previa de demanda">
     <h2 class="text-lg font-bold">Demanda en vivo</h2>
-    <p class="text-xs text-gray-500">Borrador para revisión del abogado. Las correcciones del editor final se conservan por separado.</p>
+    <p class="text-xs text-gray-500">Borrador para revisión del abogado. Los importes se incorporan después de calcular y aprobar las prestaciones.</p>
     <p id="demanda-preview-status" role="status" aria-live="polite" class="text-sm mt-2">Cargando vista previa…</p>
     <ul id="demanda-preview-errors" class="text-sm text-red-700 mt-2"></ul>
-    <p id="demanda-calculo-aviso" class="text-sm text-amber-800 mt-2" hidden>Los datos cambiaron respecto al último cálculo guardado. Revisa y recalcula las prestaciones antes de finalizar.</p>
-    <a href="{% url 'calculo_laboral' expediente.pk %}" class="text-sm text-blue-700 underline" id="demanda-calculo-link">Revisar calculadora y prestaciones</a>
+    <p id="demanda-calculo-aviso" class="text-sm text-amber-800 mt-2" hidden>Las prestaciones están pendientes de validación o aprobación. Usa la hoja de prestaciones por periodos antes de finalizar.</p>
+    <a href="{% url 'calculo_laboral' expediente.pk %}" class="text-sm text-blue-700 underline" id="demanda-calculo-link">Consultar calculadora anterior</a>
     <iframe id="demanda-preview-frame" title="Borrador de la demanda" sandbox="" referrerpolicy="no-referrer"></iframe>
   </aside>
   </div>
@@ -503,3 +484,5 @@
 </script>
 <script src="{% static 'js/demanda_live.js' %}" defer></script>
 {% endblock %}
+
+{% block extra_scripts %}{{ block.super }}<script src="{% static 'js/hoja_prestaciones.js' %}"></script>{% endblock %}

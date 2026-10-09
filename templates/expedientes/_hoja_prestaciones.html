@@ -1,0 +1,55 @@
+{% include 'expedientes/_acordeon_header.html' with sec_id='prestaciones' num=5 titulo='Hoja de prestaciones por periodos' descripcion='Captura primero; valida, calcula y revisa los importes al terminar.' completa=calculo_aprobado %}
+<div class="acordeon-body"><div class="p-6 space-y-5">
+  <input type="hidden" name="hoja_calculos" value="1">
+  <input type="hidden" name="periodos_fechas" value="{{ periodos_fechas }}">
+  <input type="hidden" name="revision_calculo" value="{{ hoja.huella }}">
+  <p class="text-sm text-gray-600">Las fechas y el salario mensual de la relación laboral alimentan las prestaciones generales. Para horas extras y vacaciones registra la base aplicable a cada periodo. Confirma los cambios de salario y las prestaciones pactadas antes de calcular.</p>
+  {% if errores.prestaciones %}<ul class="text-red-700">{% for error in errores.prestaciones %}<li>{{ error }}</li>{% endfor %}</ul>{% endif %}
+  {{ captura_prestaciones.non_field_errors }}
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    {% for field in captura_prestaciones %}
+    <div><label for="{{ field.id_for_label }}" class="block text-sm font-medium">{{ field.label }}</label>{{ field }}<div class="text-red-700 text-sm">{{ field.errors }}</div></div>
+    {% endfor %}
+  </div>
+  <section class="space-y-3">
+    <h3 class="font-semibold">Horas extras por semana</h3>
+    <p class="text-xs text-gray-600">Captura solo horas extraordinarias efectivamente trabajadas. No se extrapolan al resto de la relación. Verifica el umbral de horas al doble aplicable a cada semana y el salario que correspondía entonces. Los excedentes se calculan al triple; no se descartan horas trabajadas.</p>
+    {{ semanas_formset.management_form }}
+    <div class="text-red-700">{{ semanas_formset.non_form_errors }}</div>
+    <div id="semanas-rows" class="space-y-3">
+      {% for row in semanas_formset %}
+      <fieldset class="border rounded-lg p-3"><legend>Semana {{ forloop.counter }}</legend>
+        {{ row.non_field_errors }}
+        {% include 'expedientes/_semana_prestaciones_campos.html' with row=row %}
+      </fieldset>
+      {% endfor %}
+    </div>
+    <template id="semana-empty"><fieldset class="border rounded-lg p-3"><legend>Semana adicional</legend>{% include 'expedientes/_semana_prestaciones_campos.html' with row=semanas_formset.empty_form %}</fieldset></template>
+    <button type="button" id="agregar-semana" class="btn">Agregar semana</button>
+  </section>
+  <section class="space-y-3">
+    <h3 class="font-semibold">Vacaciones por aniversario</h3>
+    <p class="text-xs text-gray-600">Separa los periodos completos del proporcional actual. Verifica los días de derecho vigentes en cada periodo y cualquier mejora contractual. Registra días disfrutados o compensados y únicamente pagos adicionales que no estén cubiertos por esos días. La prima se revisa por separado, aunque ya haya disfrutado vacaciones. Puedes excluir un saldo del reclamo después de revisar su procedencia.</p>
+    {{ vacaciones_formset.management_form }}
+    <div class="text-red-700">{{ vacaciones_formset.non_form_errors }}</div>
+    {% for row in vacaciones_formset %}
+    <fieldset class="border rounded-lg p-3"><legend>Año de servicio {{ row.anio.value }}</legend>
+      {{ row.non_field_errors }}
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3">{% for field in row %}<div><label for="{{ field.id_for_label }}" class="text-xs block">{{ field.label }}</label>{{ field }}<div class="text-red-700 text-xs">{{ field.errors }}</div></div>{% endfor %}</div>
+    </fieldset>
+    {% empty %}<p class="text-sm text-amber-800">Completa las fechas de ingreso y despido, guarda los datos y vuelve a esta sección para capturar los aniversarios.</p>{% endfor %}
+  </section>
+  <button type="submit" name="accion" value="calcular" class="btn btn-primary">Validar datos y calcular prestaciones</button>
+  <div id="calculo-final-resumen" data-vigente="{% if calculo %}1{% else %}0{% endif %}" class="space-y-3">
+    {% if calculo and calculo.success %}
+    <h3 class="font-semibold">Desglose para revisión</h3>
+    <p class="text-sm">Salario diario: ${{ calculo.salario_diario|floatformat:2 }} · Salario diario integrado: ${{ calculo.salario_diario_integrado|floatformat:2 }} · Antigüedad: {{ calculo.años_completos }} años completos.</p>
+    <div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr><th class="text-left">Concepto y periodo</th><th class="text-right">Calculado</th><th class="text-right">Pagado</th><th class="text-right">Pendiente</th></tr></thead><tbody>
+      {% for row in calculo.hoja_desglose %}<tr class="border-t"><td class="py-2"><strong>{{ row.concepto }}</strong><p class="text-xs">{{ row.periodo }}</p><p class="text-xs text-gray-600">{{ row.formula }}</p></td><td class="text-right">${{ row.bruto|floatformat:2 }}</td><td class="text-right">${{ row.pagado|floatformat:2 }}</td><td class="text-right">${{ row.pendiente|floatformat:2 }}</td></tr>{% endfor %}
+      <tr class="border-t"><td class="font-bold">Total a reclamar</td><td colspan="3" class="text-right font-bold">${{ calculo.total|floatformat:2 }}</td></tr>
+    </tbody></table></div>
+    {% if calculo_aprobado %}<p class="text-green-700">Importes aprobados para la demanda.</p>{% else %}<button type="submit" name="accion" value="aprobar" class="btn btn-primary">Usar estos cálculos en la demanda</button>{% endif %}
+    {% else %}<p class="text-sm text-amber-800">Los importes finales aparecerán después de validar y calcular. Los datos modificados requieren un nuevo cálculo y aprobación.</p>{% endif %}
+  </div>
+  <p id="calculo-modificado" class="text-sm text-amber-800" hidden>La hoja cambió. Guarda los datos, valida y calcula nuevamente antes de aprobar o generar la demanda.</p>
+</div></div></div>

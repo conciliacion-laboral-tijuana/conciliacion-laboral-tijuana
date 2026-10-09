@@ -1,0 +1,14 @@
+<div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+{% for field in row %}
+  {% if field.name == 'salario_diario' or field.name|slice:':8' != 'salario_' %}
+  <div><label for="{{ field.id_for_label }}" class="text-xs block">{{ field.label }}</label>{{ field }}<div class="text-red-700 text-xs">{{ field.errors }}</div></div>
+  {% endif %}
+{% endfor %}
+</div>
+<details class="mt-3"><summary class="text-sm cursor-pointer">El salario cambió dentro de esta semana</summary><p class="text-xs text-gray-600">Deja vacío cada día que conserve la base semanal. La distribución de horas al doble y al triple se realiza en orden de lunes a domingo.</p><div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-2">
+{% for field in row %}
+  {% if field.name != 'salario_diario' and field.name|slice:':8' == 'salario_' %}
+  <div><label for="{{ field.id_for_label }}" class="text-xs block">{{ field.label }}</label>{{ field }}<div class="text-red-700 text-xs">{{ field.errors }}</div></div>
+  {% endif %}
+{% endfor %}
+</div></details>

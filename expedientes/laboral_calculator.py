@@ -109,14 +109,9 @@ def calcular_desde_expediente(
             "Completa los datos del cliente: fecha de ingreso, fecha de salida y salario"
         )
 
-    # Periodo de pago
+    # Cliente.salario es un importe MENSUAL. El día o frecuencia del depósito
+    # no cambia esta unidad, aunque la solicitud de conciliación sea semanal.
     periodo_pago = 'mensual'
-    try:
-        if hasattr(expediente, 'solicitud') and expediente.solicitud.periodo_pago:
-            mapa = {'diario': 'diario', 'semanal': 'semanal', 'quincenal': 'quincenal'}
-            periodo_pago = mapa.get(expediente.solicitud.periodo_pago, 'mensual')
-    except Exception:
-        pass
 
     tipo = tipo_despido or expediente.tipo_despido or 'injustificado'
     accion = accion_preferida or getattr(cliente, 'accion_preferida', None) or 'indemnizacion'

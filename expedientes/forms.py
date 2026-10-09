@@ -7,7 +7,7 @@ from django.contrib.auth.models import User
 class ClienteForm(forms.ModelForm):
     class Meta:
         model = Cliente
-        fields = ['nombre', 'curp', 'rfc', 'telefono', 'whatsapp', 'email',
+        fields = ['imss_confirmado', 'tuvo_imss', 'imss_salario_inferior', 'imss_salario_diario', 'imss_documento', 'nombre', 'curp', 'rfc', 'telefono', 'whatsapp', 'email',
                    'fecha_nacimiento', 'genero',
                    'direccion_calle', 'direccion_numero', 'direccion_cp', 'direccion_colonia',
                    'empresa', 'empresa_actividad', 'empresa_telefono', 'empresa_razon_social',
@@ -24,6 +24,8 @@ class ClienteForm(forms.ModelForm):
                    'como_supo', 'oficina',
                    'asesoria_gratuita_ofrecida', 'asesoria_gratuita_agendada', 'fecha_asesoria_gratuita']
         widgets = {
+            'imss_salario_diario': forms.NumberInput(attrs={'class': 'input', 'min': '0.01', 'step': '0.01'}),
+            'imss_documento': forms.TextInput(attrs={'class': 'input'}),
             'nombre': forms.TextInput(attrs={'class': 'input', 'placeholder': 'Nombre completo del cliente'}),
             'curp': forms.TextInput(attrs={'class': 'input', 'placeholder': '18 caracteres (ej: AEMR890312HDFLNN01)', 'id': 'id_curp'}),
             'rfc': forms.TextInput(attrs={'class': 'input', 'placeholder': 'RFC (opcional)'}),

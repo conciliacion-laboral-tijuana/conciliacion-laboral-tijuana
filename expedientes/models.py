@@ -53,6 +53,12 @@ class Cliente(models.Model):
     whatsapp = models.CharField('WhatsApp', max_length=15, blank=True)
     email = models.EmailField('Email', blank=True)
 
+    imss_confirmado = models.BooleanField('Información de IMSS confirmada', default=False)
+    tuvo_imss = models.BooleanField('¿Estuvo dado de alta en el IMSS?', default=False)
+    imss_salario_inferior = models.BooleanField('¿Fue registrado con un salario inferior al real?', default=False)
+    imss_salario_diario = models.DecimalField('Salario diario registrado ante el IMSS', max_digits=12, decimal_places=2, null=True, blank=True)
+    imss_documento = models.CharField('Documento o fuente del registro IMSS', max_length=300, blank=True)
+
     # Datos personales complementarios (para conciliación)
     fecha_nacimiento = models.DateField('Fecha de nacimiento', null=True, blank=True)
     genero = models.CharField('Género', max_length=10, choices=GENERO_CHOICES, default='masculino')
@@ -1238,3 +1244,13 @@ class WhatsAppMessage(models.Model):
     def generar_deep_link(telefono, mensaje):
         """Genera un link wa.me con mensaje pre-llenado."""
         return _generar_deep_link(telefono, mensaje)
+
+
+class HojaPrestaciones(models.Model):
+    expediente = models.OneToOneField(Expediente, on_delete=models.CASCADE, related_name='hoja_prestaciones')
+    datos = models.JSONField(default=dict)
+    resultado = models.JSONField(default=dict)
+    huella = models.CharField(max_length=64, blank=True)
+    aprobado_por = models.ForeignKey(User, on_delete=models.PROTECT, null=True, blank=True)
+    aprobado_en = models.DateTimeField(null=True, blank=True)
+    actualizado_en = models.DateTimeField(auto_now=True)

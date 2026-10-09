@@ -17,6 +17,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.models import User
 from django.contrib import messages
 from django.core.mail import send_mail
+from django.db import transaction
 from django.db.models import Q, Count, Sum
 from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -289,6 +290,8 @@ class DashboardAbogadaView(LoginRequiredMixin, TemplateView):
             with transaction.atomic():
                 cliente = Cliente.objects.create(nombre=form.cleaned_data['nombre'], created_by=request.user)
                 expediente = Expediente.objects.create(cliente=cliente, asesor=request.user)
+                from .models import HojaPrestaciones
+                HojaPrestaciones.objects.create(expediente=expediente)
             return redirect('demanda_asistente', pk=expediente.pk)
         return self.render_to_response(self.get_context_data(nueva_demanda_form=form))
 
@@ -1437,6 +1440,11 @@ def demanda_editor(request, pk):
         messages.error(request, 'No tienes permiso para generar documentos legales.')
         return redirect('dashboard_asesor')
     expediente = get_object_or_404(get_expedientes_queryset(request.user), pk=pk)
+    from .hoja_prestaciones import hoja_de, resultado_vigente
+    if hoja_de(expediente) and resultado_vigente(expediente, aprobado=True) is None:
+        messages.error(request, 'Valida, calcula y aprueba las prestaciones vigentes antes de generar o descargar la demanda.')
+        return redirect('demanda_asistente', pk=expediente.pk)
+
 
     # Validación de coherencia temporal antes de redactar la demanda: el motor
     # ya devuelve success=False, pero conviene avisar al asesor con el motivo
@@ -1522,7 +1530,8 @@ WIZARD_PASOS = {
         'titulo': 'Información laboral',
         'descripcion': 'Puesto, salario y fechas de ingreso/salida (requeridos para los cálculos).',
         'campos': ['puesto', 'salario', 'periodo_pago', 'horas_semanales', 'jornada',
-                   'fecha_ingreso', 'fecha_salida'],
+                   'fecha_ingreso', 'fecha_salida', 'zona_salarial',
+                   'imss_confirmado', 'tuvo_imss', 'imss_salario_inferior', 'imss_salario_diario', 'imss_documento'],
     },
     'empresa': {
         'titulo': 'Empresa / Patrón (demandado)',
@@ -1577,6 +1586,10 @@ def _verificar_datos_criticos(expediente):
 
 def _calculo_demanda_pendiente(expediente, resultado):
     """Compare the current engine output with the last saved calculation."""
+    from .hoja_prestaciones import hoja_de, resultado_vigente
+    hoja = hoja_de(expediente)
+    if hoja:
+        return resultado_vigente(expediente, hoja, aprobado=True) is None
     calculo = CalculoLaboral.objects.filter(expediente=expediente).first()
     if calculo is None or not resultado.get('success'):
         return False
@@ -1617,6 +1630,21 @@ def _validar_captura_demanda(post, expediente):
             setattr(cliente, campo, valor)
         except ValidationError as exc:
             errores[campo] = getattr(exc, 'messages', [str(exc)])
+    # Un PATCH parcial no debe desmarcar controles IMSS que no fueron enviados.
+    if 'imss_present' not in post:
+        for campo in ('imss_confirmado', 'tuvo_imss', 'imss_salario_inferior'):
+            datos.pop(campo, None)
+            setattr(cliente, campo, Cliente.objects.values_list(campo, flat=True).get(pk=cliente.pk))
+    if cliente.imss_confirmado and not cliente.tuvo_imss:
+        cliente.imss_salario_inferior = False
+        cliente.imss_salario_diario = None
+        cliente.imss_documento = ''
+        datos.update(imss_salario_inferior=False, imss_salario_diario=None, imss_documento='')
+    if cliente.imss_salario_inferior and (not cliente.imss_confirmado or not cliente.tuvo_imss):
+        errores['imss_salario_inferior'] = ['Confirma primero que el trabajador estuvo dado de alta.']
+    if cliente.imss_salario_diario is not None and cliente.imss_salario_diario <= 0:
+        errores['imss_salario_diario'] = ['El salario registrado debe ser mayor que cero.']
+        datos.pop('imss_salario_diario', None)
     tipo = post.get('tipo_despido') or expediente.tipo_despido or 'injustificado'
     if tipo not in dict(Expediente.TIPO_DESPIDO_CHOICES):
         errores['tipo_despido'] = ['Selecciona un tipo de despido válido.']
@@ -1653,13 +1681,22 @@ def _validar_captura_demanda(post, expediente):
 
 @login_required
 @require_POST
+@transaction.atomic
 def demanda_vista_previa(request, pk):
     """Render unsaved capture data; persist only explicit draft-save requests."""
     if not _puede_generar_documentos(request):
         return JsonResponse({'error': 'No tienes permiso para generar documentos.'}, status=403)
     expediente = get_object_or_404(get_expedientes_queryset(request.user), pk=pk)
+    if request.method == 'POST':
+        expediente = get_object_or_404(get_expedientes_queryset(request.user).select_for_update(), pk=pk)
+        expediente.cliente = Cliente.objects.select_for_update().get(pk=expediente.cliente_id)
     cliente = expediente.cliente
     errores, datos = _validar_captura_demanda(request.POST, expediente)
+    from .hoja_prestaciones import formularios, validar_formularios, hoja_de, resultado_vigente
+    from .models import HojaPrestaciones
+    hoja_context = formularios(expediente, request.POST) if request.POST.get('hoja_calculos') == '1' else None
+    datos_hoja = validar_formularios(expediente, hoja_context) if hoja_context else None
+    expediente._constructor_calculos = bool(hoja_context)
     resultado = calculo_para_demanda(expediente)
     pendiente = _calculo_demanda_pendiente(expediente, resultado)
     guardar = request.POST.get('guardar_borrador') == '1'
@@ -1671,22 +1708,48 @@ def demanda_vista_previa(request, pk):
             expediente.save(update_fields=['tipo_despido'])
             if pendiente:
                 CalculoLaboral.objects.filter(expediente=expediente).update(requiere_revision=True)
+            if datos_hoja is not None:
+                hoja, _ = HojaPrestaciones.objects.get_or_create(expediente=expediente)
+                if hoja.datos != datos_hoja:
+                    hoja.datos = datos_hoja
+                    hoja.aprobado_por = None
+                    hoja.aprobado_en = None
+                    hoja.save()
+            hoja = hoja_de(expediente)
+            if hoja and resultado_vigente(expediente, hoja) is None and hoja.aprobado_en:
+                hoja.aprobado_en = None
+                hoja.aprobado_por = None
+                hoja.save(update_fields=['aprobado_en', 'aprobado_por'])
+    if hoja_context:
+        pendiente = resultado_vigente(expediente, aprobado=True) is None
     respuesta = {
         'html': generar_demanda_html(expediente),
         'guardado': guardar,
         'calculo_pendiente': pendiente,
         'faltantes': [f['label'] for f in _verificar_datos_criticos(expediente)],
-        'calculo_error': resultado.get('error', '') if not resultado.get('success') else '',
+        'calculo_error': '' if hoja_context else (resultado.get('error', '') if not resultado.get('success') else ''),
     }
+    if hoja_context and datos_hoja is None:
+        detalles = []
+        for key in ('captura_prestaciones', 'semanas_formset', 'vacaciones_formset'):
+            obj = hoja_context[key]
+            if hasattr(obj, 'forms'):
+                detalles.extend(str(message) for row in obj.forms for messages_ in row.errors.values() for message in messages_)
+                detalles.extend(str(message) for message in obj.non_form_errors())
+            else:
+                detalles.extend(str(message) for messages_ in obj.errors.values() for message in messages_)
+        errores['prestaciones'] = detalles or ['Completa y revisa los periodos de prestaciones.']
+        respuesta['guardado'] = False
     if errores:
         # Se guardó lo válido y se reportan los campos que no se aplicaron, para
         # que el asesor sepa exactamente qué falta sin perder el resto del captura.
         respuesta['errores'] = errores
-        respuesta['guardado'] = guardar and bool(datos)
+        respuesta['guardado'] = guardar and bool(datos) and (not hoja_context or datos_hoja is not None)
     return JsonResponse(respuesta)
 
 
 @login_required
+@transaction.atomic
 def demanda_asistente(request, pk):
     """
     Acordeón de demanda: todas las secciones en UNA sola página.
@@ -1706,8 +1769,16 @@ def demanda_asistente(request, pk):
         messages.error(request, 'No tienes permiso para generar documentos legales.')
         return redirect('dashboard_asesor')
     expediente = get_object_or_404(get_expedientes_queryset(request.user), pk=pk)
+    if request.method == 'POST':
+        expediente = get_object_or_404(get_expedientes_queryset(request.user).select_for_update(), pk=pk)
+        expediente.cliente = Cliente.objects.select_for_update().get(pk=expediente.cliente_id)
     cliente = expediente.cliente
 
+    from .hoja_prestaciones import (formularios, validar_formularios, hoja_de,
+                                   calcular_hoja, resultado_vigente, huella, empaquetar)
+    from .models import HojaPrestaciones
+    constructor = request.POST.get('hoja_calculos') == '1' or bool(hoja_de(expediente))
+    hoja_context = formularios(expediente, request.POST if request.method == 'POST' and constructor else None)
     errores = {}
     seccion_abierta = request.GET.get('seccion') or request.POST.get('seccion_abierta') or ''
 
@@ -1732,6 +1803,47 @@ def demanda_asistente(request, pk):
                     cliente.save(update_fields=list(datos))
                     expediente.save(update_fields=['tipo_despido'])
 
+        if constructor:
+            if accion in ('calcular', 'aprobar', 'finalizar') and not cliente.imss_confirmado:
+                errores['imss_confirmado'] = ['Confirma si el trabajador estuvo dado de alta en el IMSS.']
+                messages.error(request, errores['imss_confirmado'][0])
+            datos_hoja = validar_formularios(expediente, hoja_context, final=accion in ('calcular', 'aprobar'))
+            if datos_hoja is None:
+                errores['prestaciones'] = ['Revisa los periodos y campos de la hoja de prestaciones.']
+            else:
+                hoja, _ = HojaPrestaciones.objects.get_or_create(expediente=expediente)
+                if hoja.datos != datos_hoja:
+                    hoja.datos = datos_hoja
+                    hoja.resultado = {}
+                    hoja.huella = ''
+                    hoja.aprobado_por = None
+                    hoja.aprobado_en = None
+                    hoja.save()
+                if accion == 'calcular' and not errores:
+                    try:
+                        resultado = calcular_hoja(expediente, datos_hoja)
+                        hoja.resultado = empaquetar(resultado)
+                        hoja.huella = huella(expediente, datos_hoja)
+                        hoja.aprobado_por = None
+                        hoja.aprobado_en = None
+                        hoja.save()
+                        messages.success(request, 'Cálculo listo. Revisa el desglose y aprueba los importes para usarlos en la demanda.')
+                    except ValidationError as exc:
+                        errores['prestaciones'] = exc.messages
+                elif accion == 'aprobar' and not errores:
+                    if (resultado_vigente(expediente, hoja) is None
+                            or request.POST.get('revision_calculo') != hoja.huella):
+                        errores['prestaciones'] = ['Los datos cambiaron o no hay cálculo. Valida y calcula nuevamente antes de aprobar.']
+                    else:
+                        hoja.aprobado_por = request.user
+                        hoja.aprobado_en = timezone.now()
+                        hoja.save(update_fields=['aprobado_por', 'aprobado_en'])
+                        messages.success(request, 'Importes revisados y aprobados para la demanda.')
+                if errores and accion in ('calcular', 'aprobar', 'finalizar'):
+                    for mensaje in errores.get('prestaciones', []):
+                        messages.error(request, mensaje)
+            seccion_abierta = 'prestaciones' if accion in ('calcular', 'aprobar') else seccion_abierta
+
         if accion == 'finalizar':
             # Guardar tipo de despido y generar la demanda
             tipo = request.POST.get('tipo_despido', '')
@@ -1743,7 +1855,7 @@ def demanda_asistente(request, pk):
                 faltantes = _verificar_datos_criticos(expediente)
                 pendiente = _calculo_demanda_pendiente(expediente, calculo_para_demanda(expediente))
                 if pendiente:
-                    messages.error(request, 'Las prestaciones cambiaron. Revisa y recalcula en la calculadora antes de finalizar.')
+                    messages.error(request, 'Las prestaciones cambiaron o están pendientes de revisión. Valida, calcula y aprueba los importes antes de finalizar.')
                     seccion_abierta = 'revision'
                 elif faltantes:
                     for f in faltantes:
@@ -1761,7 +1873,10 @@ def demanda_asistente(request, pk):
             else:
                 seccion_abierta = 'revision'
         elif postea_acordeon and not errores:
-            messages.success(request, '✅ Datos guardados. Puedes continuar con otra sección.')
+            if accion not in ('calcular', 'aprobar'):
+                messages.success(request, '✅ Datos guardados. Puedes continuar con otra sección.')
+                if constructor:
+                    return redirect(reverse('demanda_asistente', kwargs={'pk': expediente.pk}) + '?seccion=prestaciones')
         elif postea_acordeon and errores and datos:
             campos = ', '.join(sorted(errores))
             messages.warning(
@@ -1774,18 +1889,22 @@ def demanda_asistente(request, pk):
 
     # ─── Formulario y contexto del acordeón ─────────────────────────
     form = ClienteForm(instance=cliente)
-    calculo = calculo_para_demanda(expediente)
+    hoja = hoja_de(expediente)
+    calculo = resultado_vigente(expediente, hoja) if hoja else None
+    hoja_context['hoja'] = hoja
     faltantes_criticos = _verificar_datos_criticos(expediente)
     advertencias_accion = advertencias_accion_cliente(cliente)
 
     return render(request, 'expedientes/demanda_asistente.html', {
+        **hoja_context,
+        'calculo_aprobado': bool(resultado_vigente(expediente, hoja, aprobado=True)),
         'expediente': expediente,
         'cliente': cliente,
         'form': form,
         'pasos_info': WIZARD_PASOS,
         'pasos_keys': list(WIZARD_PASOS.keys()),
         'errores': errores,
-        'seccion_abierta': seccion_abierta if seccion_abierta in WIZARD_PASOS or seccion_abierta == 'revision' else '',
+        'seccion_abierta': seccion_abierta if seccion_abierta in WIZARD_PASOS or seccion_abierta in ('revision', 'prestaciones') else '',
         'tipos_despido': Expediente.TIPO_DESPIDO_CHOICES,
         'calculo': calculo,
         'faltantes_criticos': faltantes_criticos,
@@ -1890,6 +2009,11 @@ def demanda_descargar(request, pk):
         messages.error(request, 'No tienes permiso para descargar documentos legales.')
         return redirect('dashboard_asesor')
     expediente = get_object_or_404(get_expedientes_queryset(request.user), pk=pk)
+    from .hoja_prestaciones import hoja_de, resultado_vigente
+    if hoja_de(expediente) and resultado_vigente(expediente, aprobado=True) is None:
+        messages.error(request, 'Valida, calcula y aprueba las prestaciones vigentes antes de generar o descargar la demanda.')
+        return redirect('demanda_asistente', pk=expediente.pk)
+
 
     if request.method != 'POST':
         return redirect('demanda_editor', pk=expediente.pk)
@@ -1951,6 +2075,11 @@ def generar_demanda(request, pk):
         messages.error(request, 'No tienes permiso para generar documentos legales.')
         return redirect('dashboard_asesor')
     expediente = get_object_or_404(get_expedientes_queryset(request.user), pk=pk)
+    from .hoja_prestaciones import hoja_de, resultado_vigente
+    if hoja_de(expediente) and resultado_vigente(expediente, aprobado=True) is None:
+        messages.error(request, 'Valida, calcula y aprueba las prestaciones vigentes antes de generar o descargar la demanda.')
+        return redirect('demanda_asistente', pk=expediente.pk)
+
 
     try:
         doc = generar_demanda_word(expediente)

@@ -36,7 +36,7 @@ jobs:
       - name: Run tests (incluye verificación de cálculos laborales y flujo completo)
         # settings_test: usa StaticFilesStorage simple (en CI no existe el
         # manifest de collectstatic que exige CompressedManifestStaticFilesStorage)
-        run: uv run python manage.py test expedientes.tests expedientes.tests_abogada --settings=config.settings_test --verbosity 2
+        run: uv run python manage.py test expedientes.tests expedientes.tests_abogada expedientes.tests_hoja_prestaciones --settings=config.settings_test --verbosity 2
 
       - name: Run tests del motor jurídico (core/laboral)
         # Batería de casos por antigüedad, zona salarial, topes y jornada:
@@ -122,6 +122,9 @@ jobs:
           fi
           exit $EXIT
 
+      - name: Run E2E hoja de prestaciones (captura, cálculo y aprobación)
+        run: uv run python prueba_constructor_navegador.py
+
       - name: Upload E2E artifacts (screenshots/HTML al fallar)
         if: failure()
         uses: actions/upload-artifact@v4
@@ -203,6 +206,9 @@ jobs:
             tail -50 e2e_server.log || true
           fi
           exit $EXIT
+
+      - name: Run E2E hoja de prestaciones (captura, cálculo y aprobación)
+        run: uv run python prueba_constructor_navegador.py
 
       - name: Upload E2E artifacts (screenshots/HTML al fallar)
         if: failure()
