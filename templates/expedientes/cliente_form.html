@@ -13,20 +13,25 @@
         <form method="post" class="p-5 space-y-5">
             {% csrf_token %}
 
-            {% if form.non_field_errors %}
-            <div class="p-3 bg-red-50 border border-red-200 rounded-lg">
-                {% for error in form.non_field_errors %}
-                <p class="text-red-600 text-sm">{{ error }}</p>
-                {% endfor %}
+            {% if form.errors %}
+            <div class="p-4 bg-red-50 border border-red-300 rounded-lg mb-4">
+                <p class="text-red-700 font-medium text-sm mb-2">⚠️ Corrige los errores del formulario:</p>
+                <ul class="text-red-600 text-sm list-disc list-inside space-y-1">
+                    {% for field, errors in form.errors.items() %}
+                        {% for error in errors %}
+                        <li><strong>{{ field|title }}:</strong> {{ error }}</li>
+                        {% endfor %}
+                    {% endfor %}
+                </ul>
             </div>
             {% endif %}
 
             <!-- Datos Personales -->
             <div>
-                <h2 class="text-sm font-semibold text-gray-800 mb-3 border-b pb-1.5">Datos Personales</h2>
+                <h2 class="text-sm font-semibold text-gray-800 mb-3 border-b pb-1.5">Datos Personales <span class="text-red-500">*</span></h2>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div class="md:col-span-2">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.nombre.label }}</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.nombre.label }} <span class="text-red-500">*</span></a>
                         {{ form.nombre }}
                         {% if form.nombre.errors %}<p class="text-red-500 text-xs mt-1">{{ form.nombre.errors.0 }}</p>{% endif %}
                     </div>
@@ -63,7 +68,7 @@
                         {% if form.fecha_nacimiento.errors %}<p class="text-red-500 text-xs mt-1">{{ form.fecha_nacimiento.errors.0 }}</p>{% endif %}
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.genero.label }}</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.genero.label }} <span class="text-red-500">*</span></label>
                         {{ form.genero }}
                         {% if form.genero.errors %}<p class="text-red-500 text-xs mt-1">{{ form.genero.errors.0 }}</p>{% endif %}
                     </div>
@@ -130,7 +135,7 @@
                         {% if form.empresa_razon_social.errors %}<p class="text-red-500 text-xs mt-1">{{ form.empresa_razon_social.errors.0 }}</p>{% endif %}
                     </div>
                     <div class="md:col-span-2">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.tipo_persona_citado.label }}</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.tipo_persona_citado.label }} <span class="text-red-500">*</span></label>
                         {{ form.tipo_persona_citado }}
                         {% if form.tipo_persona_citado.errors %}<p class="text-red-500 text-xs mt-1">{{ form.tipo_persona_citado.errors.0 }}</p>{% endif %}
                         <p class="text-xs text-gray-400 mt-0.5">¿El patrón es persona física (dueño) o moral (empresa constituida)?</p>
@@ -194,7 +199,7 @@
                         {% if form.salario.errors %}<p class="text-red-500 text-xs mt-1">{{ form.salario.errors.0 }}</p>{% endif %}
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.periodo_pago.label }}</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.periodo_pago.label }} <span class="text-red-500">*</span></label>
                         {{ form.periodo_pago }}
                         {% if form.periodo_pago.errors %}<p class="text-red-500 text-xs mt-1">{{ form.periodo_pago.errors.0 }}</p>{% endif %}
                     </div>
@@ -204,23 +209,34 @@
                         {% if form.horas_semanales.errors %}<p class="text-red-500 text-xs mt-1">{{ form.horas_semanales.errors.0 }}</p>{% endif %}
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.jornada.label }}</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.jornada.label }} <span class="text-red-500">*</span></label>
                         {{ form.jornada }}
                         {% if form.jornada.errors %}<p class="text-red-500 text-xs mt-1">{{ form.jornada.errors.0 }}</p>{% endif %}
                     </div>
-                    <div></div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.fecha_ingreso.label }}</label>
-                        {{ form.fecha_ingreso }}
-                        {% if form.fecha_ingreso.errors %}<p class="text-red-500 text-xs mt-1">{{ form.fecha_ingreso.errors.0 }}</p>{% endif %}
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.zona_salarial.label }} <span class="text-red-500">*</span></label>
+                        {{ form.zona_salarial }}
+                        {% if form.zona_salarial.errors %}<p class="text-red-500 text-xs mt-1">{{ form.zona_salarial.errors.0 }}</p>{% endif %}
+                        <p class="text-xs text-gray-400 mt-0.5">Zona Libre de la Frontera Norte (Tijuana, Mexicali, Ciudad Juárez…) o resto del país.</p>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.fecha_salida.label }}</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.accion_preferida.label }} <span class="text-red-500">*</span></label>
+                        {{ form.accion_preferida }}
+                        {% if form.accion_preferida.errors %}<p class="text-red-500 text-xs mt-1">{{ form.accion_preferida.errors.0 }}</p>{% endif %}
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.fecha_ingreso.label }} <span class="text-red-500">*</span></label>
+                        {{ form.fecha_ingreso }}
+                        {% if form.fecha_ingreso.errors %}<p class="text-red-500 text-xs mt-1">{{ form.fecha_ingreso.errors.0 }}</p>{% endif %}
+                        <p class="text-xs text-gray-400 mt-0.5">Fechas necesarias para los cálculos de prestaciones.</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.fecha_salida.label }} <span class="text-red-500">*</span></label>
                         {{ form.fecha_salida }}
                         {% if form.fecha_salida.errors %}<p class="text-red-500 text-xs mt-1">{{ form.fecha_salida.errors.0 }}</p>{% endif %}
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.tipo_despido.label }}</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.tipo_despido.label }} <span class="text-red-500">*</span></label>
                         {{ form.tipo_despido }}
                         {% if form.tipo_despido.errors %}<p class="text-red-500 text-xs mt-1">{{ form.tipo_despido.errors.0 }}</p>{% endif %}
                     </div>
