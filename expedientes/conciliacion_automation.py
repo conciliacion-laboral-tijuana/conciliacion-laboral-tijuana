@@ -1040,19 +1040,9 @@ def _llenar_citado(page, cliente):
                       colonia=cliente.empresa_colonia or cliente.direccion_colonia)
 
     page.wait_for_timeout(500)
-
-    # Click "Guardar" para cerrar el panel del citado
-    # Click "Guardar citado" (scopado al panel citado)
-    page.evaluate("""() => {
-        const panel = document.querySelector('#stepCitado');
-        const searchIn = panel || document;
-        for (const btn of searchIn.querySelectorAll('button')) {
-            const t = btn.textContent.trim().toLowerCase();
-            if (t.includes('guardar') && t.includes('citado') && btn.offsetParent !== null) {
-                btn.click(); break;
-            }
-        }
-    }""")
+    # El guardado ("Guardar citado" = POST /solicitud/store_citado) lo hace
+    # la fase 5 una sola vez y esperando la recarga: enviarlo aquí y otra vez
+    # allá provocaba que un segundo POST vacío pisara al bueno.
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -1289,34 +1279,91 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None, modo='au
             # pasos siguientes. Hay que hacer clic en el botón submit real:
             # llamar validarSolicitud() por JS solo valida, NO envía, y entonces
             # el envío final llega a /solicitud/update sin solicitud_id → 500.
-            boton_solicitud = page.locator('#stepSolicitud form#frmSolicitud button[type="submit"]').first
-            try:
-                with page.expect_navigation(wait_until='load', timeout=30000):
-                    boton_solicitud.click(timeout=10000)
-            except PwTimeout:
-                logger.warning('[3] El envío del paso 2 no produjo navegación')
-            page.wait_for_timeout(1500)
+            def _solicitud_id_actual():
+                try:
+                    return page.evaluate("""() => {
+                        const els = document.querySelectorAll('input[name="solicitud_id"], #solicitud_id');
+                        for (const el of els) { if (el.value) return el.value; }
+                        return '';
+                    }""")
+                except Exception:
+                    return ''
+
+            def _enviar_paso_solicitud(intento):
+                """Envía el form del paso 2. Intento 1: clic real; luego requestSubmit()."""
+                try:
+                    with page.expect_navigation(wait_until='load', timeout=30000):
+                        if intento == 1:
+                            page.locator('#stepSolicitud form#frmSolicitud button[type="submit"]'
+                                         ).first.click(timeout=10000)
+                        else:
+                            # Respeta onsubmit/parsley igual que el clic, pero no
+                            # depende de que el botón sea clicable (datepicker encima).
+                            page.evaluate("""() => {
+                                const f = document.querySelector('#stepSolicitud form#frmSolicitud');
+                                const b = f && f.querySelector('button[type="submit"]');
+                                if (f) f.requestSubmit(b || undefined);
+                            }""")
+                    return True
+                except Exception as e:
+                    logger.warning('[3] Envío del paso 2 (intento %d) sin navegación: %s', intento, e)
+                    return False
+
+            solicitud_id = ''
+            for intento in (1, 2, 3):
+                if intento > 1:
+                    # Reponer fecha/objeto (el portal borra la fecha si no le gusta)
+                    # y cerrar el datepicker antes de reintentar.
+                    page.evaluate("""(fecha) => {
+                        const el = document.querySelector('#fecha_conflicto');
+                        if (el && !el.value && typeof $ !== 'undefined') {
+                            $(el).val(fecha).trigger('change');
+                        }
+                        if (typeof $ !== 'undefined') {
+                            try { $(el).datepicker('hide'); } catch (e) {}
+                            if (!document.querySelector('#frmSolicitud input[name="objeto_solicitudes[]"]')) {
+                                $('#objeto_solicitud_id').val('1').trigger('change');
+                            }
+                        }
+                        document.querySelectorAll('.datepicker, .ui-datepicker').forEach(d => d.style.display = 'none');
+                    }""", fmt_fecha(fecha_conflicto))
+                    _cerrar_modales(page)
+                    page.wait_for_timeout(500)
+                _enviar_paso_solicitud(intento)
+                page.wait_for_timeout(1500)
+                solicitud_id = _solicitud_id_actual()
+                if solicitud_id:
+                    break
             _cerrar_modales(page)
             page.wait_for_timeout(500)
             checkpoint('03_fecha_objeto')
 
-            solicitud_id = page.evaluate("""() => {
-                const els = document.querySelectorAll('input[name="solicitud_id"], #solicitud_id');
-                for (const el of els) { if (el.value) return el.value; }
-                return '';
-            }""")
             logger.info('[3] solicitud_id tras enviar paso 2: %r (URL=%s)', solicitud_id, page.url)
             if not solicitud_id:
-                cuerpo = ''
+                # Diagnóstico: qué valores tiene el form y qué errores muestra el portal
+                diag = {}
                 try:
-                    cuerpo = page.inner_text('body')[:300]
+                    diag = page.evaluate("""() => {
+                        const visibles = sel => Array.from(document.querySelectorAll(sel))
+                            .filter(e => e.offsetParent !== null)
+                            .map(e => e.textContent.trim()).filter(Boolean);
+                        return {
+                            fecha: document.querySelector('#fecha_conflicto')?.value || '',
+                            error_fecha: document.querySelector('#error_fecha_conflicto')?.textContent.trim() || '',
+                            objetos: document.querySelectorAll('#frmSolicitud input[name="objeto_solicitudes[]"]').length,
+                            industria: document.querySelector('#industria_id')?.value || '',
+                            errores: visibles('.parsley-errors-list.filled li, .swal-text, .alert-danger').slice(0, 5),
+                        };
+                    }""")
                 except Exception:
                     pass
                 resultado.error = (
-                    '[ver6] El portal no creó la solicitud en el paso "Datos de la solicitud" '
-                    f'(fecha de conflicto / objeto). objetos={objetos_agregados} URL={page.url}'
+                    '[ver7] El portal no aceptó el paso "Datos de la solicitud". '
+                    f'Fecha de conflicto enviada: {fmt_fecha(fecha_conflicto)} '
+                    f'(en el portal: "{diag.get("fecha", "?")}"). '
+                    f'Errores del portal: {diag.get("errores") or diag.get("error_fecha") or "ninguno visible"}'
                 )
-                resultado.detalle = f'URL={page.url} | TEXTO={cuerpo}'
+                resultado.detalle = f'URL={page.url} | DIAG={diag}'
                 browser.close()
                 return resultado
 
@@ -1525,35 +1572,44 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None, modo='au
             page.wait_for_timeout(1000)
             checkpoint('05_citado')
 
-            # Submit citado form via jQuery
-            page.evaluate("""() => {
-                const form = document.querySelector('#frmCitado');
-                if (form) {
-                    form.removeAttribute('data-parsley-validate');
-                    form.removeAttribute('novalidate');
-                }
-            }""")
-            page.wait_for_timeout(200)
-            page.evaluate("""() => {
-                if (typeof $ !== 'undefined' && document.querySelector('#frmCitado')) {
-                    $('#frmCitado').submit();
-                }
-            }""")
-            page.wait_for_timeout(3000)
+            def _citado_guardado():
+                try:
+                    return page.evaluate("() => Object.keys(window.datosCitado || {}).length > 0")
+                except Exception:
+                    return False
 
-            # Verificar si hay datos del citado
-            citado_ok = page.evaluate("() => Object.keys(window.datosCitado || window.datosSolicitado || {}).length > 0")
-            logger.info('[5] citado guardado: %s', citado_ok)
+            # Guardar citado: UN solo POST a /solicitud/store_citado y esperar
+            # la recarga. Solo si no hubo navegación se reintenta (con el mismo
+            # formulario lleno), nunca mientras la página está recargando.
+            citado_ok = False
+            for intento in (1, 2):
+                try:
+                    with page.expect_navigation(wait_until='load', timeout=30000):
+                        if intento == 1:
+                            page.locator('#frmCitado button[type="submit"]').first.click(timeout=10000)
+                        else:
+                            page.evaluate("""() => {
+                                const f = document.querySelector('#frmCitado');
+                                if (f) { f.removeAttribute('data-parsley-validate'); f.submit(); }
+                            }""")
+                    page.wait_for_timeout(1500)
+                    citado_ok = _citado_guardado()
+                    logger.info('[5] citado guardado (intento %d): %s', intento, citado_ok)
+                    break  # hubo POST; no reenviar aunque falle (el form ya se vació)
+                except Exception as e:
+                    logger.warning('[5] Guardar citado (intento %d) sin navegación: %s', intento, e)
 
             if not citado_ok:
-                logger.warning('[5] Guardado citado no funcionó, reintentando...')
-                page.evaluate("""() => {
-                    const form = document.querySelector('#frmCitado');
-                    if (form) { form.removeAttribute('data-parsley-validate'); form.submit(); }
-                }""")
-                page.wait_for_timeout(3000)
-                citado_ok = page.evaluate("() => Object.keys(window.datosCitado || window.datosSolicitado || {}).length > 0")
-                logger.info('[5] Reintento citado: %s', citado_ok)
+                # Mensaje del servidor (p. ej. "El campo solicitado.nombre es requerido")
+                try:
+                    msg = page.inner_text('body')[:300]
+                except Exception:
+                    msg = ''
+                resultado.error = '[ver7] El portal no guardó al citado (empresa).'
+                resultado.detalle = f'URL={page.url} | TEXTO={msg}'
+                checkpoint('05_citado_error')
+                browser.close()
+                return resultado
 
             # Avanzar al siguiente paso
             try:
