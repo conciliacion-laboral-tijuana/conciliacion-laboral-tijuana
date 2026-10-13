@@ -642,82 +642,126 @@ def _limpiar_telefono(telefono):
     return digits[-10:] if len(digits) >= 10 else digits or '6641234567'
 
 
-def _llenar_domicilio(page, vialidad, num_ext, cp, prefix='domicilio'):
-    """Llena los campos de domicilio y espera al AJAX del CP para seleccionar municipio y colonia."""
-    _select_option(page, f'{prefix}[estado_id]', '02')         # Baja California
-    _select_option(page, f'{prefix}[tipo_vialidad_id]', '5')   # CALLE
-    _fill_input(page, f'{prefix}[vialidad]', vialidad or 'Av Principal')
-    _fill_input(page, f'{prefix}[num_ext]', num_ext or '123')
+def _municipio_bc_por_cp(cp):
+    """Municipio de Baja California (nombre exacto del portal) según el CP.
 
-    # Llenar CP y disparar eventos para que el portal cargue colonia/municipio vía AJAX
-    cp_val = cp or '22000'
+    El portal NO deduce el municipio del CP, y la Unidad de Conciliación
+    se asigna por el municipio del citado; elegir uno al azar mandaba
+    solicitudes de Tijuana a Ensenada. Sin CP válido → TIJUANA (sede).
+    """
     try:
-        page.evaluate("""(args) => {
-            const [name, val] = args;
-            const el = document.querySelector(`[name="${name}"]`);
-            if (el) {
-                el.focus();
-                el.value = val;
-                ['input', 'change', 'blur'].forEach(ev =>
-                    el.dispatchEvent(new Event(ev, {bubbles: true})));
-            }
-        }""", [f'{prefix}[cp]', cp_val])
-    except Exception:
-        _fill_input(page, f'{prefix}[cp]', cp_val)
+        n = int(str(cp).strip()[:5])
+    except (TypeError, ValueError):
+        return 'TIJUANA'
+    if 21400 <= n <= 21549:
+        return 'TECATE'
+    if n in range(21850, 21860):
+        return 'SAN FELIPE'
+    if 21000 <= n <= 21999:
+        return 'MEXICALI'
+    if 22000 <= n <= 22699:
+        return 'TIJUANA'
+    if 22700 <= n <= 22749:
+        return 'PLAYAS DE ROSARITO'
+    if 22900 <= n <= 22999:
+        return 'SAN QUINTIN'
+    if 22750 <= n <= 22899:
+        return 'ENSENADA'
+    return 'TIJUANA'
+
+
+def _llenar_domicilio(page, vialidad, num_ext, cp, scope=None, colonia=''):
+    """Llena los campos de domicilio y espera al AJAX del CP para seleccionar municipio y colonia.
+
+    El solicitante y el citado usan los MISMOS names (domicilio[cp], ...),
+    así que `scope` (selector del formulario, p. ej. '#frmCitado') limita la
+    búsqueda; sin él se toma el primero de la página (el del solicitante).
+    """
+    def _en_scope(js_body, arg=None):
+        return page.evaluate(
+            """([scope, arg]) => {
+                const root = (scope && document.querySelector(scope)) || document;
+                const q = (sel) => root.querySelector(sel);
+                const setVal = (el, val) => {
+                    if (!el) return false;
+                    el.focus && el.focus();
+                    el.value = val;
+                    if (typeof $ !== 'undefined') $(el).trigger('input').trigger('change');
+                    else ['input', 'change'].forEach(ev =>
+                        el.dispatchEvent(new Event(ev, {bubbles: true})));
+                    el.dispatchEvent(new Event('blur'));
+                    return true;
+                };
+                """ + js_body + """
+            }""",
+            [scope, arg],
+        )
+
+    try:
+        _en_scope("""
+            setVal(q('select[name="domicilio[estado_id]"]'), '02');        // Baja California
+            setVal(q('select[name="domicilio[tipo_vialidad_id]"]'), '5');  // CALLE
+            setVal(q('input[name="domicilio[vialidad]"]'), arg[0]);
+            setVal(q('input[name="domicilio[num_ext]"]'), arg[1]);
+            // CP: dispara el AJAX que carga colonias/municipio
+            setVal(q('input[name="domicilio[cp]"]'), arg[2]);
+        """, [vialidad or 'Av Principal', str(num_ext or '123'), cp or '22000'])
+    except Exception as e:
+        logger.warning('  _llenar_domicilio(%s): error llenando campos: %s', scope, e)
 
     # Esperar a que el AJAX cargue las opciones de colonia y municipio
     page.wait_for_timeout(3000)
 
-    # Seleccionar primer municipio disponible (el portal lo carga según CP)
+    # Municipio: select "municipio" (solicitante) o "domicilio[municipio]" (citado);
+    # sus valores son nombres ("TIJUANA"). Se elige según el CP.
+    # Colonia: select2 con tags (texto libre) → se agrega la del cliente.
+    municipio = _municipio_bc_por_cp(cp)
     try:
-        page.evaluate("""(name) => {
-            const sel = document.querySelector(`[name="${name}"]`);
-            if (sel && sel.options.length > 1 && !sel.value) {
-                sel.selectedIndex = 1;
-                sel.dispatchEvent(new Event('change', {bubbles: true}));
+        res = _en_scope("""
+            const [municipio, colonia] = arg;
+            const mun = q('select[name="municipio"]') || q('select[name="domicilio[municipio]"]');
+            let munOk = '';
+            if (mun) {
+                const opt = Array.from(mun.options).find(o =>
+                    (o.value || '').trim().toUpperCase() === municipio);
+                if (opt) { setVal(mun, opt.value); munOk = opt.value; }
             }
-        }""", 'municipio')
-    except Exception:
-        pass
+            const col = q('select[name="asentamientoAutoc"]');
+            if (col && colonia && !col.value) {
+                col.appendChild(new Option(colonia, colonia, true, true));
+                setVal(col, colonia);
+                const h = q('input[type="hidden"][name="domicilio[asentamiento]"]');
+                if (h) h.value = colonia;
+            }
+            return munOk;
+        """, [municipio, (colonia or '').strip().upper()])
+        logger.info('  _llenar_domicilio(%s): CP=%s → municipio=%s (seleccionado=%r)',
+                    scope, cp, municipio, res)
+    except Exception as e:
+        logger.warning('  _llenar_domicilio(%s): error en municipio/colonia: %s', scope, e)
     page.wait_for_timeout(500)
 
-    # Seleccionar primer colonia/asentamiento disponible
+    # Poblar campos ocultos del domicilio que el portal espera (texto de cada select)
     try:
-        page.evaluate("""(name) => {
-            const sel = document.querySelector(`[name="${name}"]`);
-            if (sel && sel.options.length > 1) {
-                sel.selectedIndex = 1;
-                sel.dispatchEvent(new Event('change', {bubbles: true}));
+        _en_scope("""
+            const textoDe = (sel) => (sel && sel.selectedIndex >= 0)
+                ? (sel.options[sel.selectedIndex]?.text || '').trim() : '';
+            const pares = [
+                ['select[name="domicilio[tipo_vialidad_id]"]', 'input[name="domicilio[tipo_vialidad]"]'],
+                ['select[name="domicilio[tipo_asentamiento_id]"]', 'input[name="domicilio[tipo_asentamiento]"]'],
+                ['select[name="domicilio[estado_id]"]', 'input[name="domicilio[estado]"]'],
+                ['select[name="asentamientoAutoc"]', 'input[type="hidden"][name="domicilio[asentamiento]"]'],
+                ['select[name="domicilio[municipio]"]', 'input[type="hidden"][name="domicilio[municipio]"]'],
+            ];
+            for (const [s, h] of pares) {
+                const hidden = q(h), txt = textoDe(q(s));
+                if (hidden && txt && !txt.toLowerCase().startsWith('selecciona') && !hidden.value) {
+                    hidden.value = txt;
+                }
             }
-        }""", f'{prefix}[asentamiento]')
+        """)
     except Exception:
         pass
-    page.wait_for_timeout(300)
-
-    # Poblar campos ocultos del domicilio que el portal espera
-    page.evaluate("""() => {
-        // tipo_vialidad hidden: texto de la opcion seleccionada
-        const tvSel = document.querySelector('#tipo_vialidad_id');
-        const tvHidden = document.querySelector('[name="domicilio[tipo_vialidad]"]');
-        if (tvHidden && tvSel && tvSel.selectedIndex >= 0) {
-            const txt = tvSel.options[tvSel.selectedIndex]?.text?.trim();
-            if (txt && txt !== 'Selecciona el tipo de vialidad') tvHidden.value = txt;
-        }
-        // tipo_asentamiento hidden
-        const taSel = document.querySelector('#tipo_asentamiento_id');
-        const taHidden = document.querySelector('[name="domicilio[tipo_asentamiento]"]');
-        if (taHidden && taSel && taSel.selectedIndex >= 0) {
-            const txt = taSel.options[taSel.selectedIndex]?.text?.trim();
-            if (txt) taHidden.value = txt;
-        }
-        // asentamiento hidden
-        const asentSel = document.querySelector('#asentamientoAutoc');
-        const asentHidden = document.querySelector('[name="domicilio[asentamiento]"]');
-        if (asentHidden && asentSel && asentSel.selectedIndex >= 0) {
-            const txt = asentSel.options[asentSel.selectedIndex]?.text?.trim();
-            if (txt) asentHidden.value = txt;
-        }
-    }""")
 
 
 def _separar_nombre_mexicano(nombre_completo):
@@ -781,7 +825,9 @@ def _llenar_solicitante(page, cliente, fecha_nac_str, fecha_ing_str, fecha_sal_s
     _llenar_domicilio(page,
                       vialidad=cliente.direccion_calle,
                       num_ext=cliente.direccion_numero,
-                      cp=cliente.direccion_cp)
+                      cp=cliente.direccion_cp,
+                      scope='#frmSolicitante',
+                      colonia=cliente.direccion_colonia)
 
     # Datos laborales
     periodicidad_id = PERIODICIDAD_PORTAL_IDS.get(cliente.periodo_pago, '2')
@@ -989,7 +1035,9 @@ def _llenar_citado(page, cliente):
     _llenar_domicilio(page,
                       vialidad=cliente.empresa_calle or cliente.direccion_calle,
                       num_ext=cliente.empresa_numero or cliente.direccion_numero,
-                      cp=cliente.empresa_cp or cliente.direccion_cp)
+                      cp=cliente.empresa_cp or cliente.direccion_cp,
+                      scope='#frmCitado',
+                      colonia=cliente.empresa_colonia or cliente.direccion_colonia)
 
     page.wait_for_timeout(500)
 
@@ -1208,50 +1256,69 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None, modo='au
             except Exception:
                 pass
 
+            # El select de objeto es select2 (#objeto_solicitud_id). Al cambiarlo,
+            # el portal agrega un input oculto objeto_solicitudes[] que
+            # validarSolicitud() exige. Objeto 1 = "Despido".
             try:
                 objeto_texto = page.evaluate("""() => {
-                    let sel = document.querySelector('[name="solicitud[objeto_id]"]');
-                    if (!sel) {
-                        const allSels = document.querySelectorAll('select');
-                        for (const s of allSels) {
-                            if (s.name && s.name.toLowerCase().includes('objeto')) {
-                                sel = s; break;
-                            }
-                        }
-                    }
-                    if (sel && sel.options.length > 1) {
-                        sel.selectedIndex = 1;
+                    const sel = document.querySelector('#objeto_solicitud_id')
+                        || Array.from(document.querySelectorAll('select'))
+                            .find(s => (s.name || s.id || '').toLowerCase().includes('objeto'));
+                    if (!sel || sel.options.length < 2) return null;
+                    const opt = Array.from(sel.options).find(o => o.value === '1') || sel.options[1];
+                    if (typeof $ !== 'undefined') {
+                        $(sel).val(opt.value).trigger('change');
+                    } else {
+                        sel.value = opt.value;
                         sel.dispatchEvent(new Event('change', {bubbles: true}));
-                        return sel.options[1].text + ' [name=' + sel.name + ']';
                     }
-                    return null;
+                    return opt.text + ' [id=' + sel.id + ']';
                 }""")
                 logger.info('[3] Objeto seleccionado: %s', objeto_texto)
             except Exception as e:
                 logger.warning('[3] Error al seleccionar objeto: %s', e)
-            page.wait_for_timeout(300)
+            page.wait_for_timeout(500)
 
-            # Llamar validarSolicitud() directamente via JS
-            page.evaluate("""() => {
-                if (typeof validarSolicitud === 'function') {
-                    try { validarSolicitud(); } catch(e) { console.error(e); }
-                } else {
-                    const activePane = document.querySelector('.tab-pane.show.active');
-                    if (activePane) {
-                        const btns = activePane.querySelectorAll('button');
-                        for (const btn of btns) {
-                            const t = btn.textContent.trim().toLowerCase();
-                            if (t.includes('validar') && t.includes('continuar')) {
-                                btn.click(); break;
-                            }
-                        }
-                    }
-                }
-            }""")
-            page.wait_for_timeout(2000)
+            objetos_agregados = page.evaluate(
+                "() => document.querySelectorAll('#frmSolicitud input[name=\"objeto_solicitudes[]\"]').length"
+            )
+            logger.info('[3] objeto_solicitudes[] en el formulario: %s', objetos_agregados)
+
+            # El paso 2 es un <form> real (POST /solicitud/store) que crea el
+            # borrador en el portal y devuelve el solicitud_id que usan los
+            # pasos siguientes. Hay que hacer clic en el botón submit real:
+            # llamar validarSolicitud() por JS solo valida, NO envía, y entonces
+            # el envío final llega a /solicitud/update sin solicitud_id → 500.
+            boton_solicitud = page.locator('#stepSolicitud form#frmSolicitud button[type="submit"]').first
+            try:
+                with page.expect_navigation(wait_until='load', timeout=30000):
+                    boton_solicitud.click(timeout=10000)
+            except PwTimeout:
+                logger.warning('[3] El envío del paso 2 no produjo navegación')
+            page.wait_for_timeout(1500)
             _cerrar_modales(page)
             page.wait_for_timeout(500)
             checkpoint('03_fecha_objeto')
+
+            solicitud_id = page.evaluate("""() => {
+                const els = document.querySelectorAll('input[name="solicitud_id"], #solicitud_id');
+                for (const el of els) { if (el.value) return el.value; }
+                return '';
+            }""")
+            logger.info('[3] solicitud_id tras enviar paso 2: %r (URL=%s)', solicitud_id, page.url)
+            if not solicitud_id:
+                cuerpo = ''
+                try:
+                    cuerpo = page.inner_text('body')[:300]
+                except Exception:
+                    pass
+                resultado.error = (
+                    '[ver6] El portal no creó la solicitud en el paso "Datos de la solicitud" '
+                    f'(fecha de conflicto / objeto). objetos={objetos_agregados} URL={page.url}'
+                )
+                resultado.detalle = f'URL={page.url} | TEXTO={cuerpo}'
+                browser.close()
+                return resultado
 
             # ════════════════════════════════════════════════════════════════
             #  FASE 4: Solicitante (Trabajador)
@@ -1653,8 +1720,10 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None, modo='au
                     pass
                 # Verificar si apareció un link de descarga PDF
                 try:
-                    pdf_links = page.locator('a[href*=".pdf"], a[href*="getFile"], '
-                                            'a[href*="acuse"], a[href*="documento"]').count()
+                    # Solo links visibles: el modal de éxito (oculto) siempre
+                    # trae un a[href*="getFile"] y daba falso positivo.
+                    pdf_links = page.locator('a[href*=".pdf"]:visible, a[href*="getFile"]:visible, '
+                                            'a[href*="acuse"]:visible, a[href*="documento"]:visible').count()
                     if pdf_links > 0:
                         return True
                 except Exception:
@@ -1719,31 +1788,92 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None, modo='au
                 logger.warning('[7b] No se encontró botón de confirmación en diálogo')
                 return False
 
-            # ── PASO 1: Clic en "Enviar solicitud" ──────────────────
-            logger.info('[7a] Click en Enviar solicitud...')
-            page.evaluate("""() => {
-                const funcs = ['enviarSolicitud', 'confirmarEnvio'];
-                for (const f of funcs) {
-                    if (typeof window[f] === 'function') {
-                        try { window[f](); return; } catch(e) {}
-                    }
-                }
-                const panel = document.querySelector('#stepResumen');
-                if (panel) {
-                    for (const btn of panel.querySelectorAll('button, a.btn')) {
-                        const t = btn.textContent.trim().toLowerCase();
-                        if (t.includes('enviar') && btn.offsetParent !== null) {
-                            btn.click(); break;
+            # ── PASO 0: Flujo actual del portal ─────────────────────
+            # "Enviar solicitud" llama validarSolicitudEnvio(), que abre
+            # #modal-finalizar-solicitud; el submit de ese modal hace el
+            # POST real a /solicitud/update (finalizar_solicitud=true).
+            boton_final = page.locator('#modal-finalizar-solicitud form button[type="submit"]').first
+            try:
+                page.evaluate("() => { if (typeof validarSolicitudEnvio === 'function') validarSolicitudEnvio(); }")
+                boton_final.wait_for(state='visible', timeout=10000)
+                logger.info('[7a] Modal de confirmación abierto, enviando...')
+                with page.expect_navigation(wait_until='load', timeout=60000):
+                    boton_final.click(timeout=10000)
+                navegacion_completa = True
+                logger.info('[7a] Solicitud enviada. URL=%s', page.url)
+                # Tras recargar, el portal abre #modal-solicitud-creada con el
+                # link "Descargar acuse" (/api/documentos/getFile/<id>).
+                acuse_href = ''
+                try:
+                    modal_ok = page.locator('#modal-solicitud-creada')
+                    modal_ok.wait_for(state='visible', timeout=30000)
+                    acuse_href = modal_ok.locator('a[href*="getFile/"]').first.get_attribute('href') or ''
+                    logger.info('[7a] Modal "solicitud creada". Acuse: %s', acuse_href)
+                except Exception as e:
+                    logger.warning('[7a] No apareció el modal de solicitud creada: %s', e)
+
+                if acuse_href.rstrip('/').split('/')[-1] not in ('', 'getFile'):
+                    checkpoint('07_solicitud_creada')
+                    try:
+                        from .acuse_parser import parsear_acuse_pdf
+                        resp = page.context.request.get(
+                            acuse_href if acuse_href.startswith('http') else URL_BASE + acuse_href,
+                            timeout=60000,
+                        )
+                        contenido = resp.body()
+                        if resp.ok and contenido[:4] == b'%PDF':
+                            pdf_path = Path(download_dir) / f'acuse_{solicitud_id}.pdf'
+                            pdf_path.write_bytes(contenido)
+                            resultado.pdf_path = str(pdf_path)
+                            resultado.folio = parsear_acuse_pdf(contenido).get('folio', '')
+                            if not resultado.folio:
+                                resultado.folio = _extraer_folio_desde_pdf(str(pdf_path), pdf_path.stem)
+                            logger.info('[8] Acuse descargado (%d bytes). Folio=%s',
+                                        len(contenido), resultado.folio)
+                        else:
+                            logger.warning('[8] getFile respondió %s (%s)', resp.status,
+                                           resp.headers.get('content-type'))
+                    except Exception as e:
+                        logger.warning('[8] Error descargando acuse: %s', e)
+
+                    # La solicitud ya quedó registrada en el portal aunque
+                    # fallara la descarga del acuse: no reintentar el envío.
+                    resultado.success = True
+                    resultado.detalle = (
+                        f'Solicitud enviada (solicitud_id={solicitud_id}). '
+                        f'Folio: {resultado.folio or "N/A"}. Acuse: {URL_BASE}{acuse_href}'
+                    )
+                    browser.close()
+                    return resultado
+            except Exception as e:
+                logger.warning('[7a] Envío vía modal de confirmación falló: %s', e)
+
+            # ── PASO 1: Clic en "Enviar solicitud" (fallback) ───────
+            if not navegacion_completa:
+                logger.info('[7a] Click en Enviar solicitud...')
+                page.evaluate("""() => {
+                    const funcs = ['enviarSolicitud', 'confirmarEnvio'];
+                    for (const f of funcs) {
+                        if (typeof window[f] === 'function') {
+                            try { window[f](); return; } catch(e) {}
                         }
                     }
-                }
-            }""")
-            page.wait_for_timeout(1000)
+                    const panel = document.querySelector('#stepResumen');
+                    if (panel) {
+                        for (const btn of panel.querySelectorAll('button, a.btn')) {
+                            const t = btn.textContent.trim().toLowerCase();
+                            if (t.includes('enviar') && btn.offsetParent !== null) {
+                                btn.click(); break;
+                            }
+                        }
+                    }
+                }""")
+                page.wait_for_timeout(1000)
 
-            # Verificar si ya cambió la página (提交可能非常快)
-            if _pagina_cambio():
-                logger.info('[7a] Página cambió inmediatamente tras clic')
-                navegacion_completa = True
+                # Verificar si ya cambió la página (提交可能非常快)
+                if _pagina_cambio():
+                    logger.info('[7a] Página cambió inmediatamente tras clic')
+                    navegacion_completa = True
 
             # ── PASO 2: Manejar diálogo de confirmación ────────────
             if not navegacion_completa:
