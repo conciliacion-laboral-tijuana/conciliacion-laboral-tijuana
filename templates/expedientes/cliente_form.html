@@ -13,11 +13,22 @@
         <form method="post" class="p-5 space-y-5">
             {% csrf_token %}
 
+            <!-- Errores no asociados a un campo -->
+            {% if form.non_field_errors %}
+            <div class="p-4 bg-red-50 border border-red-300 rounded-lg mb-4" id="form-non-field-errors">
+                <p class="text-red-700 font-medium text-sm mb-2">⚠️ {% if form.non_field_errors|length == 1 %}Error{% else %}Errores{% endif %} del formulario:</p>
+                <ul class="text-red-600 text-sm list-disc list-inside space-y-1">
+                    {% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+
+            <!-- Errores por campo -->
             {% if form.errors %}
-            <div class="p-4 bg-red-50 border border-red-300 rounded-lg mb-4">
+            <div class="p-4 bg-red-50 border border-red-300 rounded-lg mb-4" id="form-field-errors">
                 <p class="text-red-700 font-medium text-sm mb-2">⚠️ Corrige los errores del formulario:</p>
                 <ul class="text-red-600 text-sm list-disc list-inside space-y-1">
-                    {% for field, errors in form.errors.items() %}
+                    {% for field, errors in form.errors.items %}
                         {% for error in errors %}
                         <li><strong>{{ field|title }}:</strong> {{ error }}</li>
                         {% endfor %}
@@ -31,15 +42,13 @@
                 <h2 class="text-sm font-semibold text-gray-800 mb-3 border-b pb-1.5">Datos Personales <span class="text-red-500">*</span></h2>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div class="md:col-span-2">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.nombre.label }} <span class="text-red-500">*</span></a>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.nombre.label }} <span class="text-red-500">*</span></label>
                         {{ form.nombre }}
                         {% if form.nombre.errors %}<p class="text-red-500 text-xs mt-1">{{ form.nombre.errors.0 }}</p>{% endif %}
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.curp.label }}</label>
-                        <div class="flex gap-2">
-                            {{ form.curp }}
-                        </div>
+                        {{ form.curp }}
                         {% if form.curp.errors %}<p class="text-red-500 text-xs mt-1">{{ form.curp.errors.0 }}</p>{% endif %}
                     </div>
                     <div>
@@ -187,6 +196,16 @@
             <!-- Información Laboral -->
             <div>
                 <h2 class="text-sm font-semibold text-gray-800 mb-3 border-b pb-1.5">Información Laboral</h2>
+                <div class="p-4 bg-amber-50 border border-amber-300 rounded-lg mb-4">
+                    <p class="text-amber-700 text-sm font-medium mb-1">📋 Campos requeridos:</p>
+                    <p class="text-amber-700 text-sm">Estos campos son obligatorios y debes completarlos para guardar el cliente:</p>
+                    <ul class="text-amber-700 text-sm list-disc list-inside space-y-1 mt-2">
+                        <li><strong>Zona salarial</strong> — Zona Libre de la Frontera Norte (Tijuana, Mexicali, Ciudad Juárez…) o resto del país.</li>
+                        <li><strong>Acción preferida</strong> — ¿Qué quieres lograr: indemnización de 3 meses o reinstalación en tu puesto?</li>
+                        <li><strong>Fecha de ingreso y fecha de salida</strong> — Fechas necesarias para los cálculos.</li>
+                        <li><strong>Tipo de despido, Jornada, Periodo de pago</strong> — Información laboral clave.</li>
+                    </ul>
+                </div>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.puesto.label }}</label>
@@ -291,7 +310,7 @@
   const curpField = document.getElementById('campo-empresa-curp');
   if (tipoSelect && curpField) {
     function toggleCurp() {
-      curpField.style.display = tipoSelect.value === 'fisica' ? '' : 'none';
+      curpField.style.display = String(tipoSelect.value || '') === 'fisica' ? '' : 'none';
     }
     toggleCurp();
     tipoSelect.addEventListener('change', toggleCurp);
