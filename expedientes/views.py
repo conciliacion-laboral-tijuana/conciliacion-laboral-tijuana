@@ -627,6 +627,118 @@ def cambiar_estado(request, pk):
     return JsonResponse({'success': False, 'error': 'Transición no permitida'}, status=400)
 
 
+# ─── Fecha de Audiencia ────────────────────────────────────────────────────
+
+# Estados desde los que se puede agendar (o reagendar) la audiencia.
+ESTADOS_AGENDAR_AUDIENCIA = (
+    'nuevo', 'solicitud', 'citatorio', 'audiencia', 'no_notificado',
+    'reprogramacion', 'convenio', 'sin_conciliacion', 'demanda',
+)
+
+
+def _ruta_a_audiencia(estado):
+    """Estados intermedios para llegar a 'audiencia' respetando TRANSICIONES.
+
+    Tras presentar la solicitud el centro entrega el citatorio con la fecha,
+    así que desde 'solicitud' se pasa por 'citatorio'.
+    """
+    ruta, actual = [], estado
+    while actual != 'audiencia':
+        siguientes = Expediente.TRANSICIONES.get(actual, [])
+        if 'audiencia' in siguientes:
+            siguiente = 'audiencia'
+        elif actual == 'nuevo':
+            siguiente = 'solicitud'
+        elif actual == 'solicitud':
+            siguiente = 'citatorio'
+        else:
+            return None
+        ruta.append(siguiente)
+        actual = siguiente
+    return ruta
+
+
+@login_required
+@require_POST
+def registrar_fecha_audiencia(request, pk):
+    """Registra la fecha/hora de audiencia que el centro de conciliación asignó.
+
+    Opcionalmente guarda el citatorio (PDF/imagen) y deja el expediente en
+    'Audiencia programada', con lo que aparece en el calendario y en los
+    recordatorios.
+    """
+    expediente = get_object_or_404(get_expedientes_queryset(request.user), pk=pk)
+
+    if expediente.estado not in ESTADOS_AGENDAR_AUDIENCIA:
+        messages.error(request, f'No se puede agendar audiencia en estado "{expediente.get_estado_display()}".')
+        return redirect('expediente_detail', pk=expediente.pk)
+
+    try:
+        fecha = datetime.strptime(request.POST.get('fecha', ''), '%Y-%m-%d').date()
+        hora = datetime.strptime(request.POST.get('hora', ''), '%H:%M').time()
+    except ValueError:
+        messages.error(request, 'Indica la fecha y la hora de la audiencia.')
+        return redirect('expediente_detail', pk=expediente.pk)
+
+    citatorio = request.FILES.get('citatorio')
+    if citatorio:
+        ext = Path(citatorio.name).suffix.lower()
+        if ext not in ('.pdf', '.jpg', '.jpeg', '.png'):
+            messages.error(request, 'El citatorio debe ser PDF o imagen (JPG/PNG).')
+            return redirect('expediente_detail', pk=expediente.pk)
+        if citatorio.size > 10 * 1024 * 1024:
+            messages.error(request, 'El citatorio es demasiado grande (máximo 10 MB).')
+            return redirect('expediente_detail', pk=expediente.pk)
+
+    ruta = _ruta_a_audiencia(expediente.estado)
+    if ruta is None:
+        messages.error(request, 'El estado actual no permite programar audiencia.')
+        return redirect('expediente_detail', pk=expediente.pk)
+
+    fecha_audiencia = timezone.make_aware(datetime.combine(fecha, hora))
+    anterior = expediente.fecha_audiencia
+    estado_anterior = expediente.get_estado_display()
+
+    with transaction.atomic():
+        expediente.fecha_audiencia = fecha_audiencia
+        expediente.proxima_accion = fecha
+        # Nueva audiencia: el resultado de la anterior ya no aplica
+        expediente.resultado_audiencia = None
+        if not ruta:
+            expediente.save()
+        # Cada paso se guarda por separado: Expediente.clean() valida la
+        # transición contra el estado guardado en BD.
+        for estado in ruta:
+            expediente.estado = estado
+            expediente.save()
+
+        if citatorio:
+            Documento.objects.create(
+                expediente=expediente,
+                archivo=citatorio,
+                descripcion=f'Citatorio - Audiencia {fecha_audiencia:%d/%m/%Y %H:%M}',
+                tipo='citatorio',
+                subido_por=request.user,
+            )
+
+    cuando = f'{fecha_audiencia:%d/%m/%Y} a las {fecha_audiencia:%H:%M}'
+    if anterior:
+        detalle = (f'Audiencia reagendada: de {timezone.localtime(anterior):%d/%m/%Y %H:%M} '
+                   f'al {fecha_audiencia:%d/%m/%Y %H:%M}')
+    else:
+        detalle = f'Audiencia programada para el {cuando}'
+    if ruta:
+        detalle += f'. Estado cambiado de "{estado_anterior}" a "{expediente.get_estado_display()}"'
+    registrar_movimiento(expediente=expediente, usuario=request.user,
+                         accion='actualizacion', detalle=detalle)
+
+    if fecha < timezone.localdate():
+        messages.warning(request, f'Audiencia registrada para el {cuando}, pero esa fecha ya pasó. Verifícala.')
+    else:
+        messages.success(request, f'📅 Audiencia registrada para el {cuando}.')
+    return redirect('expediente_detail', pk=expediente.pk)
+
+
 # ─── Resultado de Audiencia ────────────────────────────────────────────────
 
 @login_required
@@ -727,22 +839,29 @@ class ClienteCreateView(LoginRequiredMixin, CreateView):
             )
             return redirect('cliente_list')
 
-        expediente = Expediente.objects.create(
-            cliente=cliente,
-            asesor=asesor,
-            estado='solicitud',
-            notas=f'Expediente creado automáticamente desde registro de cliente {cliente.nombre}',
-        )
-        registrar_movimiento(
-            expediente=expediente,
-            usuario=self.request.user,
-            accion='creacion',
-            detalle=f'Expediente creado automáticamente por {self.request.user.get_full_name() or self.request.user.username}'
-        )
-        messages.success(self.request, f'✅ Cliente {cliente.nombre} registrado. Expediente {expediente.numero} creado.')
-
-        # Redirigir al detalle del expediente recién creado
-        return redirect('expediente_detail', pk=expediente.pk)
+        try:
+            expediente = Expediente.objects.create(
+                cliente=cliente,
+                asesor=asesor,
+                estado='solicitud',
+                notas=f'Expediente creado automáticamente desde registro de cliente {cliente.nombre}',
+            )
+            registrar_movimiento(
+                expediente=expediente,
+                usuario=self.request.user,
+                accion='creacion',
+                detalle=f'Expediente creado automáticamente por {self.request.user.get_full_name() or self.request.user.username}'
+            )
+            messages.success(self.request, f'✅ Cliente {cliente.nombre} registrado. Expediente {expediente.numero} creado.')
+            return redirect('expediente_detail', pk=expediente.pk)
+        except Exception:
+            logger.exception('No se pudo crear el expediente automático para el cliente %s', cliente.pk)
+            messages.warning(
+                self.request,
+                f'✅ Cliente {cliente.nombre} registrado. '
+                f'Pero no se pudo crear el expediente automático. Contacta a soporte.',
+            )
+            return redirect('cliente_list')
 
     def get_success_url(self):
         # No se usa porque form_valid ya hace redirect
@@ -755,6 +874,19 @@ class ClienteUpdateView(LoginRequiredMixin, UpdateView):
     template_name = 'expedientes/cliente_form.html'
     success_url = reverse_lazy('cliente_list')
 
+    def get(self, request, *args, **kwargs):
+        try:
+            return super().get(request, *args, **kwargs)
+        except Http404:
+            raise
+        except Exception as exc:
+            logger.exception('Error al renderizar formulario de edición de cliente')
+            messages.error(
+                request,
+                'No se pudo cargar el formulario. Intenta de nuevo o contacta a soporte.',
+            )
+            return redirect('cliente_list')
+
 
 @login_required
 def buscar_empresas_catalogo(request):
@@ -766,24 +898,32 @@ def buscar_empresas_catalogo(request):
     from .management.commands.importar_clt import _normalizar
     # Normalizar la consulta (mayúsculas, sin acentos) para que coincida
     # con los nombres normalizados del catálogo ("soriana"/"Soríana" → "SORIANA")
-    q = _normalizar(request.GET.get('q', ''))
+    try:
+        q = _normalizar(request.GET.get('q', ''))
+    except Exception as exc:
+        logger.exception('Error normalizando búsqueda de empresas')
+        return JsonResponse({'resultados': [], 'error': 'No se pudo procesar la búsqueda.'})
     resultados = []
     if len(q) >= 2:
-        resultados = [
-            {
-                'id': e.pk,
-                'nombre': e.nombre,
-                'domicilio': e.domicilio,
-                'telefono': e.telefono,
-                'tipo_persona': e.tipo_persona,
-                'abogado': e.abogado or '',
-                'calle': e.domicilio_calle,
-                'numero': e.domicilio_numero,
-                'colonia': e.domicilio_colonia,
-                'cp': e.domicilio_cp,
-            }
-            for e in Empresa.objects.filter(nombre__icontains=q).order_by('nombre')[:8]
-        ]
+        try:
+            resultados = [
+                {
+                    'id': e.pk,
+                    'nombre': e.nombre,
+                    'domicilio': e.domicilio,
+                    'telefono': e.telefono,
+                    'tipo_persona': e.tipo_persona,
+                    'abogado': e.abogado or '',
+                    'calle': e.domicilio_calle,
+                    'numero': e.domicilio_numero,
+                    'colonia': e.domicilio_colonia,
+                    'cp': e.domicilio_cp,
+                }
+                for e in Empresa.objects.filter(nombre__icontains=q).order_by('nombre')[:8]
+            ]
+        except Exception as exc:
+            logger.exception('Error consultando catálogo de empresas')
+            return JsonResponse({'resultados': [], 'error': 'No se pudo consultar el catálogo.'})
     return JsonResponse({'resultados': resultados})
 
 

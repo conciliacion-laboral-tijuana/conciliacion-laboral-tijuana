@@ -36,6 +36,7 @@ urlpatterns = [
     path('expedientes/<int:pk>/editar/', views.ExpedienteUpdateView.as_view(), name='expediente_update'),
     path('expedientes/<int:pk>/cambiar-estado/', views.cambiar_estado, name='cambiar_estado'),
     path('expedientes/<int:pk>/resultado-audiencia/', views.registrar_resultado_audiencia, name='resultado_audiencia'),
+    path('expedientes/<int:pk>/fecha-audiencia/', views.registrar_fecha_audiencia, name='registrar_fecha_audiencia'),
 
     # Notas
     path('expedientes/<int:pk>/notas/agregar/', views.agregar_nota, name='agregar_nota'),

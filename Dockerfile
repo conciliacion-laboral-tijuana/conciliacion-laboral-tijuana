@@ -95,4 +95,4 @@ RUN uv run python manage.py collectstatic --noinput --clear
 # ================================================
 EXPOSE 8000
 
-ENTRYPOINT /entrypoint.sh
+ENTRYPOINT ["/entrypoint.sh"]

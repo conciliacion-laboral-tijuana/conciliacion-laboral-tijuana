@@ -2030,3 +2030,86 @@ class AjustesTests(TestCase):
         r = self.client.get(reverse('dashboard_asesor'))
         self.assertContains(r, reverse('ajustes'))
         self.assertContains(r, 'fa-cog')
+
+
+class RegistrarFechaAudienciaTests(TestCase):
+    """El asesor registra la fecha de audiencia que asignó el centro de conciliación."""
+
+    def setUp(self):
+        self.asesor = User.objects.create_user(username='asesor_aud', password='x')
+        self.asesor.profile.rol = 'asesor'
+        self.asesor.profile.save()
+        self.cliente = Cliente.objects.create(
+            nombre='MARIA PEREZ LOPEZ', curp='PELM900101MBCRPR09', telefono='6641234567',
+            empresa='EMPRESA SA DE CV', oficina='plaza_patria',
+        )
+        self.expediente = Expediente.objects.create(
+            cliente=self.cliente, asesor=self.asesor, estado='solicitud',
+            notificar_whatsapp_auto=False,
+        )
+        self.url = reverse('registrar_fecha_audiencia', args=[self.expediente.pk])
+        self.client.login(username='asesor_aud', password='x')
+        self.manana = timezone.localdate() + timedelta(days=1)
+
+    def test_desde_solicitud_programa_audiencia_y_pasa_por_citatorio(self):
+        resp = self.client.post(self.url, {'fecha': self.manana.isoformat(), 'hora': '10:30'})
+        self.assertRedirects(resp, reverse('expediente_detail', args=[self.expediente.pk]))
+        self.expediente.refresh_from_db()
+        self.assertEqual(self.expediente.estado, 'audiencia')
+        fecha = timezone.localtime(self.expediente.fecha_audiencia)
+        self.assertEqual((fecha.date(), fecha.hour, fecha.minute), (self.manana, 10, 30))
+        self.assertEqual(self.expediente.proxima_accion, self.manana)
+        self.assertTrue(self.expediente.movimientos.filter(detalle__contains='Audiencia programada').exists())
+
+    def test_guarda_citatorio_como_documento(self):
+        pdf = SimpleUploadedFile('citatorio.pdf', b'%PDF-1.4 prueba', content_type='application/pdf')
+        self.client.post(self.url, {'fecha': self.manana.isoformat(), 'hora': '09:00', 'citatorio': pdf})
+        doc = self.expediente.documentos.get()
+        self.assertEqual(doc.tipo, 'citatorio')
+        self.assertIn('Citatorio - Audiencia', doc.descripcion)
+
+    def test_rechaza_citatorio_con_extension_invalida(self):
+        exe = SimpleUploadedFile('citatorio.exe', b'MZ', content_type='application/octet-stream')
+        self.client.post(self.url, {'fecha': self.manana.isoformat(), 'hora': '09:00', 'citatorio': exe})
+        self.expediente.refresh_from_db()
+        self.assertIsNone(self.expediente.fecha_audiencia)
+        self.assertEqual(self.expediente.estado, 'solicitud')
+
+    def test_reprogramacion_registra_nueva_fecha_y_limpia_resultado(self):
+        self.expediente.estado = 'citatorio'
+        self.expediente.save()
+        self.expediente.estado = 'audiencia'
+        self.expediente.save()
+        self.expediente.estado = 'reprogramacion'
+        self.expediente.resultado_audiencia = 'reprogramada'
+        self.expediente.save()
+        self.client.post(self.url, {'fecha': self.manana.isoformat(), 'hora': '12:00'})
+        self.expediente.refresh_from_db()
+        self.assertEqual(self.expediente.estado, 'audiencia')
+        self.assertIsNone(self.expediente.resultado_audiencia)
+
+    def test_fecha_invalida_no_cambia_nada(self):
+        self.client.post(self.url, {'fecha': '', 'hora': '10:00'})
+        self.expediente.refresh_from_db()
+        self.assertIsNone(self.expediente.fecha_audiencia)
+        self.assertEqual(self.expediente.estado, 'solicitud')
+
+    def test_expediente_cerrado_no_se_agenda(self):
+        self.expediente.estado = 'cerrado'
+        self.expediente.save()
+        self.client.post(self.url, {'fecha': self.manana.isoformat(), 'hora': '10:00'})
+        self.expediente.refresh_from_db()
+        self.assertIsNone(self.expediente.fecha_audiencia)
+
+    def test_otro_asesor_no_puede_agendar(self):
+        otro = User.objects.create_user(username='otro_aud', password='x')
+        otro.profile.rol = 'asesor'
+        otro.profile.save()
+        self.client.login(username='otro_aud', password='x')
+        resp = self.client.post(self.url, {'fecha': self.manana.isoformat(), 'hora': '10:00'})
+        self.assertEqual(resp.status_code, 404)
+
+    def test_detalle_muestra_formulario(self):
+        resp = self.client.get(reverse('expediente_detail', args=[self.expediente.pk]))
+        self.assertContains(resp, 'Registrar Fecha de Audiencia')
+        self.assertContains(resp, self.url)
