@@ -98,6 +98,41 @@ class SemanaForm(forms.Form):
         locals()[dia] = forms.DecimalField(label=dia.capitalize(), min_value=0, max_value=24, max_digits=5, decimal_places=2, initial=0, widget=forms.NumberInput(attrs={'class': 'input', 'step': '.01'}))
     del dia
 
+    for dia in DIAS:
+        for tramo, label in (('entrada', 'Entrada'), ('ordinaria', 'Fin de jornada ordinaria'), ('salida', 'Salida')):
+            locals()[tramo + '_' + dia] = forms.CharField(
+                label=label + ' ' + dia, required=False,
+                widget=forms.TimeInput(attrs={'class': 'input', 'type': 'time'}))
+    del dia, tramo, label
+
+    def clean(self):
+        data = super().clean()
+        for dia in DIAS:
+            valores = [data.get(tramo + '_' + dia, '') for tramo in ('entrada', 'ordinaria', 'salida')]
+            if not any(valores):
+                continue
+            try:
+                minutos = []
+                for valor in valores:
+                    hora, minuto = map(int, valor.split(':'))
+                    if len(valor) != 5 or not 0 <= hora < 24 or not 0 <= minuto < 60:
+                        raise ValueError
+                    minutos.append(hora * 60 + minuto)
+                entrada, ordinaria, salida = minutos
+                if ordinaria < entrada:
+                    ordinaria += 1440
+                if salida < entrada:
+                    salida += 1440
+                if not entrada <= ordinaria <= salida or salida == entrada:
+                    raise ValueError
+            except (ValueError, AttributeError):
+                self.add_error('entrada_' + dia, 'Completa los tres horarios en orden; se admite salida al día siguiente.')
+                continue
+            horas = (D(salida - ordinaria) / 60).quantize(CENTAVO, rounding=ROUND_HALF_UP)
+            if data.get(dia) != horas:
+                self.add_error(dia, 'Las horas no coinciden con el tramo extraordinario. Actualiza el horario o elimina los tres horarios para capturar horas manualmente.')
+        return data
+
     def clean_semana(self):
         value = self.cleaned_data['semana']
         if value.weekday() != 0:
@@ -196,7 +231,7 @@ def validar_formularios(expediente, forms_context, final=False):
     for row in semana_rows:
         for i, dia in enumerate(DIAS):
             fecha = row['semana'] + timedelta(days=i)
-            if row[dia] and (not cliente.fecha_ingreso or not cliente.fecha_salida
+            if (row[dia] or row.get('entrada_' + dia)) and (not cliente.fecha_ingreso or not cliente.fecha_salida
                              or not cliente.fecha_ingreso <= fecha <= cliente.fecha_salida):
                 config.add_error(None, 'Hay horas extras fuera de las fechas de la relación laboral.')
                 return None
@@ -258,6 +293,7 @@ def calcular_hoja(expediente, stored):
                   'formula': f'{sd} × {config["dias_aguinaldo"]} × {periodo.dias_anio_actual}/{periodo.dias_anio_total}',
                   'bruto': aguinaldo_bruto, 'pagado': config['aguinaldo_pagado'], 'pendiente': result['aguinaldo']['monto']})
     dobles = triples = monto_horas = pagado_horas = CERO
+    detalle_semanas = []
     for row in datos['semanas']:
         cantidad = sum((row[dia] for dia in DIAS), CERO)
         doble = min(cantidad, row['limite_dobles'])
@@ -282,11 +318,21 @@ def calcular_hoja(expediente, stored):
         triples += triple
         monto_horas += bruto - row['pagado']
         pagado_horas += row['pagado']
+        detalle_semanas.append({
+            'inicio': max(row['semana'], cliente.fecha_ingreso),
+            'fin': min(row['semana'] + timedelta(days=6), cliente.fecha_salida),
+            'dias': [{'fecha': row['semana'] + timedelta(days=i), 'horas': row[dia],
+                      'entrada': row.get('entrada_' + dia, ''),
+                      'ordinaria': row.get('ordinaria_' + dia, ''),
+                      'salida': row.get('salida_' + dia, '')}
+                     for i, dia in enumerate(DIAS) if row[dia] or row.get('entrada_' + dia)],
+            'dobles': doble, 'triples': triple, 'bruto': bruto,
+            'pagado': row['pagado'], 'pendiente': bruto - row['pagado']})
         audit.append({'concepto': 'Horas extras', 'periodo': f'{row["semana"]} a {row["semana"] + timedelta(days=6)}',
                       'formula': '; '.join(detalle_dias) + f'; umbral semanal {row["limite_dobles"]} h',
                       'bruto': bruto, 'pagado': row['pagado'], 'pendiente': bruto - row['pagado']})
     result['horas_extras'].update(cantidad=dobles + triples, dobles=dobles, triples=triples, monto=monto_horas,
-                                por_semana=True, pagado=pagado_horas)
+                                por_semana=True, pagado=pagado_horas, semanas=detalle_semanas)
     rows_by_year = {r['anio']: r for r in datos['vacaciones']}
     vac_total = prima_total = dias_pendientes = CERO
     for ciclo in periodo.ciclos_vacaciones:

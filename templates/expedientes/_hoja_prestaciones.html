@@ -14,6 +14,24 @@
   <section class="space-y-3">
     <h3 class="font-semibold">Horas extras por semana</h3>
     <p class="text-xs text-gray-600">Captura solo horas extraordinarias efectivamente trabajadas. No se extrapolan al resto de la relación. Verifica el umbral de horas al doble aplicable a cada semana y el salario que correspondía entonces. Los excedentes se calculan al triple; no se descartan horas trabajadas.</p>
+    <details class="border rounded-lg p-3"><summary class="cursor-pointer font-medium">Generar semanas por horario habitual</summary>
+      <p class="text-xs text-gray-600 mt-2">Genera una propuesta para revisar día por día. Indica el fin de jornada ordinaria conforme a la distribución pactada. No se descuentan descansos automáticamente ni se prorratean semanas incompletas. Para cambios de horario genera cada periodo por separado.</p>
+      <div class="grid grid-cols-2 md:grid-cols-3 gap-3 mt-3" id="horario-habitual">
+        <label>Desde<input id="horario-desde" type="date" class="input"></label>
+        <label>Hasta<input id="horario-hasta" type="date" class="input"></label>
+        <label>Entrada<input id="horario-entrada" type="time" class="input"></label>
+        <label>Fin de jornada ordinaria<input id="horario-ordinaria" type="time" class="input"></label>
+        <label>Salida<input id="horario-salida" type="time" class="input"></label>
+        <label>Salario diario ($)<input id="horario-salario" type="number" min="0.01" step="0.01" class="input"></label>
+        <label>Jornada<select id="horario-jornada" class="input"><option value="diurna">Diurna</option><option value="nocturna">Nocturna</option><option value="mixta">Mixta</option></select></label>
+        <label>Umbral semanal de horas dobles<input id="horario-limite" type="number" min="0" max="168" step="0.01" class="input" value="9"></label>
+      </div>
+      <div class="flex flex-wrap gap-3 mt-3" id="horario-dias">
+        <label><input type="checkbox" value="0" checked> Lunes</label><label><input type="checkbox" value="1" checked> Martes</label><label><input type="checkbox" value="2" checked> Miércoles</label><label><input type="checkbox" value="3" checked> Jueves</label><label><input type="checkbox" value="4" checked> Viernes</label><label><input type="checkbox" value="5"> Sábado</label><label><input type="checkbox" value="6"> Domingo</label>
+      </div>
+      <button type="button" id="generar-semanas-horario" class="btn mt-3">Generar semanas para revisar</button>
+      <p id="horario-mensaje" role="status" class="text-sm mt-2"></p>
+    </details>
     {{ semanas_formset.management_form }}
     <div class="text-red-700">{{ semanas_formset.non_form_errors }}</div>
     <div id="semanas-rows" class="space-y-3">

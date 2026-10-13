@@ -1,6 +1,6 @@
 <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
 {% for field in row %}
-  {% if field.name == 'salario_diario' or field.name|slice:':8' != 'salario_' %}
+  {% if field.name == 'salario_diario' or field.name|slice:':8' != 'salario_' and field.name|slice:':8' != 'entrada_' and field.name|slice:':9' != 'ordinaria' and field.name|slice:':7' != 'salida_' %}
   <div><label for="{{ field.id_for_label }}" class="text-xs block">{{ field.label }}</label>{{ field }}<div class="text-red-700 text-xs">{{ field.errors }}</div></div>
   {% endif %}
 {% endfor %}
@@ -12,3 +12,10 @@
   {% endif %}
 {% endfor %}
 </div></details>
+
+<details class="mt-3"><summary class="text-sm cursor-pointer">Horarios por día para el cuadro de la demanda</summary>
+<p class="text-xs text-gray-600">Revisa los horarios reales y el fin de jornada ordinaria pactado. Los tramos extraordinarios deben ser efectivamente trabajados; si hubo interrupciones, elimina los tres horarios del día y captura sus horas manualmente. Ajusta ausencias eliminando horarios y horas del día.</p>
+<div class="grid grid-cols-2 md:grid-cols-3 gap-3 mt-2">{% for field in row %}
+{% if field.name|slice:':8' == 'entrada_' or field.name|slice:':9' == 'ordinaria' or field.name|slice:':7' == 'salida_' %}
+<div><label for="{{ field.id_for_label }}" class="text-xs block">{{ field.label }}</label>{{ field }}<div class="text-red-700 text-xs">{{ field.errors }}</div></div>
+{% endif %}{% endfor %}</div></details>

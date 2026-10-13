@@ -50,7 +50,16 @@ class ConstructorNavegador(StaticLiveServerTestCase):
             page.wait_for_function("document.getElementById('demanda-preview-status').textContent !== 'Cargando vista previa…'")
             page.locator('[data-acordeon-toggle="prestaciones"]').click()
             page.locator('#id_prestaciones-salario_integrado').fill('650')
-            page.locator('#id_prestaciones-extras_estado').select_option('no')
+            page.locator('summary', has_text='Generar semanas por horario habitual').click()
+            for key, value in {'desde':'2026-06-29', 'hasta':'2026-07-01', 'entrada':'07:00', 'ordinaria':'15:00', 'salida':'17:00', 'salario':'600'}.items():
+                page.locator('#horario-' + key).fill(value)
+            page.locator('#generar-semanas-horario').click()
+            self.assertEqual(page.locator('#id_semanas-TOTAL_FORMS').input_value(), '1')
+            self.assertEqual(page.locator('#id_semanas-0-miercoles').input_value(), '2.00')
+            self.assertEqual(page.locator('#id_semanas-0-jueves').input_value(), '0')
+            page.locator('#generar-semanas-horario').click()
+            self.assertIn('semanas ya capturadas', page.locator('#horario-mensaje').text_content())
+            self.assertEqual(page.locator('#id_semanas-TOTAL_FORMS').input_value(), '1')
             page.locator('#id_prestaciones-datos_confirmados').check()
             for row in page.locator('[id^="id_vacaciones-"][id$="-confirmado"]').all():
                 row.check()
@@ -58,10 +67,10 @@ class ConstructorNavegador(StaticLiveServerTestCase):
             page.locator('#id_vacaciones-0-prima_pagada').fill('1800')
             # Dynamic row construction, deletion and management counters.
             page.locator('#agregar-semana').click()
-            page.locator('#id_semanas-0-semana').fill('2026-06-08')
-            page.locator('#id_semanas-0-salario_diario').fill('600')
+            page.locator('#id_semanas-1-semana').fill('2026-06-08')
+            page.locator('#id_semanas-1-salario_diario').fill('600')
             for dia in ('lunes','martes','miercoles','jueves'):
-                page.locator('#id_semanas-0-' + dia).fill('3')
+                page.locator('#id_semanas-1-' + dia).fill('3')
             page.locator('button[name="accion"][value="calcular"]').click()
             page.wait_for_load_state('domcontentloaded')
             try:
@@ -76,6 +85,7 @@ class ConstructorNavegador(StaticLiveServerTestCase):
                 raise
             hoja = HojaPrestaciones.objects.get(expediente=exp)
             self.assertTrue(hoja.resultado)
+            self.assertEqual(hoja.resultado['horas_extras']['dobles'], {'decimal': '15.00'})
             self.assertIsNone(hoja.aprobado_en)
             self.assertEqual(page.locator('input[name="revision_calculo"]').input_value(), hoja.huella)
             page.locator('button[value="aprobar"]').click()
@@ -90,6 +100,8 @@ class ConstructorNavegador(StaticLiveServerTestCase):
             page.wait_for_url('**/demanda/')
             self.assertIn('dado de alta ante el IMSS', page.content())
             self.assertIn('Desglose de prestaciones por periodos', page.content())
+            self.assertIn('Horas extraordinarias reclamadas', page.content())
+            self.assertIn('15:00 a 17:00', page.content())
             browser.close()
 
 

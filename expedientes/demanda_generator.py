@@ -382,6 +382,38 @@ def calculo_para_demanda(expediente: Expediente,
     )
 
 
+def _cuadro_horas_extras_html(calculo):
+    horas = calculo.get('horas_extras', {})
+    semanas = horas.get('semanas', [])
+    if not semanas:
+        return ''
+    def duracion(valor):
+        minutos = int((Decimal(str(valor)) * 60).quantize(Decimal('1')))
+        return f'{minutos // 60} {"hora" if minutos // 60 == 1 else "horas"} y {minutos % 60} {"minuto" if minutos % 60 == 1 else "minutos"}'
+    partes = [f'<h4>Horas extraordinarias reclamadas</h4><p>Se reclama el saldo de {_importe_demanda(horas["monto"])} '
+              f'por {duracion(horas["dobles"])} al doble y {duracion(horas["triples"])} al triple, '
+              f'del periodo {min(s["inicio"] for s in semanas):%d/%m/%Y} a {max(s["fin"] for s in semanas):%d/%m/%Y}, '
+              'conforme al siguiente desglose semanal y descontando los pagos recibidos.</p>',
+              '<table><thead><tr><th>Jornada semanal</th><th>Jornada ordinaria</th><th>Jornada extra</th><th>Horas extras e importe</th></tr></thead><tbody>']
+    for semana in semanas:
+        ordinaria, extra = [], []
+        for dia in semana['dias']:
+            fecha = dia['fecha'].strftime('%d/%m/%Y')
+            if dia['entrada']:
+                ordinaria.append(f'{fecha}: {dia["entrada"]} a {dia["ordinaria"]}')
+                extra.append(f'{fecha}: {dia["ordinaria"]} a {dia["salida"]} ({duracion(dia["horas"])})')
+            elif dia['horas']:
+                extra.append(f'{fecha}: {duracion(dia["horas"])}; horario no capturado')
+        celdas = [f'{semana["inicio"]:%d/%m/%Y} a {semana["fin"]:%d/%m/%Y}',
+                  '; '.join(ordinaria) or 'Horario no capturado', '; '.join(extra),
+                  f'{duracion(semana["dobles"])} dobles; {duracion(semana["triples"])} triples. '
+                  f'Calculado: {_importe_demanda(semana["bruto"])}; pagado: {_importe_demanda(semana["pagado"])}; '
+                  f'saldo: {_importe_demanda(semana["pendiente"])}']
+        partes.append('<tr>' + ''.join('<td>' + html_escape(celda) + '</td>' for celda in celdas) + '</tr>')
+    partes.append('</tbody></table>')
+    return '\n'.join(partes)
+
+
 def _desglose_hoja_html(calculo):
     if not calculo.get('hoja_desglose'):
         return ''
@@ -393,6 +425,7 @@ def _desglose_hoja_html(calculo):
             f'<p><strong>{html_escape(row["concepto"])}</strong> · {html_escape(row["periodo"])}. '
             f'{html_escape(row["formula"])}. Calculado: {_importe_demanda(row["bruto"])}; '
             f'pagado: {_importe_demanda(row["pagado"])}; saldo reclamado: {_importe_demanda(row["pendiente"])}.</p>')
+    partes.append(_cuadro_horas_extras_html(calculo))
     return '\n'.join(partes)
 
 

@@ -253,3 +253,38 @@ class HojaPrestacionesTests(TestCase):
         html = generar_demanda_html(self.exp)
         self.assertNotIn('$99,999.00', html)
         self.assertFalse(calculo_para_demanda(self.exp)['success'])
+
+    def test_horarios_coherentes_se_guardan_y_generan_cuadro_aprobado(self):
+        datos = desempaquetar(self.datos())
+        datos['config']['extras_estado'] = 'si'
+        row = self.semana(date(2026, 6, 29), horas=(0,0, D('1.6'),0,0,0,0), pagado='20')
+        row.update(entrada_miercoles='07:00', ordinaria_miercoles='15:24', salida_miercoles='17:00')
+        datos['semanas'] = [row]
+        context = formularios(self.exp, self.payload(empaquetar(datos)))
+        stored = validar_formularios(self.exp, context, final=True)
+        self.assertIsNotNone(stored)
+        result = calcular_hoja(self.exp, stored)
+        self.assertEqual(result['horas_extras']['monto'], D('220'))
+        self.assertEqual(result['horas_extras']['semanas'][0]['fin'], date(2026,7,1))
+        from .demanda_generator import _cuadro_horas_extras_html, html_a_docx
+        from docx import Document
+        cuadro = _cuadro_horas_extras_html(result)
+        self.assertIn('1 hora y 36 minutos', cuadro)
+        self.assertIn('15:24 a 17:00', cuadro)
+        self.assertIn('$220.00', cuadro)
+        doc = Document()
+        html_a_docx(cuadro, doc)
+        self.assertEqual(len(doc.tables), 1)
+        self.assertIn('15:24', doc.tables[0].cell(1,2).text)
+
+    def test_horarios_incompletos_o_inconsistentes_no_se_aprueban(self):
+        from .hoja_prestaciones import SemanaForm
+        row = self.semana(date(2026,6,8), horas=(2,0,0,0,0,0,0))
+        row.update(entrada_lunes='07:00', ordinaria_lunes='15:00', salida_lunes='17:00')
+        self.assertTrue(SemanaForm(row).is_valid())
+        row['salida_lunes'] = '18:00'
+        self.assertFalse(SemanaForm(row).is_valid())
+        row['salida_lunes'] = ''
+        self.assertFalse(SemanaForm(row).is_valid())
+        row.update(entrada_lunes='22:00', ordinaria_lunes='06:00', salida_lunes='08:00')
+        self.assertTrue(SemanaForm(row).is_valid())
