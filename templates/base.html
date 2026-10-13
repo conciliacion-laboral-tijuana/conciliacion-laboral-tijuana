@@ -708,6 +708,7 @@
     });
     </script>
 
+    <script src="{% static 'js/curp.js' %}"></script>
     {% block extra_scripts %}{% endblock %}
 
     {% if aviso_obligatorio %}
@@ -843,16 +844,16 @@
               <option value="PL">Puebla</option>
               <option value="QT">Querétaro</option>
               <option value="QR">Quintana Roo</option>
-              <option value="SL">San Luis Potosí</option>
-              <option value="SI">Sinaloa</option>
-              <option value="SO">Sonora</option>
-              <option value="TB">Tabasco</option>
-              <option value="TM">Tamaulipas</option>
+              <option value="SP">San Luis Potosí</option>
+              <option value="SL">Sinaloa</option>
+              <option value="SR">Sonora</option>
+              <option value="TC">Tabasco</option>
+              <option value="TS">Tamaulipas</option>
               <option value="TL">Tlaxcala</option>
-              <option value="VE">Veracruz</option>
-              <option value="YU">Yucatán</option>
-              <option value="ZR">Zacatecas</option>
-              <option value="NE">Nuevo León (vigencia 2024+)</option>
+              <option value="VZ">Veracruz</option>
+              <option value="YN">Yucatán</option>
+              <option value="ZS">Zacatecas</option>
+              <option value="NE">Nacido en el Extranjero</option>
             </select>
           </div>
           <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
@@ -906,95 +907,16 @@
         }
         setTimeout(() => { txt.textContent = 'Copiar'; }, 1500);
     }
-    // Normalización y generación (lógica compacta, idéntica al generador completo)
-    function normalizar(txt) {
-        if (!txt) return '';
-        return txt.normalize('NFD').replace(/\p{Mn}/gu, '').toUpperCase().trim().replace(/\s+/g, ' ');
-    }
-    function mayusculaInicial(c) { return c.toUpperCase(); }
-    // Shorthand para entidades no válidas (solo para esta versión compacta)
-    function getSiglas(apellidos, nombres, sexo, fechaNac, entidad) {
-        const ape1 = normalizar(apellidos || '').substring(0, 1);
-        const vocal = normalizar(apellidos || '').substring(1, 2);
-        const ape2 = normalizar(apellidos || '').substring(2, 3);
-        const nom1 = normalizar(nombres || '').substring(0, 1);
-        // Regla: si el primer nombre es María o José y hay más nombres, usar el segundo
-        const nombresArr = normalizar(nombres || '').split(' ').filter(Boolean);
-        let nom = nom1;
-        if ((nombresArr[0] === 'MARIA' || nombresArr[0] === 'JOSE') && nombresArr.length > 1) {
-            nom = nombresArr[1].substring(0, 1);
-        }
-        // Fecha: 2 dígitos año, 2 dígitos mes, 2 dígitos día
-        const ano = String(fechaNac ? fechaNac.getFullYear() : '').substring(2);
-        const mes = String(fechaNac ? (fechaNac.getMonth() + 1) : '').padStart(2, '0');
-        const dia = String(fechaNac ? fechaNac.getDate() : '').padStart(2, '0');
-        let curso = ape1 + (vocal && 'AEIOU'.includes(vocal) ? vocal : 'X') + ape2 + nom;
-        curso = curso.substring(0, 4);
-        const fechaStr = ano + mes + dia;
-        const sexoChar = sexo || 'H';
-        const entStr = entidad || 'BC';
-        return curso + fechaStr + sexoChar + entStr;
-    }
-    function consonantes(fullName, curso) {
-        const name = normalizar(fullName || '');
-        let consonantes = '';
-        const courseSet = new Set(curso.split(''));
-        for (let i = 0; i < name.length && consonantes.length < 3; i++) {
-            const ch = name[i];
-            if (ch >= 'A' && ch <= 'Z' && !courseSet.has(ch)) {
-                consonantes += ch;
-                courseSet.add(ch);
-            }
-        }
-        // Si faltan consonantes, probar con apellidos solamente
-        if (consonantes.length < 3) {
-            const apellidos = normalizar(document.getElementById('modal-curp-apellido1').value + ' ' + (document.getElementById('modal-curp-apellido2').value || ''));
-            for (let i = 0; i < apellidos.length && consonantes.length < 3; i++) {
-                const ch = apellidos[i];
-                if (ch >= 'A' && ch <= 'Z' && !courseSet.has(ch)) {
-                    consonantes += ch;
-                    courseSet.add(ch);
-                }
-            }
-        }
-        return consonantes.padEnd(3, 'X');
-    }
-    function digitoVerificador(curpBase) {
-        const tabla = '0123456789ABCDEFGHIJKLMNÃÑOOPQRSTUVWXYZ';
-        let suma = 0;
-        for (let i = 0; i < curpBase.length; i++) {
-            const pos = tabla.indexOf(curpBase[i]);
-            if (pos >= 0) suma += pos * (18 - i);
-        }
-        const residuo = suma % 10;
-        return (10 - residuo) % 10;
-    }
     function generarCURPModal() {
-        const apellido1 = document.getElementById('modal-curp-apellido1').value;
-        const apellido2 = document.getElementById('modal-curp-apellido2').value;
-        const nombres = document.getElementById('modal-curp-nombres').value;
-        const fechaStr = document.getElementById('modal-curp-fecha').value;
-        const sexo = document.getElementById('modal-curp-sexo').value;
-        const entidad = document.getElementById('modal-curp-estado').value;
-
-        if (!apellido1 || !nombres || !fechaStr || !sexo) {
-            document.getElementById('modal-curp-completa').value = '';
-            return;
-        }
-
-        const fechaNac = new Date(fechaStr + 'T12:00:00');
-        if (isNaN(fechaNac.getTime())) {
-            document.getElementById('modal-curp-completa').value = '';
-            return;
-        }
-
-        const curso = getSiglas(apellido1, nombres, sexo, fechaNac, entidad);
-        const consonanteStr = consonantes(apellido1 + ' ' + (apellido2 || '') + ' ' + nombres, curso);
-        const baseCurp = curso + consonanteStr;
-        const digito = digitoVerificador(baseCurp);
-        const curpCompleta = baseCurp + digito;
-
-        document.getElementById('modal-curp-completa').value = curpCompleta;
+        const r = CURP.calcular({
+            apellido1: document.getElementById('modal-curp-apellido1').value,
+            apellido2: document.getElementById('modal-curp-apellido2').value,
+            nombres: document.getElementById('modal-curp-nombres').value,
+            fecha: document.getElementById('modal-curp-fecha').value,
+            sexo: document.getElementById('modal-curp-sexo').value,
+            estado: document.getElementById('modal-curp-estado').value,
+        });
+        document.getElementById('modal-curp-completa').value = r.curp;
     }
 
     // Cerrar modal con Escape
