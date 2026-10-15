@@ -11,7 +11,11 @@ romper el redactado, y se agregan las claves propias del sistema local
 más ricas que las del original.
 """
 
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
+
+# Días de la semana en el orden en que se capturan las horas extras.
+DIAS_SEMANA = ('lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado',
+               'domingo')
 
 
 def _dec(valor):
@@ -255,7 +259,7 @@ def _horas_extras(cliente, expediente) -> dict:
     # Los días con horas extras capturados en la primera semana sirven de patrón
     dias_semana = []
     primera = semanas[0]
-    for dia in ('lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'):
+    for dia in DIAS_SEMANA:
         if primera.get(dia):
             dias_semana.append(dia)
 
@@ -273,12 +277,21 @@ def _horas_extras(cliente, expediente) -> dict:
 
 
 def _suma_horas_semana(semana: dict):
-    """Horas extra de la semana (suma de los días capturados)."""
+    """Horas extra de la semana (suma de los días capturados).
+
+    Una celda capturada a medias no puede tumbar el render del expediente: si
+    el valor no es un número, ese día aporta cero horas. Antes esto reventaba
+    con `decimal.InvalidOperation` y la pantalla entera devolvía error 500.
+    """
     total = Decimal('0')
-    for dia in ('lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'):
+    for dia in DIAS_SEMANA:
         valor = semana.get(dia)
-        if valor:
+        if not valor:
+            continue
+        try:
             total += _dec(valor)
+        except (InvalidOperation, ValueError, TypeError):
+            continue
     return total or None
 
 

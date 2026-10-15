@@ -21,6 +21,8 @@ from .adaptador import datos_de_expediente, datos_desde_post
 from .condiciones import evaluar_condiciones
 from .demanda import capitulos, encabezado_capitulo, generar_texto_completo
 from .salida import (
+    ORDEN_HTML,
+    capitulos_html,
     generar_demanda_capitulos_docx,
     generar_demanda_capitulos_html,
     guardar_demanda_capitulos,
@@ -31,9 +33,11 @@ __all__ = [
     'datos_desde_post',
     'evaluar_condiciones',
     'capitulos',
+    'capitulos_html',
     'encabezado_capitulo',
     'generar_texto_completo',
     'generar_demanda_capitulos_html',
     'generar_demanda_capitulos_docx',
     'guardar_demanda_capitulos',
+    'ORDEN_HTML',
 ]

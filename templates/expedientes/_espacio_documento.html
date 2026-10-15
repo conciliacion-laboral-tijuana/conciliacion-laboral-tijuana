@@ -1,0 +1,114 @@
+{# Espacio 3 · Documento: la demanda capítulo por capítulo, con los huecos
+   señalados en su lugar. Es el borrador real que se va a presentar, no una
+   vista previa aparte. #}
+<div class="dem-layout documento">
+
+  {# ─── Índice de capítulos ────────────────────────────────────────── #}
+  <aside class="panel-lateral indice dem-lateral">
+    <h3>La demanda, capítulo por capítulo</h3>
+    <p>El estado real del escrito que se va a presentar.</p>
+    <ol>
+      {% for clave, c in estado_demanda.capitulos.items %}
+        <li>
+          <a href="#cap-{{ clave }}">
+            <span class="num {% if c.fijo %}fijo{% elif c.completo %}ok{% else %}falta{% endif %}">
+              {% if c.fijo %}·{% elif c.completo %}✓{% else %}!{% endif %}
+            </span>
+            <span>
+              <span class="rot">{{ c.titulo }}</span>
+              <span class="sub">
+                {% if c.fijo %}Texto fijo del despacho
+                {% elif not c.completo %}Falta: {{ c.faltantes|join:' · ' }}
+                {% elif c.total_opcionales %}Se puede precisar: {{ c.faltantes_opcionales|join:' · ' }}
+                {% else %}Sin pendientes{% endif %}
+              </span>
+            </span>
+          </a>
+        </li>
+      {% endfor %}
+    </ol>
+    <p class="ayuda">
+      Los capítulos marcados con «·» no se capturan caso por caso: son la plantilla
+      del despacho y sólo se verifican.
+    </p>
+  </aside>
+
+  {# ─── El escrito ─────────────────────────────────────────────────── #}
+  <div>
+    <div class="hoja">
+      {% for cap in documento %}
+        <section class="capitulo-doc" id="cap-{{ cap.clave }}">
+          <header>
+            <h2>{{ cap.info.titulo }}</h2>
+            <span class="nota">{{ cap.info.descripcion }}</span>
+            {% if cap.info.completo %}
+              <span class="bloque-estado ok">✓</span>
+            {% else %}
+              <span class="bloque-estado falta">Falta {{ cap.info.total_faltantes }}</span>
+            {% endif %}
+          </header>
+          {% if cap.presente %}
+            {{ cap.html|safe }}
+          {% else %}
+            <p class="capitulo-vacio">
+              Este capítulo todavía no se genera con los datos capturados.
+            </p>
+          {% endif %}
+        </section>
+      {% endfor %}
+    </div>
+
+    <p class="ayuda mt-3">
+      Los recuadros ámbar son huecos: un dato que falta y que el motor sustituiría por un
+      texto genérico o por un marcador. Haz clic para ir al campo que lo completa.
+    </p>
+  </div>
+
+  {# ─── Paneles de revisión ────────────────────────────────────────── #}
+  <aside>
+    <div class="panel-lateral">
+      <h3>Huecos del escrito</h3>
+      <p>Lo que falta, sin buscarlo en seis pantallas.</p>
+      <ul class="lista-estado">
+        {% for r in estado_demanda.pendientes %}
+          <li>
+            <span class="marca {% if r.obligatorio %}falta{% else %}ok{% endif %}">
+              {% if r.obligatorio %}!{% else %}·{% endif %}
+            </span>
+            <span>
+              <a href="{% url 'demanda_asistente' expediente.pk %}?espacio={{ r.espacio }}&seccion={{ r.bloque }}#{{ r.ancla }}"
+                 class="font-semibold text-blue-700 hover:underline">{{ r.etiqueta }}</a>
+              <span class="detalle">
+                {{ r.ayuda }}
+                {% if not r.obligatorio %}<em>Opcional.</em>{% endif %}
+              </span>
+            </span>
+          </li>
+        {% empty %}
+          <li>
+            <span class="marca ok">✓</span>
+            <span>Sin huecos: todos los datos que la demanda necesita están capturados.</span>
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+
+    <div class="panel-lateral">
+      <h3>Coherencia del escrito</h3>
+      <p>Contrastes entre lo capturado y lo que el documento va a afirmar.</p>
+      {% for c in estado_demanda.coherencias %}
+        <p class="aviso {% if c.nivel == 'ojo' %}ojo{% elif c.nivel == 'bien' %}bien{% else %}legal{% endif %}">
+          {{ c.texto }}
+        </p>
+      {% endfor %}
+    </div>
+
+    <div class="panel-lateral">
+      <h3>Texto fijo del despacho</h3>
+      <p>
+        Artículos, juramento y ofrecimiento de pruebas se editan una vez en el machote,
+        no caso por caso. Aquí sólo se verifican.
+      </p>
+    </div>
+  </aside>
+</div>

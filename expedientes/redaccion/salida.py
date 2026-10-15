@@ -47,41 +47,59 @@ def _objeto_html(objeto) -> str:
 # HTML (vista previa)
 # ══════════════════════════════════════════════════════════════════════════
 
-def generar_demanda_capitulos_html(datos: dict, calculo: dict,
-                                   tipo_despido: str = 'injustificado') -> str:
-    """HTML de la demanda completa con la estructura de capítulos."""
+# Orden de los bloques en el escrito. La pantalla del documento usa el mismo
+# orden para el índice de capítulos, así que vive aquí y no en la plantilla.
+ORDEN_HTML = ('encabezado', 'proemio', 'demandados', 'prestaciones', 'jornada',
+              'hechos', 'pruebas', 'derecho', 'cierre')
+
+
+def capitulos_html(datos: dict, calculo: dict,
+                   tipo_despido: str = 'injustificado') -> dict:
+    """HTML de la demanda SEPARADO por capítulos: {capítulo: html}.
+
+    La pantalla del documento necesita cada capítulo por separado para poder
+    señalar en cuál falta algo; `generar_demanda_capitulos_html` los vuelve a
+    unir en el mismo orden para la descarga y las pruebas.
+    """
     cap = capitulos(datos, calculo, tipo_despido)
     car = cap['caratula']
-    partes = []
+    bloques = {}
 
-    partes.append('<p><strong>INICIO.</strong></p>')
-    partes.append(f'<p><strong>ACTOR.</strong> {_e(car["actor"])}</p>')
-    partes.append(f'<p><strong>ACCIÓN.</strong> {_e(car["accion"])}</p>')
-    partes.append(f'<h2>{_e(car["tribunal"])}</h2>')
-    partes.append('<p><strong>P R E S E N T E.-</strong></p>')
+    bloques['encabezado'] = '\n'.join([
+        '<p><strong>INICIO.</strong></p>',
+        f'<p><strong>ACTOR.</strong> {_e(car["actor"])}</p>',
+        f'<p><strong>ACCIÓN.</strong> {_e(car["accion"])}</p>',
+        f'<h2>{_e(car["tribunal"])}</h2>',
+        '<p><strong>P R E S E N T E.-</strong></p>',
+    ])
 
-    for parrafo in cap['proemio'].split('\n\n'):
-        partes.append(f'<p>{_e(parrafo)}</p>')
+    bloques['proemio'] = '\n'.join(
+        f'<p>{_e(parrafo)}</p>' for parrafo in cap['proemio'].split('\n\n')
+    )
 
+    demandados = []
     if cap['demandados']:
-        partes.append('<p>Que mediante el presente escrito y con fundamento en, '
-                      'vengo a demandar a:</p>')
+        demandados.append('<p>Que mediante el presente escrito y con fundamento en, '
+                          'vengo a demandar a:</p>')
         romanos = ['I', 'II', 'III', 'IV', 'V']
         for i, numeral in enumerate(cap['demandados']):
             etiqueta = romanos[i] if i < len(romanos) else str(i + 1)
-            partes.append(f'<p><strong>{etiqueta}.-</strong> {_e(numeral)}</p>')
+            demandados.append(f'<p><strong>{etiqueta}.-</strong> {_e(numeral)}</p>')
+    demandados.append(f'<p>{_e(cap["introduccion"])}</p>')
+    bloques['demandados'] = '\n'.join(demandados)
 
-    partes.append(f'<p>{_e(cap["introduccion"])}</p>')
-
+    prestaciones = []
     if cap['prestaciones']:
-        partes.append(f'<h3>{encabezado_capitulo("PRESTACIONES")}</h3>')
+        prestaciones.append(f'<h3>{encabezado_capitulo("PRESTACIONES")}</h3>')
         for i, renglon in enumerate(cap['prestaciones'], start=1):
-            partes.append(f'<p>{i}. {_e(renglon)}</p>')
+            prestaciones.append(f'<p>{i}. {_e(renglon)}</p>')
+    bloques['prestaciones'] = '\n'.join(prestaciones)
 
+    jornada = []
     if cap['jornada']['filas']:
-        partes.append(f'<h3>{encabezado_capitulo("JORNADA SEMANAL")}</h3>')
+        jornada.append(f'<h3>{encabezado_capitulo("JORNADA SEMANAL")}</h3>')
         if cap['jornada']['resumen']:
-            partes.append(f'<p>{_e(cap["jornada"]["resumen"])}</p>')
+            jornada.append(f'<p>{_e(cap["jornada"]["resumen"])}</p>')
         enc = cap['jornada']['encabezados']
         cabecera = ''.join(f'<th>{_e(h)}</th>' for h in enc)
         filas = ''
@@ -94,34 +112,50 @@ def generar_demanda_capitulos_html(datos: dict, calculo: dict,
                 f'<td>{_e(fila["horas"])}</td>'
                 '</tr>'
             )
-        partes.append(f'<table><thead><tr>{cabecera}</tr></thead>'
-                      f'<tbody>{filas}</tbody></table>')
+        jornada.append(f'<table><thead><tr>{cabecera}</tr></thead>'
+                       f'<tbody>{filas}</tbody></table>')
+    bloques['jornada'] = '\n'.join(jornada)
 
+    hechos = []
     if cap['hechos']:
-        partes.append(f'<h3>{encabezado_capitulo("HECHOS")}</h3>')
+        hechos.append(f'<h3>{encabezado_capitulo("HECHOS")}</h3>')
         for hecho in cap['hechos']:
-            partes.append(f'<p>{_e(hecho)}</p>')
+            hechos.append(f'<p>{_e(hecho)}</p>')
+    bloques['hechos'] = '\n'.join(hechos)
 
+    pruebas = []
     if cap['pruebas']:
-        partes.append('<h3>PRUEBAS</h3>')
+        pruebas.append('<h3>PRUEBAS</h3>')
         for i, prueba in enumerate(cap['pruebas'], start=1):
-            partes.append(
+            pruebas.append(
                 f'<p><strong>{i}.- {_e(prueba["titulo"])}.</strong> '
                 f'{_e(prueba["texto"])}</p>'
             )
             objeto = _objeto_html(prueba.get('objeto'))
             if objeto:
-                partes.append(objeto)
+                pruebas.append(objeto)
+    bloques['pruebas'] = '\n'.join(pruebas)
 
+    derecho = []
     if cap['derecho']:
-        partes.append(f'<h3>{encabezado_capitulo("DERECHO")}</h3>')
-        partes.append(f'<p>{_e(cap["derecho"])}</p>')
+        derecho.append(f'<h3>{encabezado_capitulo("DERECHO")}</h3>')
+        derecho.append(f'<p>{_e(cap["derecho"])}</p>')
+    bloques['derecho'] = '\n'.join(derecho)
 
-    partes.append('<p>&nbsp;</p>')
-    partes.append('<p><strong>PROTESTO LO NECESARIO</strong></p>')
-    partes.append(f'<p>{_e(car["actor"])}</p>')
+    bloques['cierre'] = '\n'.join([
+        '<p>&nbsp;</p>',
+        '<p><strong>PROTESTO LO NECESARIO</strong></p>',
+        f'<p>{_e(car["actor"])}</p>',
+    ])
 
-    return '\n'.join(partes)
+    return bloques
+
+
+def generar_demanda_capitulos_html(datos: dict, calculo: dict,
+                                   tipo_despido: str = 'injustificado') -> str:
+    """HTML de la demanda completa con la estructura de capítulos."""
+    bloques = capitulos_html(datos, calculo, tipo_despido)
+    return '\n'.join(bloques[clave] for clave in ORDEN_HTML if bloques.get(clave))
 
 
 # ══════════════════════════════════════════════════════════════════════════

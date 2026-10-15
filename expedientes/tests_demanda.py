@@ -187,13 +187,30 @@ class DemandaEnVivoTests(BaseDemanda):
         self.assertEqual(self.client.post(self.url, {}).status_code, 404)
 
     def test_assistant_has_sandboxed_live_preview_and_correct_capture_names(self):
-        response = self.client.get(reverse('demanda_asistente', args=[self.expediente.pk]))
+        """Los tres espacios capturan con los nombres correctos y el documento es el real.
+
+        Antes esta prueba exigía un iframe con `sandbox=""` y `demanda_live.js`
+        (una vista previa generada por OTRO motor, distinta del .docx que se
+        descarga). Ahora el espacio Documento muestra la demanda del mismo motor
+        de capítulos, con los huecos señalados en su lugar.
+        """
+        url = reverse('demanda_asistente', args=[self.expediente.pk])
+
+        response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'sandbox=""')
-        self.assertContains(response, 'demanda_live.js')
+        self.assertContains(response, 'value="2021-09-15"')
+
+        response = self.client.get(url + '?espacio=estrategia')
         self.assertContains(response, 'name="hubo_documento_despido"')
         self.assertNotContains(response, 'name="hubo_documento_despidio"')
-        self.assertContains(response, 'value="2021-09-15"')
+
+        response = self.client.get(url + '?espacio=documento')
+        self.assertEqual(response.status_code, 200)
+        # El documento real, capítulo por capítulo, y no una vista previa aparte
+        for capitulo in ('señalando como domicilio', 'CAPÍTULO DE PRESTACIONES'):
+            self.assertContains(response, capitulo, status_code=200)
+        # Un dato que falta aparece como hueco enlazado, no como marcador suelto
+        self.assertContains(response, 'hueco-doc')
 
     def test_captured_markup_is_escaped_in_generated_document(self):
         response = self.client.post(self.url, {'nombre': '<script>alert(1)</script>'})

@@ -1,8 +1,17 @@
 """
-Prueba E2E del acordeón de demanda en navegador real (Chromium/Playwright).
+Prueba E2E del ESPACIO DE TRABAJO DE LA DEMANDA en navegador real
+(Chromium/Playwright).
+
+Antes recorría el «acordeón de demanda»: siete bloques en una sola página, un
+iframe de vista previa y un solo formulario. Ahora recorre los tres espacios
+(datos · estrategia · documento), comprueba que el semáforo de cada bloque
+refleja lo capturado, que el autoguardado funciona y que un hueco del documento
+lleva al campo que lo completa.
+
 - Login con usuario temporal
-- Abre el acordeón del expediente (real en demanda, o crea uno temporal)
-- Interactúa con las secciones, guarda datos y captura screenshots
+- Crea SIEMPRE un expediente temporal: la prueba captura domicilio, modalidad
+  de la separación y confirmación del IMSS, así que no puede tocar un caso real
+- Captura en los tres espacios, guarda y captura screenshots
 - Deja todo como estaba (elimina el usuario temporal al final)
 
 Artefactos de depuración (carpeta e2e_artifacts/):
@@ -53,23 +62,20 @@ print(f'[setup] Usuario {USER} listo (id={user.pk})')
 from expedientes.models import Expediente, Cliente
 from datetime import date
 
-# Preferir un expediente real en demanda; si no hay, crear uno temporal E2E
-exp = Expediente.objects.filter(estado='demanda').select_related('cliente').order_by('-created_at').first()
-exp_temporal = False
-if not exp:
-    exp_temporal = True
-    # Limpiar restos de corridas anteriores (por curp única)
-    Cliente.objects.filter(curp='E2EA890312HDFLNN01').delete()
-    cli = Cliente(nombre='E2E ACORDEON PRUEBA', curp='E2EA890312HDFLNN01', oficina='clt',
-                  salario=15000, fecha_ingreso=date(2020, 3, 1), fecha_salida=date(2026, 9, 15),
-                  empresa='EMPRESA E2E SA', puesto='Operador', genero='masculino')
-    try:
-        cli.full_clean()
-    except Exception as e:
-        print('[setup] validacion cliente:', e)
-    cli.save()
-    exp = Expediente.objects.create(cliente=cli, asesor=user, estado='demanda', tipo_despido='injustificado')
-    print('[setup] Expediente TEMPORAL creado para la prueba')
+# Expediente TEMPORAL siempre: la prueba captura datos (domicilio, modalidad,
+# IMSS) y no puede permitirse modificar un expediente real de la base.
+exp_temporal = True
+Cliente.objects.filter(curp='E2EA890312HDFLNN01').delete()
+cli = Cliente(nombre='E2E ACORDEON PRUEBA', curp='E2EA890312HDFLNN01', oficina='clt',
+              salario=15000, fecha_ingreso=date(2020, 3, 1), fecha_salida=date(2026, 9, 15),
+              empresa='EMPRESA E2E SA', puesto='Operador', genero='masculino')
+try:
+    cli.full_clean()
+except Exception as e:
+    print('[setup] validacion cliente:', e)
+cli.save()
+exp = Expediente.objects.create(cliente=cli, asesor=user, estado='demanda', tipo_despido='injustificado')
+print('[setup] Expediente TEMPORAL creado para la prueba')
 print(f'[setup] Expediente de prueba: {exp.numero} — {exp.cliente.nombre} (pk={exp.pk})')
 URL = f'{BASE}/expedientes/{exp.pk}/demanda/asistente/'
 
@@ -136,69 +142,110 @@ with sync_playwright() as p:
         check('Login', '/accounts/login' not in page.url, page.url)
         _shot('login_dashboard')
 
-        # ─── 2. Abrir el acordeón ──────────────────────────────────
+        # ─── 2. Espacio de datos ───────────────────────────────────
         page.goto(URL)
         page.wait_for_load_state('networkidle')
-        check('Acordeón carga (HTTP 200)', 'asistente' in page.url)
-        check('Título correcto', page.locator('h1').first.inner_text().strip().lower().find('acorde') >= 0)
+        check('Espacio de trabajo carga (HTTP 200)', 'asistente' in page.url)
+        check('Los tres espacios se anuncian', page.locator('.dem-tab').count() == 3)
+        check('Hay un solo formulario', page.locator('form#demandaForm').count() == 1)
+        for bloque in ('trabajador', 'laboral', 'empresa', 'representacion'):
+            check(f'Bloque #{bloque} en Datos', page.locator(f'#sec-{bloque}').count() == 1)
+        check('La separación NO está en Datos', page.locator('#sec-despido').count() == 0)
+        check('El domicilio del actor se captura aquí',
+              page.locator('#id_direccion_calle').count() == 1)
+        # El semáforo tiene que ser real: con el nombre y la CURP capturados pero
+        # SIN domicilio, el bloque del actor no puede decir «Completo». El
+        # semáforo anterior pintaba verde la sección con un solo campo lleno.
+        check('El semáforo del actor no miente con el domicilio vacío',
+              'Completo' not in page.locator('#sec-trabajador .bloque-estado').inner_text(),
+              page.locator('#sec-trabajador .bloque-estado').inner_text())
+        _shot('espacio_datos', full_page=True)
 
-        secciones = ['trabajador', 'laboral', 'empresa', 'despido', 'revision']
-        for s in secciones:
-            visible = page.locator(f'#sec-{s}').count() == 1
-            check(f'Sección #{s} existe', visible)
-        check('Badge COMPLETA/PENDIENTE presente', page.locator('.acordeon-num').count() == 5)
+        # ─── 3. Autoguardado y estado en vivo ──────────────────────
+        page.fill('#id_direccion_calle', 'Calle E2E 123')
+        page.wait_for_function(
+            "document.getElementById('dem-guardado').textContent.indexOf('guardado') >= 0",
+            timeout=8000)
+        exp.cliente.refresh_from_db()
+        check('El autoguardado persiste sin pulsar Guardar',
+              exp.cliente.direccion_calle == 'Calle E2E 123',
+              repr(exp.cliente.direccion_calle))
+        try:
+            page.wait_for_function(
+                "document.querySelector('#sec-trabajador .bloque-estado')"
+                ".textContent.indexOf('Completo') >= 0",
+                timeout=8000)
+            completo = True
+        except Exception:
+            completo = False
+        check('Al capturar el domicilio el bloque queda completo', completo,
+              page.locator('#sec-trabajador .bloque-estado').inner_text())
 
-        # La primera sección debe estar abierta por defecto
-        abierta = page.locator('.acordeon-seccion.abierta').count()
-        check('Una sección abierta por defecto', abierta == 1, f'abiertas={abierta}')
-        _shot('acordeon_inicial', full_page=True)
+        # ─── 4. Confirmación del IMSS (bloque propio, en Estrategia) ─
+        page.click('.dem-tab[data-espacio="estrategia"]')
+        page.wait_for_load_state('networkidle')
+        check('La pestaña lleva a Estrategia', 'espacio=estrategia' in page.url, page.url)
+        for bloque in ('despido', 'imss', 'prestaciones'):
+            check(f'Bloque #{bloque} en Estrategia', page.locator(f'#sec-{bloque}').count() == 1)
+        check('La hoja de prestaciones está plegada pero presente',
+              page.locator('#sec-prestaciones #agregar-semana').count() == 1)
+        check('El semáforo del IMSS arranca en falta',
+              'Falta' in page.locator('#sec-imss .bloque-estado').inner_text())
+        page.locator('#id_imss_confirmado').check()
+        page.locator('#id_tuvo_imss').check()
+        page.click('button[name=accion][value=guardar]')
+        page.wait_for_load_state('networkidle')
+        check('Guardar permanece en Estrategia', 'espacio=estrategia' in page.url, page.url)
+        page.wait_for_function(
+            "document.querySelector('#sec-imss .bloque-estado').textContent.indexOf('Completo') >= 0",
+            timeout=8000)
+        _shot('espacio_estrategia', full_page=True)
 
-        # ─── 3. Comportamiento acordeón: abre una y cierra la otra ──
-        page.click('[data-acordeon-toggle="despido"]')
-        page.wait_for_timeout(300)
-        check('Sección despido abre', page.locator('#sec-despido').get_attribute('class').find('abierta') >= 0)
-        check('Solo una abierta tras clic', page.locator('.acordeon-seccion.abierta').count() == 1)
-        check('Trabajador se cerró', page.locator('#sec-trabajador').get_attribute('class').find('abierta') == -1)
-
-        # Captura de la sección despido abierta
-        page.locator('#sec-despido').scroll_into_view_if_needed()
-        _shot('seccion_despido')
-
-        # ─── 4. Llenar la sección de despido/pruebas ────────────────
+        # ─── 5. La separación: modalidad y hechos ──────────────────
+        page.locator('#sec-despido input[name="modalidad_despido"][value="verbal"]').check()
         page.fill('textarea[name=circunstancias_despido]',
                   'El día de la separación me entregaron carta de despido sin causa explicada, '
                   'y me indicaron que recogería mi finiquito la semana siguiente.')
         page.fill('textarea[name=testigos]', 'Juan Pérez\nMaría López')
         page.fill('textarea[name=documentos_prueba]', 'Carta de despido\nRecibos de nómina\nCapturas de WhatsApp')
-
-        # ─── 5. Guardar datos (permanece en la página) ──────────────
         page.click('button[name=accion][value=guardar]')
         page.wait_for_load_state('networkidle')
-        check('Guardar permanece en la página', 'asistente' in page.url, page.url)
-        _shot('guardado_exito')
-
-        # Verificar en BD que se guardó (permitido con DJANGO_ALLOW_ASYNC_UNSAFE)
         exp.cliente.refresh_from_db()
-        check('Circunstancias guardadas en BD', 'carta de despido' in (exp.cliente.circunstancias_despido or '').lower())
+        check('Circunstancias guardadas en BD',
+              'carta de despido' in (exp.cliente.circunstancias_despido or '').lower())
         check('Testigos guardados en BD', 'Juan Pérez' in (exp.cliente.testigos or ''))
+        check('Modalidad guardada en BD', exp.cliente.modalidad_despido == 'verbal',
+              repr(exp.cliente.modalidad_despido))
+        check('El bloque de la separación queda completo tras decidir',
+              'Completo' in page.locator('#sec-despido .bloque-estado').inner_text(),
+              page.locator('#sec-despido .bloque-estado').inner_text())
 
-        # Tras el POST, la sección despido debe reabrirse (seccion_abierta)
-        check('Sección despido reabierta tras guardar',
-              page.locator('#sec-despido').get_attribute('class').find('abierta') >= 0)
+        # ─── 6. El documento: índice, huecos y coherencia ──────────
+        page.click('.dem-tab[data-espacio="documento"]')
+        page.wait_for_load_state('networkidle')
+        check('La pestaña lleva al Documento', 'espacio=documento' in page.url, page.url)
+        check('El índice lista los capítulos del escrito',
+              page.locator('.indice ol li').count() >= 7,
+              str(page.locator('.indice ol li').count()))
+        check('El escrito se muestra capítulo por capítulo',
+              page.locator('.hoja .capitulo-doc').count() >= 6)
+        check('El panel de coherencia tiene avisos',
+              page.locator('.aviso').count() > 0)
+        huecos = page.locator('a.hueco-doc')
+        check('Los datos que faltan son huecos enlazados', huecos.count() > 0,
+              str(huecos.count()))
 
-        # Badge de la sección despido ahora COMPLETA
-        badge_despido = page.locator('#sec-despido .acordeon-num').inner_text()
-        check('Badge despido en verde (COMPLETA)', '✓' in badge_despido or 'check' in page.locator('#sec-despido .acordeon-num').inner_html().lower())
-
-        # ─── 6. Revisión final: tipo de despido + cálculo ───────────
-        page.click('[data-acordeon-toggle="revision"]')
-        page.wait_for_timeout(300)
-        tiene_calculo = page.locator('#sec-revision table').count() > 0
-        check('Cálculo automático visible en revisión', tiene_calculo)
-        if tiene_calculo:
-            total_txt = page.locator('#sec-revision').inner_text()
-            check('TOTAL presente', 'TOTAL' in total_txt)
-        _shot('seccion_revision')
+        # El hueco lleva al campo que lo completa
+        if huecos.count():
+            href = huecos.first.get_attribute('href')
+            check('El hueco apunta a un espacio y a un campo',
+                  'espacio=' in href and '#' in href, href)
+            huecos.first.click()
+            page.wait_for_load_state('networkidle')
+            destino = page.evaluate("document.activeElement ? document.activeElement.id : ''")
+            check('Al llegar, el campo del hueco queda enfocado', bool(destino),
+                  f'activo={destino!r} url={page.url}')
+        _shot('espacio_documento', full_page=True)
 
         # ─── 7. Verificación visual: sin desbordes ──────────────────
         overflow = page.evaluate("""() => {
@@ -210,7 +257,8 @@ with sync_playwright() as p:
         # ─── 8. Flujo finalizar → editor de demanda ─────────────────
         page.click('button[name=accion][value=finalizar]')
         page.wait_for_load_state('networkidle')
-        check('Finalizar redirige al editor', '/demanda/' in page.url and '/asistente/' not in page.url, page.url)
+        check('Finalizar redirige al editor',
+              '/demanda/' in page.url and '/asistente/' not in page.url, page.url)
         _shot('editor_demanda', full_page=True)
     except Exception as e:
         # Excepción no esperada: capturar el estado del navegador ANTES de cerrarlo
@@ -242,5 +290,5 @@ if FALLOS:
     print(f'\n[FALLO] {len(FALLOS)} checks fallaron: {FALLOS}')
     print(f'[artefactos] Evidencia en: {ART.resolve()}')
     sys.exit(1)
-print('\n[EXITO] Todos los checks del acordeón pasaron en navegador real.')
+print('\n[EXITO] Todos los checks del espacio de trabajo pasaron en navegador real.')
 print(f'[artefactos] Screenshots del flujo en: {ART.resolve()}')

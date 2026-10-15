@@ -1,52 +1,210 @@
 {% extends 'base.html' %}
 {% load custom_filters svg_tags static %}
-{% block title %}Acordeón de Demanda - {{ expediente.numero }}{% endblock %}
+{% block title %}{{ titulo_espacio }} · Demanda {{ expediente.numero }}{% endblock %}
 
 {% block content %}
 <style>
-  .acordeon-seccion { border: 1px solid #e5e7eb; border-radius: 0.75rem; background: #fff; overflow: hidden; transition: box-shadow .2s ease; }
-  .acordeon-seccion + .acordeon-seccion { margin-top: 0.75rem; }
-  .acordeon-seccion.abierta { box-shadow: 0 4px 14px rgba(29,78,216,0.10); border-color: #93c5fd; }
-  .acordeon-seccion.completa .acordeon-num { background: #dcfce7; color: #15803d; border-color: #bbf7d0; }
-  .acordeon-seccion.incompleta .acordeon-num { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
-  .acordeon-num { transition: all .2s ease; }
-  .acordeon-body { display: none; }
-  .acordeon-seccion.abierta .acordeon-body { display: block; animation: acordeonFade .25s ease; }
-  .acordeon-flecha { transition: transform .2s ease; }
-  .acordeon-seccion.abierta .acordeon-flecha { transform: rotate(180deg); }
-  @keyframes acordeonFade { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
-  .demanda-layout { display:grid; grid-template-columns:minmax(0, 1fr); gap:24px; }
-  .demanda-preview { min-width:0; border:1px solid #e5e7eb; border-radius:12px; background:white; padding:16px; }
-  .demanda-preview iframe { width:100%; height:70vh; border:1px solid #e5e7eb; background:white; margin-top:12px; }
-  @media (min-width:1100px) { .demanda-layout { grid-template-columns:minmax(0, 1fr) minmax(0, 1fr); } .demanda-preview { position:sticky; top:24px; align-self:start; } }
-  .campo-error { border-color: #ef4444 !important; background: #fef2f2; }
+  :root{
+    --tinta:#1f2937; --gris:#6b7280; --linea:#e5e7eb; --fondo:#f6f7f9;
+    --azul:#1d4ed8; --azul-suave:#eff6ff; --ambar:#b45309; --ambar-suave:#fffbeb;
+    --verde:#15803d; --verde-suave:#f0fdf4; --rojo:#b91c1c; --rojo-suave:#fef2f2;
+  }
+
+  /* ── Encabezado del expediente ───────────────────────────────────── */
+  .dem-cabecera{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap}
+  .dem-cabecera h1{margin:0;font-size:20px;font-weight:700;color:var(--tinta)}
+  .dem-cabecera p{margin:0;color:var(--gris);font-size:13px}
+  .dem-chip{font-size:12px;font-weight:600;border-radius:999px;padding:3px 10px;white-space:nowrap}
+  .dem-chip.ambar{background:var(--ambar-suave);color:var(--ambar);border:1px solid #fde68a}
+  .dem-chip.verde{background:var(--verde-suave);color:var(--verde);border:1px solid #bbf7d0}
+
+  /* ── Pestañas de espacio ─────────────────────────────────────────── */
+  .dem-tabs{display:flex;gap:6px;margin-top:16px;flex-wrap:wrap}
+  .dem-tab{border:1px solid var(--linea);background:#fff;border-radius:9px;padding:8px 14px;
+           font-size:13px;font-weight:600;color:var(--gris);display:flex;align-items:center;gap:8px;
+           text-decoration:none}
+  .dem-tab:hover{background:var(--fondo);color:var(--tinta)}
+  .dem-tab[aria-current="page"]{background:var(--azul);border-color:var(--azul);color:#fff}
+  .dem-tab .cuenta{width:18px;height:18px;border-radius:50%;background:var(--linea);color:var(--tinta);
+                   font-size:10px;font-weight:700;display:grid;place-items:center}
+  .dem-tab[aria-current="page"] .cuenta{background:rgba(255,255,255,.25);color:#fff}
+  .dem-tab .cuenta.ok{background:#dcfce7;color:var(--verde)}
+  .dem-tab .cuenta.pend{background:#fee2e2;color:var(--rojo)}
+
+  /* ── Rejilla de trabajo ──────────────────────────────────────────── */
+  .dem-layout{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:20px;align-items:start;margin-top:18px}
+  .dem-layout.documento{grid-template-columns:230px minmax(0,1fr) 300px}
+  @media (max-width:1180px){.dem-layout,.dem-layout.documento{grid-template-columns:minmax(0,1fr)}}
+  .dem-lateral{position:sticky;top:16px}
+
+  /* ── Bloques de captura ──────────────────────────────────────────── */
+  .bloque{background:#fff;border:1px solid var(--linea);border-radius:12px;overflow:hidden}
+  .bloque + .bloque{margin-top:14px}
+  .bloque.incompleto{border-color:#fecaca}
+  .bloque-cabecera{display:flex;align-items:flex-start;gap:12px;justify-content:space-between;
+                   padding:14px 16px;border-bottom:1px solid var(--linea);background:#fff}
+  .bloque-cabecera h2{margin:0;font-size:15px;font-weight:700;color:var(--tinta)}
+  .bloque-cabecera p{margin:2px 0 0;font-size:12px;color:var(--gris)}
+  .bloque-estado{font-size:11px;font-weight:700;border-radius:999px;padding:3px 9px;white-space:nowrap}
+  .bloque-estado.ok{background:#dcfce7;color:var(--verde)}
+  .bloque-estado.falta{background:#fee2e2;color:var(--rojo)}
+  .bloque-cuerpo{padding:16px}
+  .bloque-campos{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}
+  .bloque-campos .ancho{grid-column:1/-1}
+  .bloque label,.campo label{display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:4px}
+  .ayuda{font-size:11px;color:var(--gris);margin-top:4px}
+  .requerido{color:var(--rojo)}
+  .campo-error{border-color:#ef4444 !important;background:#fef2f2}
+  .grupo-destino{animation:destello 1.4s ease}
+  @keyframes destello{0%{background:#fef3c7}100%{background:transparent}}
+  .aviso{font-size:12px;border-radius:8px;padding:9px 11px;margin-top:10px}
+  .aviso.legal{background:var(--azul-suave);color:#1e3a8a;border:1px solid #bfdbfe}
+  .aviso.ojo{background:var(--ambar-suave);color:#92400e;border:1px solid #fde68a}
+  .aviso.bien{background:var(--verde-suave);color:#166534;border:1px solid #bbf7d0}
+  .opciones{display:grid;gap:6px}
+  .opciones.dos{grid-template-columns:1fr 1fr}
+  .op{border:1px solid var(--linea);border-radius:9px;padding:9px 11px;font-size:13px;
+      display:flex;gap:9px;align-items:flex-start;background:#fff;cursor:pointer}
+  .op:hover{border-color:#93c5fd}
+  .op.marcada{border-color:var(--azul);background:var(--azul-suave)}
+  .op input{margin-top:3px}
+
+  /* ── Lista de estado lateral ─────────────────────────────────────── */
+  .panel-lateral{background:#fff;border:1px solid var(--linea);border-radius:12px;padding:14px}
+  .panel-lateral + .panel-lateral{margin-top:12px}
+  .panel-lateral h3{margin:0 0 4px;font-size:14px}
+  .panel-lateral p{margin:0;font-size:11.5px;color:var(--gris)}
+  .lista-estado{margin:12px 0 0;padding:0;list-style:none}
+  .lista-estado li{display:flex;gap:9px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--linea);font-size:12.5px}
+  .lista-estado li:first-child{border-top:0}
+  .lista-estado .marca{flex:0 0 18px;height:18px;border-radius:50%;display:grid;place-items:center;font-size:10px;font-weight:700}
+  .lista-estado .marca.ok{background:#dcfce7;color:var(--verde)}
+  .lista-estado .marca.falta{background:#fee2e2;color:var(--rojo)}
+  .lista-estado .detalle{color:var(--gris);font-size:11px;display:block;margin-top:1px}
+
+  /* ── Índice de capítulos del documento ───────────────────────────── */
+  .indice ol{margin:10px 0 0;padding:0;list-style:none}
+  .indice a{display:flex;gap:9px;align-items:flex-start;text-decoration:none;color:var(--tinta);
+            border:1px solid transparent;border-radius:9px;padding:8px 10px;font-size:13px}
+  .indice a:hover{background:var(--fondo)}
+  .indice .num{flex:0 0 18px;height:18px;border-radius:50%;background:#f3f4f6;color:#374151;
+               font-size:10px;font-weight:700;display:grid;place-items:center;margin-top:2px}
+  .indice .num.ok{background:#dcfce7;color:var(--verde)}
+  .indice .num.falta{background:#fee2e2;color:var(--rojo)}
+  .indice .num.fijo{background:#eef2ff;color:#3730a3}
+  .indice .rot{display:block;font-weight:600}
+  .indice .sub{display:block;color:var(--gris);font-size:11px}
+
+  /* ── Hoja del escrito ────────────────────────────────────────────── */
+  .hoja{background:#fff;border:1px solid var(--linea);border-radius:12px;padding:30px 38px;
+        font-family:Georgia,"Times New Roman",serif;font-size:13.5px;line-height:1.75;color:#111}
+  .hoja h2{text-align:center;font-size:14px;letter-spacing:.04em}
+  .hoja h3{font-size:12.5px;letter-spacing:.09em;text-transform:uppercase;text-align:center;
+           margin:26px 0 10px;padding-bottom:6px;border-bottom:1px solid #d1d5db}
+  .hoja p{margin:0 0 9px;text-align:justify}
+  .hoja table{width:100%;border-collapse:collapse;font-size:12px;margin:10px 0}
+  .hoja th,.hoja td{border:1px solid #d1d5db;padding:5px 7px;text-align:left}
+  .hueco-doc{background:var(--ambar-suave);border:1px dashed #f59e0b;border-radius:5px;padding:1px 7px;
+             color:var(--ambar);font-family:-apple-system,"Segoe UI",sans-serif;font-size:11.5px;
+             font-weight:600;text-decoration:none;white-space:nowrap}
+  .hueco-doc:hover{background:#fef3c7}
+  .capitulo-doc{margin-bottom:22px}
+  .capitulo-doc > header{display:flex;align-items:baseline;gap:10px;border-bottom:1px solid var(--linea);
+                         padding-bottom:6px;margin-bottom:12px}
+  .capitulo-doc > header h2{margin:0;font-size:15px;font-family:-apple-system,"Segoe UI",sans-serif}
+  .capitulo-doc > header .nota{font-size:11.5px;color:var(--gris);font-family:-apple-system,"Segoe UI",sans-serif}
+  .capitulo-vacio{font-size:12.5px;color:var(--gris);font-style:italic}
+
+  /* ── Barra de acciones ───────────────────────────────────────────── */
+  .dem-acciones{position:sticky;bottom:0;margin-top:18px;padding:10px 4px;
+                background:rgba(246,247,249,.95);backdrop-filter:blur(6px);
+                border-top:1px solid var(--linea);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .dem-acciones .estado-guardado{font-size:12px;color:var(--gris);margin-right:auto}
+  .btn-link{border-radius:9px;padding:9px 15px;font-size:13px;font-weight:600;text-decoration:none;
+            display:inline-flex;align-items:center;gap:7px;cursor:pointer}
+  .btn-borde{background:#fff;border:1px solid var(--linea);color:#374151}
+  .btn-borde:hover{background:var(--fondo)}
+  .btn-azul{background:var(--azul);border:1px solid var(--azul);color:#fff}
+  .btn-verde{background:#047857;border:1px solid #047857;color:#fff}
+  .btn-rojo{background:#fff;border:1px solid #be123c;color:#be123c}
+  .btn-rojo:hover{background:#fff1f2}
+  .btn-deshabilitado{opacity:.55;pointer-events:none}
 </style>
 
-<div class="max-w-7xl mx-auto pb-10">
-  <!-- Header -->
-  <div class="flex items-center justify-between mb-5">
-    <div>
-      <h1 class="text-2xl font-bold text-gray-800">{% svg 'compass' %} Acordeón de Demanda</h1>
-      <p class="text-gray-500 text-sm">
-        Expediente: <strong>{{ expediente.numero }}</strong> — {{ expediente.cliente.nombre }}
-      </p>
-      <p class="text-gray-400 text-xs mt-0.5">Completa la hoja de datos y consulta la demanda en vivo. Los cambios válidos se guardan como borrador; revisa el documento antes de descargarlo.</p>
+<div class="max-w-[1400px] mx-auto pb-10">
+  <div class="flex items-start justify-between gap-4 flex-wrap">
+    <div class="dem-cabecera">
+      <div>
+        <h1>{{ cliente.nombre|default:'Sin nombre capturado' }}</h1>
+        <p>
+          Expediente {{ expediente.numero }} ·
+          {{ expediente.get_tipo_despido_display|default:'Sin tipo de separación' }} ·
+          {{ expediente.get_estado_display }}
+        </p>
+      </div>
+      {% if estado_demanda.resumen.listo %}
+        <span class="dem-chip verde" id="dem-chip" data-listo="1"
+              data-opcionales="{{ estado_demanda.resumen.opcionales }}">
+          {% if estado_demanda.resumen.completo %}
+            Sin datos pendientes: la demanda se puede presentar
+          {% else %}
+            Se puede presentar · {{ estado_demanda.resumen.opcionales }} precisi{{ estado_demanda.resumen.opcionales|pluralize:"ón,ones" }}
+            del relato por afinar
+          {% endif %}
+        </span>
+      {% else %}
+        <span class="dem-chip ambar" id="dem-chip" data-listo="0"
+              data-obligatorios="{{ estado_demanda.resumen.obligatorios }}"
+              data-decisiones="{{ estado_demanda.resumen.decisiones }}">
+          Falta{{ estado_demanda.resumen.obligatorios|pluralize:"n" }}
+          {{ estado_demanda.resumen.obligatorios }} requisito{{ estado_demanda.resumen.obligatorios|pluralize:"s" }}
+          para poder presentar{% if estado_demanda.resumen.decisiones %} · {{ estado_demanda.resumen.decisiones }}
+          {{ estado_demanda.resumen.decisiones|pluralize:"es una decisión,son decisiones" }} del abogado{% endif %}
+        </span>
+      {% endif %}
     </div>
     <a href="{% if user.profile.rol == 'abogada' %}{% url 'dashboard_abogada' %}{% else %}{% url 'expediente_detail' expediente.pk %}{% endif %}"
-       class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm flex items-center gap-1.5">
+       class="btn-link btn-borde">
       <i class="fas fa-arrow-left text-xs"></i> Volver
     </a>
   </div>
 
-  <div class="demanda-layout">
-  <form method="post" action="{% url 'demanda_asistente' expediente.pk %}" id="acordeonForm" data-preview-url="{% url 'demanda_vista_previa' expediente.pk %}">
+  <nav class="dem-tabs" role="tablist" aria-label="Espacios de la demanda">
+    {% for clave, titulo, descripcion in espacios %}
+      <a class="dem-tab" role="tab"
+         href="{% url 'demanda_asistente' expediente.pk %}?espacio={{ clave }}"
+         data-espacio="{{ clave }}"
+         {% if clave == espacio %}aria-current="page"{% endif %}
+         title="{{ descripcion }}">
+        {% if clave == 'datos' %}
+          <span class="cuenta {% if not pendientes_por_espacio.datos %}ok{% else %}pend{% endif %}">
+            {% if not pendientes_por_espacio.datos %}✓{% else %}!{% endif %}
+          </span>
+        {% elif clave == 'estrategia' %}
+          <span class="cuenta {% if not pendientes_por_espacio.estrategia %}ok{% else %}pend{% endif %}">
+            {% if not pendientes_por_espacio.estrategia %}✓{% else %}!{% endif %}
+          </span>
+        {% else %}
+          <span class="cuenta {% if estado_demanda.resumen.listo %}ok{% else %}pend{% endif %}">
+            {% if estado_demanda.resumen.listo %}✓{% else %}{{ estado_demanda.resumen.pendientes }}{% endif %}
+          </span>
+        {% endif %}
+        {{ titulo }}
+      </a>
+    {% endfor %}
+  </nav>
+
+  <form method="post" action="{% url 'demanda_asistente' expediente.pk %}"
+        id="demandaForm" data-espacio="{{ espacio }}"
+        data-preview-url="{% url 'demanda_vista_previa' expediente.pk %}">
     {% csrf_token %}
+    <input type="hidden" name="espacio" value="{{ espacio }}">
     <input type="hidden" name="seccion_abierta" id="seccion_abierta" value="{{ seccion_abierta }}">
 
     {% if errores %}
-    <div class="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-      <p class="text-red-600 text-sm font-medium">Corrige los campos marcados en rojo:</p>
-      <ul class="mt-1 list-disc list-inside text-red-600 text-xs">
+    <div class="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+      <p class="text-red-700 text-sm font-medium">Corrige los campos marcados en rojo:</p>
+      <ul class="mt-1 list-disc list-inside text-red-700 text-xs">
         {% for campo, msgs in errores.items %}
           {% for msg in msgs %}<li>{{ campo }}: {{ msg }}</li>{% endfor %}
         {% endfor %}
@@ -54,645 +212,59 @@
     </div>
     {% endif %}
 
-    <!-- ══════════════ SECCIONES DEL ACORDEÓN ══════════════ -->
+    {% if espacio == 'datos' %}
+      {% include 'expedientes/_espacio_datos.html' %}
+    {% elif espacio == 'estrategia' %}
+      {% include 'expedientes/_espacio_estrategia.html' %}
+    {% else %}
+      {% include 'expedientes/_espacio_documento.html' %}
+    {% endif %}
 
-    <!-- ─── 1. Trabajador (actor) ─────────────────────────────────── -->
-    {% include 'expedientes/_acordeon_header.html' with sec_id='trabajador' num=1 titulo=pasos_info|get_item:'trabajador'|get_item:'titulo' descripcion=pasos_info|get_item:'trabajador'|get_item:'descripcion' completa=cliente.nombre %}
-    <div class="acordeon-body">
-      <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div class="md:col-span-2">
-          <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.nombre.label }} <span class="text-red-500">*</span></label>
-          {{ form.nombre }}
-          {% if errores.nombre %}<p class="text-red-500 text-xs mt-1">{{ errores.nombre.0 }}</p>{% endif %}
-          <p class="text-xs text-gray-400 mt-0.5">Este nombre aparecerá en la parte superior (ACTOR) y en la FIRMA al final de la demanda.</p>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.curp.label }} <span class="text-red-500">*</span></label>
-          {{ form.curp }}
-          {% if errores.curp %}<p class="text-red-500 text-xs mt-1">{{ errores.curp.0 }}</p>{% endif %}
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.rfc.label }}</label>
-          {{ form.rfc }}
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.telefono.label }}</label>
-          {{ form.telefono }}
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.whatsapp.label }}</label>
-          {{ form.whatsapp }}
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.email.label }}</label>
-          {{ form.email }}
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.fecha_nacimiento.label }}</label>
-          {{ form.fecha_nacimiento }}
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.genero.label }}</label>
-          {{ form.genero }}
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.como_supo.label }}</label>
-          {{ form.como_supo }}
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.oficina.label }}</label>
-          {{ form.oficina }}
-          {% if errores.oficina %}<p class="text-red-500 text-xs mt-1">{{ errores.oficina.0 }}</p>{% endif %}
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.nacionalidad.label }}</label>
-          {{ form.nacionalidad }}
-          <p class="text-xs text-gray-400 mt-0.5">Aparece en el proemio: «con nacionalidad mexicana».</p>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.ciudad.label }}</label>
-          {{ form.ciudad }}
-          <p class="text-xs text-gray-400 mt-0.5">Ciudad donde fue contratado (hecho 1 de la demanda).</p>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.estado.label }}</label>
-          {{ form.estado }}
-        </div>
-      </div>
-    </div>
-    </div>
+    <div class="dem-acciones">
+      <span class="estado-guardado" id="dem-guardado" role="status" aria-live="polite">
+        {% if errores %}Hay campos con error.{% else %}Borrador con guardado automático.{% endif %}
+      </span>
 
-    <!-- ─── 2. Información laboral ────────────────────────────────── -->
-    {% include 'expedientes/_acordeon_header.html' with sec_id='laboral' num=2 titulo=pasos_info|get_item:'laboral'|get_item:'titulo' descripcion=pasos_info|get_item:'laboral'|get_item:'descripcion' completa=cliente.salario %}
-    <div class="acordeon-body">
-      <div class="p-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div class="md:col-span-3">
-          <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.puesto.label }}</label>
-          {{ form.puesto }}
-        </div>
-        <div class="md:col-span-3">
-          <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.actividades.label }}</label>
-          {{ form.actividades }}
-          <p class="text-xs text-gray-400 mt-0.5">Funciones que desempeñaba. Se usa en el hecho del puesto. Puedes capturarlas como lista A), B), C)…</p>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.tipo_contrato.label }}</label>
-          {{ form.tipo_contrato }}
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.horario_entrada.label }}</label>
-          {{ form.horario_entrada }}
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.horario_salida.label }}</label>
-          {{ form.horario_salida }}
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.dias_trabajo.label }}</label>
-          {{ form.dias_trabajo }}
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.dia_descanso.label }}</label>
-          {{ form.dia_descanso }}
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.salario.label }} <span class="text-red-500">*</span></label>
-          {{ form.salario }}
-          {% if errores.salario %}<p class="text-red-500 text-xs mt-1">{{ errores.salario.0 }}</p>{% endif %}
-          <p class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1 mt-1">
-            <i class="fas fa-exclamation-triangle"></i> Captura el importe <strong>MENSUAL</strong>.
-            Si le pagan por semana, convierte: <strong>semanal × 4.33</strong>. El motor calcula el salario diario a partir de este dato.
-          </p>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.periodo_pago.label }}</label>
-          {{ form.periodo_pago }}
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.horas_semanales.label }}</label>
-          {{ form.horas_semanales }}
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.jornada.label }}</label>
-          {{ form.jornada }}
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.fecha_ingreso.label }} <span class="text-red-500">*</span></label>
-          {{ form.fecha_ingreso }}
-          {% if errores.fecha_ingreso %}<p class="text-red-500 text-xs mt-1">{{ errores.fecha_ingreso.0 }}</p>{% endif %}
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.fecha_salida.label }} <span class="text-red-500">*</span></label>
-          {{ form.fecha_salida }}
-          {% if errores.fecha_salida %}<p class="text-red-500 text-xs mt-1">{{ errores.fecha_salida.0 }}</p>{% endif %}
-        </div>
-      </div>
-    </div>
-    </div>
+      <a href="{% url 'demanda_capitulos_descargar' expediente.pk %}"
+         class="btn-link btn-rojo {% if not puede_descargar %}btn-deshabilitado{% endif %}"
+         id="dem-descargar"
+         {% if not puede_descargar %}
+           aria-disabled="true" tabindex="-1"
+           title="Faltan {{ bloqueos|length }} requisitos para presentar: {{ bloqueos|join:', ' }}"
+         {% else %}
+           title="Descarga la demanda completa con los siete capítulos, lista para presentar"
+         {% endif %}>
+        <i class="fas fa-file-word text-xs"></i> Descargar demanda final
+      </a>
 
-    <div class="card p-4 mb-4 space-y-3">
-      <h3 class="font-semibold">Registro ante el IMSS</h3>
-      <input type="hidden" name="imss_present" value="1">
-      <label class="flex gap-2">{{ form.imss_confirmado }} Confirmé si el trabajador estuvo dado de alta</label>
-      <label class="flex gap-2">{{ form.tuvo_imss }} ¿El trabajador estuvo dado de alta en el IMSS?</label>
-      <div id="imss-detalles" class="space-y-3">
-        <label class="flex gap-2">{{ form.imss_salario_inferior }} ¿Fue registrado con un salario inferior al real?</label>
-        <div><label for="id_imss_salario_diario">Salario diario registrado</label>{{ form.imss_salario_diario }}{% for e in errores.imss_salario_diario %}<p class="text-red-700">{{ e }}</p>{% endfor %}</div>
-        <div><label for="id_imss_documento">Documento o fuente del registro</label>{{ form.imss_documento }}</div>
-        <p class="text-xs text-gray-600">Esta sección se incorpora a los hechos cuando se confirma el alta. La afirmación sobre salario inferior depende de su propia casilla.</p>
-      </div>
-    </div>
+      {% if espacio != 'documento' %}
+      <button type="submit" name="accion" value="guardar" class="btn-link btn-borde">
+        <i class="fas fa-save text-xs"></i> Guardar datos
+      </button>
+      {% endif %}
 
-    <!-- ─── 3. Empresa / Patrón (demandado) ───────────────────────── -->
-    {% include 'expedientes/_acordeon_header.html' with sec_id='empresa' num=3 titulo=pasos_info|get_item:'empresa'|get_item:'titulo' descripcion=pasos_info|get_item:'empresa'|get_item:'descripcion' completa=cliente.empresa %}
-    <div class="acordeon-body">
-      <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-        {% include 'expedientes/_empresa_buscador.html' with empresa_actual=cliente.empresa_razon_social|default:cliente.empresa %}
-        <div class="md:col-span-2">
-          <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.empresa.label }} <span class="text-red-500">*</span></label>
-          {{ form.empresa }}
-          {% if errores.empresa %}<p class="text-red-500 text-xs mt-1">{{ errores.empresa.0 }}</p>{% endif %}
-        </div>
-        <div class="md:col-span-2">
-          <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.empresa_razon_social.label }}</label>
-          {{ form.empresa_razon_social }}
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.empresa_actividad.label }}</label>
-          {{ form.empresa_actividad }}
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.tipo_persona_citado.label }}</label>
-          {{ form.tipo_persona_citado }}
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.empresa_telefono.label }}</label>
-          {{ form.empresa_telefono }}
-        </div>
-        <div class="md:col-span-2">
-          <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
-            <div class="md:col-span-2">
-              <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.empresa_calle.label }}</label>
-              {{ form.empresa_calle }}
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.empresa_numero.label }}</label>
-              {{ form.empresa_numero }}
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.empresa_cp.label }}</label>
-              {{ form.empresa_cp }}
-            </div>
-            <div class="md:col-span-4">
-              <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.empresa_colonia.label }}</label>
-              {{ form.empresa_colonia }}
-            </div>
-          </div>
-        </div>
-        <div class="md:col-span-2">
-          <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.empresa_referencias.label }}</label>
-          {{ form.empresa_referencias }}
-        </div>
-      </div>
-    </div>
-    </div>
+      <a href="{% url 'demanda_editor' expediente.pk %}" class="btn-link btn-borde">
+        <i class="fas fa-file-edit text-xs"></i> Editar el texto
+      </a>
 
-    <!-- ─── 4. Despido, testigos y pruebas ────────────────────────── -->
-    {% include 'expedientes/_acordeon_header.html' with sec_id='despido' num=4 titulo=pasos_info|get_item:'despido'|get_item:'titulo' descripcion=pasos_info|get_item:'despido'|get_item:'descripcion' completa=cliente.modalidad_despido %}
-    <div class="acordeon-body">
-      <div class="p-6 space-y-5">
-
-        <div class="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <h3 class="text-sm font-semibold text-blue-900 mb-1">Modalidad de la separación</h3>
-          <p class="text-xs text-blue-700 mb-3">
-            La modalidad determina cómo se redacta el hecho de la separación en la demanda.
-            Sin aviso escrito, el artículo 47 LFT presume la separación injustificada
-            aunque el patrón alegue una causa.
-          </p>
-          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
-            {% for valor, etiqueta in cliente.MODALIDAD_DESPIDO_CHOICES %}
-            <label class="flex items-center gap-2 px-3 py-2 bg-white border rounded-lg cursor-pointer
-                          {% if cliente.modalidad_despido == valor %}border-blue-500 ring-1 ring-blue-300{% else %}border-gray-200{% endif %}">
-              <input type="radio" name="modalidad_despido" value="{{ valor }}"
-                     class="text-blue-600 focus:ring-blue-500"
-                     {% if cliente.modalidad_despido == valor %}checked{% endif %}>
-              <span class="text-xs text-gray-700">{{ etiqueta }}</span>
-            </label>
-            {% endfor %}
-          </div>
-
-          <label class="flex items-center gap-2 text-sm text-gray-700">
-            <input type="checkbox" name="hubo_documento_despido" value="on" class="rounded border-gray-300 text-blue-600"
-                   {% if cliente.hubo_documento_despido %}checked{% endif %}>
-            Se entregó documento de terminación (aviso escrito)
-          </label>
-        </div>
-
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Centro de trabajo</label>
-            <input type="text" name="lugar_trabajo" class="input w-full"
-                   placeholder="Nombre o dirección donde prestaba servicios"
-                   value="{{ cliente.lugar_trabajo }}">
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Quién comunicó la separación</label>
-            <input type="text" name="despido_comunicado_por" class="input w-full"
-                   placeholder="Nombre de quien se la comunicó" value="{{ cliente.despido_comunicado_por }}">
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Dónde ocurrió</label>
-            <input type="text" name="despido_lugar" class="input w-full"
-                   placeholder="Oficina, caseta o lugar físico" value="{{ cliente.despido_lugar }}">
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Motivo en el documento</label>
-            <input type="text" name="despido_documento_motivo" class="input w-full"
-                   placeholder="Causa que consigna el documento (si hubo)"
-                   value="{{ cliente.despido_documento_motivo }}">
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Hora del despido</label>
-            <input type="text" name="hora_despido" class="input w-full" maxlength="5"
-                   placeholder="14:45" value="{{ cliente.hora_despido }}">
-            <p class="text-xs text-gray-400 mt-0.5">Se cita en el hecho de la separación: «aproximadamente las 14:45 horas».</p>
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Puesto de quien comunicó la separación</label>
-            <input type="text" name="despido_persona_puesto" class="input w-full"
-                   placeholder="Ej: personal de Recursos Humanos, líder de línea"
-                   value="{{ cliente.despido_persona_puesto }}">
-          </div>
-        </div>
-
-        <!-- Condicionales que cambian el redactado de la demanda -->
-        <div class="p-4 bg-gray-50 border border-gray-200 rounded-lg space-y-3">
-          <h3 class="text-sm font-semibold text-gray-700">Situaciones que agregan hechos a la demanda</h3>
-
-          <label class="flex items-start gap-2 text-sm text-gray-700">
-            <input type="checkbox" name="se_firmo_renuncia" value="on"
-                   class="mt-0.5 rounded border-gray-300 text-blue-600"
-                   {% if cliente.se_firmo_renuncia %}checked{% endif %}>
-            <span>
-              Le hicieron firmar una renuncia o documentos en blanco
-              <span class="block text-xs text-gray-500">Agrega el hecho de impugnación anticipada de renuncia
-              (como en el caso de las hojas firmadas al ingreso). Es un alegato preventivo.</span>
-            </span>
-          </label>
-
-          <label class="flex items-start gap-2 text-sm text-gray-700">
-            <input type="checkbox" name="hubo_ofrecimiento" value="on"
-                   class="mt-0.5 rounded border-gray-300 text-blue-600"
-                   {% if cliente.hubo_ofrecimiento %}checked{% endif %}>
-            <span>
-              Le ofrecieron una cantidad al separarlo
-              <span class="block text-xs text-gray-500">Indica que la patronal reconoció la existencia del despido.</span>
-            </span>
-          </label>
-
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Monto ofrecido (si lo hubo)</label>
-            <input type="number" step="0.01" min="0" name="monto_ofrecido" class="input w-full"
-                   placeholder="0.00" value="{{ cliente.monto_ofrecido|default:'' }}">
-          </div>
-
-          <label class="flex items-start gap-2 text-sm text-gray-700">
-            <input type="checkbox" name="hubo_discriminacion" value="on"
-                   class="mt-0.5 rounded border-gray-300 text-blue-600"
-                   {% if cliente.hubo_discriminacion %}checked{% endif %}>
-            <span>
-              Hubo discriminación
-              <span class="block text-xs text-gray-500">Agrega el hecho condicional de trato discriminatorio.</span>
-            </span>
-          </label>
-
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Tipo de discriminación</label>
-              <input type="text" name="tipo_discriminacion" class="input w-full"
-                     placeholder="Ej: Embarazo, Edad, Género" value="{{ cliente.tipo_discriminacion }}">
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Detalle de la discriminación</label>
-              <textarea name="detalle_discriminacion" rows="2" class="input w-full">{{ cliente.detalle_discriminacion }}</textarea>
-            </div>
-          </div>
-        </div>
-
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Qué le dijeron al separarlo</label>
-          <textarea name="despido_frase" rows="2" class="input w-full"
-                    placeholder="Frase textual. Se citará entre comillas en la demanda.">{{ cliente.despido_frase }}</textarea>
-        </div>
-
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Si fue otra modalidad, explique</label>
-          <textarea name="despido_otra_modalidad" rows="2" class="input w-full"
-                    placeholder="Describa la modalidad cuando no sea verbal, documento ni negada la entrada">{{ cliente.despido_otra_modalidad }}</textarea>
-        </div>
-
-        <div class="p-4 bg-purple-50 border border-purple-200 rounded-lg">
-          <h3 class="text-sm font-semibold text-purple-900 mb-1">Acción preferida (art. 48 LFT)</h3>
-          <p class="text-xs text-purple-700 mb-3">
-            El trabajador elige entre reinstalación o indemnización de tres meses: no son acumulables.
-            La reinstalación no procede con menos de un año de antigüedad (art. 49 fr. I LFT).
-          </p>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {% for valor, etiqueta in cliente.ACCION_CHOICES %}
-            <label class="flex items-start gap-2 px-3 py-2 bg-white border rounded-lg cursor-pointer
-                          {% if cliente.accion_preferida == valor %}border-purple-500 ring-1 ring-purple-300{% else %}border-gray-200{% endif %}">
-              <input type="radio" name="accion_preferida" value="{{ valor }}"
-                     class="mt-0.5 text-purple-600 focus:ring-purple-500"
-                     {% if cliente.accion_preferida == valor %}checked{% endif %}>
-              <span class="text-xs text-gray-700">{{ etiqueta }}</span>
-            </label>
-            {% endfor %}
-          </div>
-          {% for aviso in advertencias_accion %}
-          <p class="mt-3 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded p-2">
-            <strong>Atención:</strong> {{ aviso }}
-          </p>
-          {% endfor %}
-        </div>
-
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Circunstancias del despido (texto libre)</label>
-          <textarea name="circunstancias_despido" rows="5" class="input w-full"
-                    placeholder="Anotaciones adicionales. Se suman al redactado estructurado como último hecho de la demanda.">{{ cliente.circunstancias_despido }}</textarea>
-          <p class="text-xs text-gray-400 mt-1">Opcional: la narración principal ya se arma con los campos de arriba.</p>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Testigos de los hechos</label>
-          <textarea name="testigos" rows="3" class="input w-full"
-                    placeholder="Un testigo por línea: nombre completo y datos de contacto si los tienes.">{{ cliente.testigos }}</textarea>
-          <p class="text-xs text-gray-400 mt-1">Se citan en los hechos y se ofrece la prueba TESTIMONIAL.</p>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Documentos disponibles (prueba documental)</label>
-          <textarea name="documentos_prueba" rows="4" class="input w-full"
-                    placeholder="Un documento por línea: contrato, recibos de nómina, mensajes de WhatsApp, cartas, credencial…">{{ cliente.documentos_prueba }}</textarea>
-          <p class="text-xs text-gray-400 mt-1">Se ofrecen como prueba DOCUMENTAL en la demanda.</p>
-        </div>
-      </div>
-    </div>
-    </div>
-
-<!-- ─── 5. Revisión final: tipo de despido, cálculo y firma ──── -->
-    {% include 'expedientes/_hoja_prestaciones.html' %}
-
-    <!-- ─── 5. Representación legal (apoderados y autorizados) ─────── -->
-    {% include 'expedientes/_acordeon_header.html' with sec_id='representacion' num=5 titulo='Representación legal' descripcion='Apoderados con cédula profesional y personas autorizadas para oír notificaciones (proemio).' completa=apoderados_formset.total_form_count %}
-    <div class="acordeon-body">
-      <div class="p-6 space-y-5">
-
-        <div class="p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-2">
-          <h3 class="text-sm font-semibold text-blue-900">¿Quiénes firman y reciben notificaciones?</h3>
-          <p class="text-xs text-blue-700">
-            Estos datos aparecen en el <strong>proemio</strong> (página 1 de la demanda): los apoderados
-            se listan con su número de cédula profesional y los autorizados en los términos de los
-            artículos 692 fracción I, 693 y 696 de la Ley Federal del Trabajo.
-          </p>
-          <p class="text-xs text-blue-700">
-            En un despacho suelen ser siempre los mismos: captúralos una vez y el botón
-            <strong>Copiar del expediente anterior</strong> los reutiliza en los siguientes casos.
-          </p>
-        </div>
-
-        {{ apoderados_formset.management_form }}
-        {{ autorizados_formset.management_form }}
-
-        <!-- Apoderados legales -->
-        <div>
-          <div class="flex items-center justify-between mb-2">
-            <h3 class="text-sm font-semibold text-gray-700">{% svg 'edit' %} Apoderados legales</h3>
-            <button type="submit" name="accion" value="representacion"
-                    formnovalidate
-                    formaction="{% url 'copiar_representacion' expediente.pk %}"
-                    class="text-xs px-3 py-1.5 border border-blue-600 text-blue-700 rounded-lg hover:bg-blue-50 font-semibold">
-              <i class="fas fa-copy"></i> Copiar del expediente anterior
-            </button>
-          </div>
-          <div class="space-y-2">
-            {% for f in apoderados_formset %}
-            <div class="grid grid-cols-1 sm:grid-cols-12 gap-2 items-start p-2 border border-gray-200 rounded-lg">
-              <div class="sm:col-span-6">
-                <label class="block text-xs text-gray-500 mb-0.5">Nombre completo</label>
-                {{ f.nombre }}
-                {% for e in f.nombre.errors %}<p class="text-red-500 text-xs mt-0.5">{{ e }}</p>{% endfor %}
-              </div>
-              <div class="sm:col-span-3">
-                <label class="block text-xs text-gray-500 mb-0.5">Cédula profesional</label>
-                {{ f.cedula_profesional }}
-              </div>
-              <div class="sm:col-span-1">
-                <label class="block text-xs text-gray-500 mb-0.5">Orden</label>
-                {{ f.orden }}
-              </div>
-              <div class="sm:col-span-2 flex items-center gap-2 pt-4">
-                {% if f.instance.pk %}{{ f.DELETE }}<span class="text-xs text-gray-500">Eliminar</span>{% endif %}
-              </div>
-              {{ f.id }}
-            </div>
-            {% empty %}
-            <p class="text-xs text-gray-400 p-3 bg-gray-50 rounded-lg border border-dashed border-gray-300">
-              Sin apoderados capturados. Usa <strong>Agregar apoderado</strong> o copia los del expediente anterior.
-            </p>
-            {% endfor %}
-          </div>
-        </div>
-
-        <!-- Autorizados para notificaciones -->
-        <div>
-          <h3 class="text-sm font-semibold text-gray-700 mb-2">{% svg 'mail' %} Autorizados para oír y recibir notificaciones</h3>
-          <div class="space-y-2">
-            {% for f in autorizados_formset %}
-            <div class="grid grid-cols-1 sm:grid-cols-12 gap-2 items-start p-2 border border-gray-200 rounded-lg">
-              <div class="sm:col-span-9">
-                <label class="block text-xs text-gray-500 mb-0.5">Nombre completo</label>
-                {{ f.nombre }}
-                {% for e in f.nombre.errors %}<p class="text-red-500 text-xs mt-0.5">{{ e }}</p>{% endfor %}
-              </div>
-              <div class="sm:col-span-1">
-                <label class="block text-xs text-gray-500 mb-0.5">Orden</label>
-                {{ f.orden }}
-              </div>
-              <div class="sm:col-span-2 flex items-center gap-2 pt-4">
-                {% if f.instance.pk %}{{ f.DELETE }}<span class="text-xs text-gray-500">Eliminar</span>{% endif %}
-              </div>
-              {{ f.id }}
-            </div>
-            {% empty %}
-            <p class="text-xs text-gray-400 p-3 bg-gray-50 rounded-lg border border-dashed border-gray-300">
-              Sin autorizados capturados.
-            </p>
-            {% endfor %}
-          </div>
-        </div>
-
-        <p class="text-xs text-gray-400">
-          Para agregar más de uno, guarda y vuelve a entrar: los renglones nuevos aparecen al final.
-          Márcalos como eliminados y guarda para quitarlos.
-        </p>
-      </div>
-    </div>
-    </div>
-
-    {% include 'expedientes/_acordeon_header.html' with sec_id='revision' num=6 titulo='Revisión final' descripcion='Tipo de despido, importes revisados y verificación de la firma.' completa=expediente.tipo_despido %}
-    <div class="acordeon-body">
-      <div class="p-6 space-y-5">
-        <!-- Datos críticos -->
-        <div>
-          <h3 class="text-sm font-semibold text-gray-700 mb-2">{% svg 'lock' %} Datos críticos (obligatorios)</h3>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {% for crit in faltantes_criticos %}
-            <div class="flex items-center gap-2 p-2.5 bg-red-50 border border-red-200 rounded-lg">
-              <i class="fas fa-times-circle text-red-500"></i>
-              <span class="text-sm text-red-700">{{ crit.label }}</span>
-              <span class="ml-auto text-[10px] font-bold bg-red-100 text-red-600 px-1.5 py-0.5 rounded">FALTA</span>
-            </div>
-            {% empty %}
-            <div class="flex items-center gap-2 p-2.5 bg-green-50 border border-green-200 rounded-lg col-span-2">
-              <i class="fas fa-check-circle text-green-600"></i>
-              <span class="text-sm text-green-700">Todos los datos críticos del cliente están completos.</span>
-            </div>
-            {% endfor %}
-          </div>
-        </div>
-
-        <!-- Tipo de despido -->
-        <div>
-          <h3 class="text-sm font-semibold text-gray-700 mb-2">{% svg 'scale' %} Tipo de despido</h3>
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-            {% for key, label in tipos_despido %}
-            <label class="flex items-center gap-2 p-3 border rounded-lg cursor-pointer transition-colors
-                          {% if expediente.tipo_despido == key %}border-blue-500 bg-blue-50{% else %}border-gray-200 hover:border-blue-300{% endif %}">
-              <input type="radio" name="tipo_despido" value="{{ key }}"
-                     {% if expediente.tipo_despido == key or not expediente.tipo_despido and key == 'injustificado' %}checked{% endif %}
-                     class="accent-blue-600">
-              <span class="text-sm text-gray-800">{{ label }}</span>
-            </label>
-            {% endfor %}
-          </div>
-          <p class="text-xs text-gray-400 mt-1.5">El tipo de despido define los conceptos que se reclaman (un cambio requiere recalcular y aprobar las prestaciones).</p>
-        </div>
-
-        <p class="text-sm text-gray-600">Revisa los importes en la sección «Hoja de prestaciones por periodos». La demanda usa únicamente el cálculo vigente aprobado.</p>
-
-        <!-- Firma (nombre arriba y abajo) -->
-        <div>
-          <h3 class="text-sm font-semibold text-gray-700 mb-2">{% svg 'edit' %} Verificación de la firma</h3>
-          <div class="bg-white border border-gray-200 rounded-xl p-5 text-center">
-            <div class="text-sm font-bold text-gray-800">{{ cliente.nombre|upper }}</div>
-            <div class="text-[11px] text-gray-500 mt-0.5">ACTOR (parte superior de la demanda)</div>
-            <div class="my-4 border-t-2 border-dashed border-gray-300"></div>
-            <div class="inline-block border-t border-gray-400 pt-2 px-10">
-              <div class="text-sm font-bold text-gray-800">{{ cliente.nombre|upper }}</div>
-            </div>
-            <div class="text-[11px] text-gray-500 mt-0.5">FIRMA (parte inferior)</div>
-            {% if cliente.nombre %}
-            <p class="mt-3 text-xs text-green-600 font-medium"><i class="fas fa-check-circle"></i> El nombre aparece arriba y abajo: no se quedará el de una demanda anterior.</p>
-            {% endif %}
-          </div>
-        </div>
-      </div>
-    </div>
-    </div>
-
-    <!-- ══════════════ BARRA DE ACCIONES (fija) ══════════════ -->
-    <div class="sticky bottom-0 mt-6 pt-3 pb-2 bg-gray-50/95 backdrop-blur border-t border-gray-200 -mx-1 px-1">
-      <div class="flex items-center justify-between gap-3">
-        <p class="text-xs text-gray-500 hidden sm:block">Borrador con guardado automático. También puedes pulsar <strong>Guardar datos</strong>. {% if errores %}<span class="text-red-600 font-medium">Hay campos con error.</span>{% endif %}</p>
-        <div class="flex items-center gap-2 ml-auto">
-          <a href="{% url 'demanda_capitulos_descargar' expediente.pk %}"
-             class="px-4 py-2.5 border border-rose-600 text-rose-700 rounded-lg hover:bg-rose-50 transition-colors text-sm font-semibold flex items-center gap-1.5"
-             title="Descarga la demanda completa con todos los capítulos (proemio, prestaciones, hechos, pruebas y derecho) lista para presentar">
-            <i class="fas fa-file-word text-xs"></i> Descargar demanda final
-          </a>
-          <button type="submit" name="accion" value="guardar"
-                  class="px-5 py-2.5 border border-blue-600 text-blue-700 rounded-lg hover:bg-blue-50 transition-colors text-sm font-semibold flex items-center gap-1.5">
-            <i class="fas fa-save text-xs"></i> Guardar datos
-          </button>
-          <button type="submit" name="accion" value="finalizar"
-                  class="px-6 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-sm font-semibold flex items-center gap-1.5 shadow-sm">
-            <i class="fas fa-magic"></i> Generar demanda y editar
-          </button>
-        </div>
-      </div>
+      <button type="submit" name="accion" value="finalizar" class="btn-link btn-verde">
+        <i class="fas fa-magic text-xs"></i> Generar demanda y editar
+      </button>
     </div>
   </form>
-  <aside class="demanda-preview" aria-label="Vista previa de demanda">
-    <h2 class="text-lg font-bold">Demanda en vivo</h2>
-    <p class="text-xs text-gray-500">Borrador para revisión del abogado. Los importes se incorporan después de calcular y aprobar las prestaciones.</p>
-    <p id="demanda-preview-status" role="status" aria-live="polite" class="text-sm mt-2">Cargando vista previa…</p>
-    <ul id="demanda-preview-errors" class="text-sm text-red-700 mt-2"></ul>
-    <p id="demanda-calculo-aviso" class="text-sm text-amber-800 mt-2" hidden>Las prestaciones están pendientes de validación o aprobación. Usa la hoja de prestaciones por periodos antes de finalizar.</p>
-    <a href="{% url 'calculo_laboral' expediente.pk %}" class="text-sm text-blue-700 underline" id="demanda-calculo-link">Consultar calculadora anterior</a>
-    <iframe id="demanda-preview-frame" title="Borrador de la demanda" sandbox="" referrerpolicy="no-referrer"></iframe>
-  </aside>
-  </div>
 
-  <p class="text-center text-xs text-gray-400 mt-4">
-    Después de generar, podrás <strong>editar cualquier parte</strong> de la demanda y <strong>guardarla como machote</strong> en la librería.
+  {% if not puede_descargar %}
+  <p class="text-xs text-amber-800 mt-3">
+    <strong>Para poder presentarla falta:</strong> {{ bloqueos|join:' · ' }}.
+    Redactar el borrador y editarlo no está bloqueado; lo que se bloquea es el
+    documento que se lleva al Tribunal.
   </p>
+  {% endif %}
 </div>
 
-<script>
-// ─── Acordeón: abrir/cerrar secciones ──────────────────────────────────
-(function () {
-  var form = document.getElementById('acordeonForm');
-  if (!form) return;
-
-  function setAbierta(id, abrir) {
-    var sec = document.getElementById('sec-' + id);
-    if (!sec) return;
-    if (abrir) {
-      // Cierra las demás (comportamiento acordeón clásico)
-      form.querySelectorAll('.acordeon-seccion.abierta').forEach(function (s) {
-        if (s !== sec) s.classList.remove('abierta');
-      });
-      sec.classList.add('abierta');
-    } else {
-      sec.classList.remove('abierta');
-    }
-    var hidden = document.getElementById('seccion_abierta');
-    if (hidden) hidden.value = sec.classList.contains('abierta') ? id : '';
-  }
-
-  // Clicks en los headers (delegado)
-  form.addEventListener('click', function (e) {
-    var header = e.target.closest('[data-acordeon-toggle]');
-    if (!header) return;
-    e.preventDefault();
-    var id = header.getAttribute('data-acordeon-toggle');
-    var sec = document.getElementById('sec-' + id);
-    setAbierta(id, sec ? !sec.classList.contains('abierta') : true);
-  });
-
-  // Abrir por hash (#sec-despido) o por la sección enviada desde el servidor
-  var inicial = location.hash ? location.hash.replace('#sec-', '') : '{{ seccion_abierta }}';
-  if (inicial) {
-    setAbierta(inicial, true);
-  } else {
-    var primera = document.querySelector('.acordeon-seccion');
-    if (primera) setAbierta(primera.id.replace('sec-', ''), true);
-  }
-
-  // Enter en un input no debe enviar el formulario a mitad del acordeón
-  form.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter' && e.target.tagName === 'INPUT' && e.target.type !== 'submit') {
-      e.preventDefault();
-    }
-  });
-
-  // Marcar la sección visible antes de enviar (para reabrirla tras el POST)
-  form.addEventListener('submit', function () {
-    var abierta = form.querySelector('.acordeon-seccion.abierta');
-    var hidden = document.getElementById('seccion_abierta');
-    if (abierta && hidden) hidden.value = abierta.id.replace('sec-', '');
-  });
-})();
-</script>
-<script src="{% static 'js/demanda_live.js' %}" defer></script>
+<script src="{% static 'js/demanda_espacio.js' %}" defer></script>
 {% endblock %}
 
-{% block extra_scripts %}{{ block.super }}<script src="{% static 'js/hoja_prestaciones.js' %}"></script>{% endblock %}
+{% block extra_scripts %}{{ block.super }}
+  {% if espacio == 'estrategia' %}<script src="{% static 'js/hoja_prestaciones.js' %}"></script>{% endif %}
+{% endblock %}

@@ -1,0 +1,271 @@
+{% load svg_tags %}
+{# Espacio 2 · Estrategia y prestaciones: las decisiones que el abogado firma.
+   Cada decisión muestra su consecuencia legal; ninguna alega un hecho sola. #}
+<div class="dem-layout">
+  <div>
+
+    {# ─── Cómo terminó la relación ───────────────────────────────────── #}
+    <section class="bloque {% if not bloques_estrategia.despido.completo %}incompleto{% endif %}" id="sec-despido">
+      {% include 'expedientes/_bloque_cabecera.html' with bloque=bloques_estrategia.despido %}
+      <div class="bloque-cuerpo">
+
+        <div id="grupo-tipo-despido">
+          <h3 class="text-sm font-semibold text-gray-700 mb-1">{% svg 'scale' %} Tipo de separación</h3>
+          <p class="ayuda mb-2">
+            Define la carátula, el hecho central y qué prestaciones proceden. Cambiarlo
+            invalida el cálculo: hay que recalcular y aprobar de nuevo.
+          </p>
+          <div class="opciones dos">
+            {% for key, label in tipos_despido %}
+              <label class="op {% if expediente.tipo_despido == key %}marcada{% endif %}">
+                <input type="radio" name="tipo_despido" value="{{ key }}"
+                       {% if expediente.tipo_despido == key %}checked{% endif %}>
+                <span>{{ label }}</span>
+              </label>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div id="grupo-modalidad" class="mt-5 pt-4 border-t border-gray-200">
+          <h3 class="text-sm font-semibold text-gray-700 mb-1">Modalidad de la separación</h3>
+          <p class="ayuda mb-2">
+            Determina cómo se redacta el hecho central. Sin aviso escrito, el artículo 47 LFT
+            presume la separación injustificada aunque el patrón alegue una causa.
+          </p>
+          <div class="opciones dos">
+            {% for valor, etiqueta in cliente.MODALIDAD_DESPIDO_CHOICES %}
+              <label class="op {% if cliente.modalidad_despido == valor %}marcada{% endif %}">
+                <input type="radio" name="modalidad_despido" value="{{ valor }}"
+                       {% if cliente.modalidad_despido == valor %}checked{% endif %}>
+                <span>{{ etiqueta }}</span>
+              </label>
+            {% endfor %}
+          </div>
+          <label class="flex items-center gap-2 text-sm text-gray-700 mt-3">
+            <input type="checkbox" name="hubo_documento_despido" value="on"
+                   class="rounded border-gray-300 text-blue-600"
+                   {% if cliente.hubo_documento_despido %}checked{% endif %}>
+            Se entregó documento de terminación (aviso escrito)
+          </label>
+          <p class="ayuda">
+            Si se marca, deja de alegarse la presunción del artículo 47 LFT y hay que transcribir
+            la causa que consigna el documento.
+          </p>
+        </div>
+
+        <div class="bloque-campos mt-5 pt-4 border-t border-gray-200">
+          <div>
+            <label for="id_lugar_trabajo">Centro de trabajo</label>
+            <input type="text" name="lugar_trabajo" id="id_lugar_trabajo" class="input w-full"
+                   placeholder="Nombre o dirección donde prestaba servicios"
+                   value="{{ cliente.lugar_trabajo }}">
+          </div>
+          <div>
+            <label for="id_despido_comunicado_por">Quién comunicó la separación</label>
+            <input type="text" name="despido_comunicado_por" id="id_despido_comunicado_por" class="input w-full"
+                   placeholder="Nombre de quien se la comunicó" value="{{ cliente.despido_comunicado_por }}">
+            <p class="ayuda">Con el nombre se sostiene la prueba confesional a su cargo.</p>
+          </div>
+          <div>
+            <label for="id_despido_persona_puesto">Puesto de quien la comunicó</label>
+            <input type="text" name="despido_persona_puesto" id="id_despido_persona_puesto" class="input w-full"
+                   placeholder="Ej: personal de Recursos Humanos, líder de línea"
+                   value="{{ cliente.despido_persona_puesto }}">
+          </div>
+          <div>
+            <label for="id_despido_lugar">Dónde ocurrió</label>
+            <input type="text" name="despido_lugar" id="id_despido_lugar" class="input w-full"
+                   placeholder="Oficina, caseta o lugar físico" value="{{ cliente.despido_lugar }}">
+            <p class="ayuda">Si lo dejas vacío, los hechos dicen que ocurrió en el domicilio de la demandada.</p>
+          </div>
+          <div>
+            <label for="id_hora_despido">Hora de la separación</label>
+            <input type="text" name="hora_despido" id="id_hora_despido" class="input w-full" maxlength="5"
+                   placeholder="14:45" value="{{ cliente.hora_despido }}">
+          </div>
+          <div>
+            <label for="id_despido_documento_motivo">Causa que consigna el documento</label>
+            <input type="text" name="despido_documento_motivo" id="id_despido_documento_motivo" class="input w-full"
+                   placeholder="Si hubo aviso escrito" value="{{ cliente.despido_documento_motivo }}">
+          </div>
+          <div class="ancho">
+            <label for="id_despido_frase">Qué le dijeron al separarlo (frase textual)</label>
+            <textarea name="despido_frase" id="id_despido_frase" rows="2" class="input w-full"
+                      placeholder="Se citará entre comillas en la demanda.">{{ cliente.despido_frase }}</textarea>
+          </div>
+          <div class="ancho">
+            <label for="id_despido_otra_modalidad">Si fue otra modalidad, explique</label>
+            <textarea name="despido_otra_modalidad" id="id_despido_otra_modalidad" rows="2" class="input w-full"
+                      placeholder="Describa la modalidad cuando no sea verbal, documento ni negada la entrada">{{ cliente.despido_otra_modalidad }}</textarea>
+          </div>
+        </div>
+
+        <div id="grupo-accion" class="mt-5 p-4 bg-purple-50 border border-purple-200 rounded-lg">
+          <h3 class="text-sm font-semibold text-purple-900 mb-1">Acción preferida (art. 48 LFT)</h3>
+          <p class="text-xs text-purple-700 mb-3">
+            El trabajador elige entre reinstalación o indemnización de tres meses: no son
+            acumulables. La reinstalación no procede con menos de un año de antigüedad
+            (art. 49 fracción I LFT).
+          </p>
+          <div class="opciones dos">
+            {% for valor, etiqueta in cliente.ACCION_CHOICES %}
+              <label class="op {% if cliente.accion_preferida == valor %}marcada{% endif %}">
+                <input type="radio" name="accion_preferida" value="{{ valor }}"
+                       {% if cliente.accion_preferida == valor %}checked{% endif %}>
+                <span>{{ etiqueta }}</span>
+              </label>
+            {% endfor %}
+          </div>
+          {% for aviso in advertencias_accion %}
+            <p class="aviso ojo"><strong>Atención:</strong> {{ aviso }}</p>
+          {% endfor %}
+        </div>
+
+        <div class="mt-5 pt-4 border-t border-gray-200">
+          <h3 class="text-sm font-semibold text-gray-700 mb-2">Situaciones que agregan hechos</h3>
+          <p class="ayuda mb-2">
+            Marcar aquí cambia el redactado del escrito. El motor sólo incorpora el bloque
+            cuando el dato está confirmado: sin confirmar no se alega nada.
+          </p>
+          <div class="opciones">
+            <label class="op {% if cliente.se_firmo_renuncia %}marcada{% endif %}">
+              <input type="checkbox" name="se_firmo_renuncia" value="on"
+                     {% if cliente.se_firmo_renuncia %}checked{% endif %}>
+              <span>
+                Le hicieron firmar una renuncia o documentos en blanco
+                <span class="ayuda">Agrega el hecho de impugnación anticipada de renuncia. Es un alegato preventivo.</span>
+              </span>
+            </label>
+            <label class="op {% if cliente.hubo_ofrecimiento %}marcada{% endif %}">
+              <input type="checkbox" name="hubo_ofrecimiento" value="on"
+                     {% if cliente.hubo_ofrecimiento %}checked{% endif %}>
+              <span>
+                Le ofrecieron una cantidad al separarlo
+                <span class="ayuda">Indica que la patronal reconoció la existencia del despido.</span>
+              </span>
+            </label>
+            <label class="op {% if cliente.hubo_discriminacion %}marcada{% endif %}">
+              <input type="checkbox" name="hubo_discriminacion" value="on"
+                     {% if cliente.hubo_discriminacion %}checked{% endif %}>
+              <span>
+                Hubo discriminación
+                <span class="ayuda">Agrega el hecho condicional de trato discriminatorio.</span>
+              </span>
+            </label>
+          </div>
+          <div class="bloque-campos mt-3">
+            <div>
+              <label for="id_monto_ofrecido">Monto ofrecido (si lo hubo)</label>
+              <input type="number" step="0.01" min="0" name="monto_ofrecido" id="id_monto_ofrecido"
+                     class="input w-full" placeholder="0.00" value="{{ cliente.monto_ofrecido|default:'' }}">
+            </div>
+            <div>
+              <label for="id_tipo_discriminacion">Tipo de discriminación</label>
+              <input type="text" name="tipo_discriminacion" id="id_tipo_discriminacion" class="input w-full"
+                     placeholder="Ej: Embarazo, Edad, Género" value="{{ cliente.tipo_discriminacion }}">
+            </div>
+            <div class="ancho">
+              <label for="id_detalle_discriminacion">Detalle de la discriminación</label>
+              <textarea name="detalle_discriminacion" id="id_detalle_discriminacion" rows="2" class="input w-full">{{ cliente.detalle_discriminacion }}</textarea>
+            </div>
+          </div>
+        </div>
+
+        <div class="bloque-campos mt-5 pt-4 border-t border-gray-200">
+          <div class="ancho">
+            <label for="id_circunstancias_despido">Circunstancias del despido (texto libre)</label>
+            <textarea name="circunstancias_despido" id="id_circunstancias_despido" rows="4" class="input w-full"
+                      placeholder="Anotaciones adicionales. Se suman al redactado estructurado como último hecho.">{{ cliente.circunstancias_despido }}</textarea>
+            <p class="ayuda">Opcional: la narración principal ya se arma con los campos de arriba.</p>
+          </div>
+          <div class="ancho">
+            <label for="id_testigos">Testigos de los hechos</label>
+            <textarea name="testigos" id="id_testigos" rows="3" class="input w-full"
+                      placeholder="Un testigo por línea: nombre completo y datos de contacto si los tienes.">{{ cliente.testigos }}</textarea>
+            <p class="ayuda">Se citan en los hechos y se ofrece la prueba TESTIMONIAL.</p>
+          </div>
+          <div class="ancho">
+            <label for="id_documentos_prueba">Documentos disponibles (prueba documental)</label>
+            <textarea name="documentos_prueba" id="id_documentos_prueba" rows="4" class="input w-full"
+                      placeholder="Un documento por línea: contrato, recibos de nómina, mensajes de WhatsApp, cartas, credencial…">{{ cliente.documentos_prueba }}</textarea>
+            <p class="ayuda">Se ofrecen como prueba DOCUMENTAL. Sin documentos, la prueba se ofrece en blanco.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    {# ─── Registro ante el IMSS ──────────────────────────────────────── #}
+    <section class="bloque {% if not bloques_estrategia.imss.completo %}incompleto{% endif %}" id="sec-imss">
+      {% include 'expedientes/_bloque_cabecera.html' with bloque=bloques_estrategia.imss %}
+      <div class="bloque-cuerpo" id="grupo-imss">
+        <input type="hidden" name="imss_present" value="1">
+        <label class="flex gap-2 items-start text-sm text-gray-700">
+          {{ form.imss_confirmado }} <span>Confirmé si el trabajador estuvo dado de alta</span>
+        </label>
+        <label class="flex gap-2 items-start text-sm text-gray-700 mt-2">
+          {{ form.tuvo_imss }} <span>¿El trabajador estuvo dado de alta en el IMSS?</span>
+        </label>
+        <p class="ayuda mt-2">
+          Sin esta confirmación no se alega nada del IMSS, ni a favor ni en contra:
+          afirmarlo sin confirmarlo sería inventar un hecho.
+        </p>
+        <div id="imss-detalles" class="mt-3 pt-3 border-t border-gray-200 space-y-3">
+          <label class="flex gap-2 items-start text-sm text-gray-700">
+            {{ form.imss_salario_inferior }} <span>¿Fue registrado con un salario inferior al real?</span>
+          </label>
+          <div>
+            <label for="id_imss_salario_diario">Salario diario registrado</label>
+            {{ form.imss_salario_diario }}
+            {% for e in errores.imss_salario_diario %}<p class="text-xs text-red-600">{{ e }}</p>{% endfor %}
+          </div>
+          <div>
+            <label for="id_imss_documento">Documento o fuente del registro</label>
+            {{ form.imss_documento }}
+          </div>
+          <p class="ayuda">
+            Esta sección se incorpora a los hechos cuando se confirma el alta. La afirmación
+            sobre salario inferior depende de su propia casilla.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    {# ─── Prestaciones por periodos ──────────────────────────────────── #}
+    {% include 'expedientes/_hoja_prestaciones.html' %}
+
+  </div>
+
+  {# ─── Lateral: qué bloquea presentar ───────────────────────────────── #}
+  <aside class="dem-lateral">
+    <div class="panel-lateral">
+      <h3>Para poder presentar</h3>
+      <p>Lo que impide descargar el escrito. Redactar el borrador no se bloquea.</p>
+      <ul class="lista-estado">
+        {% for r in estado_demanda.pendientes %}
+          {% if r.obligatorio %}
+          <li>
+            <span class="marca falta">!</span>
+            <span>
+              <strong>{{ r.etiqueta }}</strong>
+              <span class="detalle">
+                {% if r.decision %}Decisión del abogado.{% else %}Dato del expediente.{% endif %}
+                Se captura en {{ r.espacio }}.
+              </span>
+            </span>
+          </li>
+          {% endif %}
+        {% empty %}
+          <li><span class="marca ok">✓</span><span>Nada pendiente: la demanda se puede presentar.</span></li>
+        {% endfor %}
+      </ul>
+    </div>
+
+    <div class="panel-lateral">
+      <h3>Por qué está separado así</h3>
+      <p>
+        Aquí van las decisiones que un abogado debe firmar y los importes que se aprueban.
+        Cada una muestra su consecuencia legal y su efecto en el documento.
+      </p>
+    </div>
+  </aside>
+</div>

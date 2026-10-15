@@ -450,30 +450,53 @@ Entra a **Machotes → Catálogo** (menú o desde el botón **Documentos** del e
 
 ---
 
-### 10.7 Asistente de Demanda (paso a paso)
+### 10.7 Espacio de trabajo de la demanda (tres espacios)
 
-Guía de **4 pasos** para no omitir ningún dato. En el expediente, presiona
-**Asistente de Demanda**:
+La demanda se arma en **tres espacios** con URL propia. Cada uno contiene sólo lo que le
+toca y el encabezado te dice en todo momento cuánto falta para poder presentarla. Entra
+desde el expediente con **Asistente de Demanda**.
 
-- **Paso 1 — Datos del actor (trabajador):** nombre (aparecerá arriba y en la firma),
-  CURP, RFC, teléfono, WhatsApp, email, fecha de nacimiento, género, cómo supo del
-  despacho y oficina. (Los obligatorios están marcados con `*`.)
-- **Paso 2 — Datos de empleo:** puesto, **salario** (necesario para los cálculos),
-  periodo de pago, horas semanales, jornada, **fecha de ingreso** y **fecha de salida**.
-- **Paso 3 — Datos de la empresa/patrón:** usa el **buscador de empresas** del catálogo
-  para autocompletar, o captura nombre, razón social, actividad, tipo de persona
-  (física/moral), teléfono, domicilio y referencias.
-- **Paso 4 — Revisión final:**
-  - **🔒 Datos críticos** — lista de lo que falta (si algo aparece en rojo "FALTA",
-    regresa a completarlo).
-  - **⚖️ Tipo de despido** — selecciónalo; **los cálculos se ajustan automáticamente**.
-  - **🧮 Cálculo automático** — tabla con aguinaldo, vacaciones, prima vacacional,
-    prima de antigüedad, indemnización y **TOTAL**.
-  - **✍️ Verificación de la firma** — confirma que el nombre del actor aparezca arriba
-    y abajo (evita que quede el nombre de una demanda anterior).
+- **1. Datos del caso** — lo que se captura, sin nada jurídico todavía:
+  - **Actor:** nombre (aparece en la carátula, el proemio, las pruebas y la firma), CURP,
+    RFC, contacto, nacionalidad, ciudad de contratación y el **domicilio para oír y
+    recibir notificaciones** (calle, número, colonia y CP).
+  - **Relación laboral:** puesto, funciones, tipo de contrato, **salario mensual**,
+    periodo de pago, fechas de ingreso y de separación, horario y días de trabajo.
+  - **Patrón demandado:** con el **buscador de empresas** del catálogo para autocompletar
+    razón social, teléfono y domicilio.
+  - **Representación legal:** apoderados con cédula y autorizados para oír
+    notificaciones. El botón **Copiar del expediente anterior** los reutiliza.
+- **2. Estrategia y prestaciones** — las decisiones que firma el abogado, cada una con su
+  consecuencia legal:
+  - **Tipo de separación:** define la carátula, el hecho central y qué prestaciones
+    proceden.
+  - **Modalidad de la separación** y si se entregó aviso escrito (artículo 47 LFT).
+  - **Acción preferida** del artículo 48 LFT: reinstalación o indemnización.
+  - **Situaciones que agregan hechos:** renuncia firmada, ofrecimiento, discriminación.
+  - **Registro ante el IMSS:** sólo se alega si tú lo confirmas.
+  - **Prestaciones por periodos:** captura los periodos y las horas extras, presiona
+    **Validar datos y calcular prestaciones**, revisa el desglose y presiona **Usar estos
+    cálculos en la demanda**. Mientras no los apruebes, los numerales del escrito salen
+    **sin cifra**.
+- **3. Documento** — la demanda real, **capítulo por capítulo** (proemio, demandados,
+  prestaciones, jornada, hechos, pruebas, derecho y firma):
+  - Los datos que faltan aparecen como **recuadros ámbar**: haz clic y te lleva al campo
+    que los completa.
+  - El **índice** de la izquierda marca el estado de cada capítulo.
+  - El panel **Coherencia del escrito** avisa de lo que el documento va a afirmar,
+    incluidas las **sustituciones silenciosas**: si no capturaste los días de trabajo, el
+    escrito afirmará «de lunes a viernes»; si no capturaste el lugar de la separación,
+    dirá que ocurrió en el domicilio de la patronal.
 
-Al terminar, presiona **✨ Generar demanda y editar** → se abre el editor con todo
-insertado. Puedes volver atrás en cualquier paso con **Anterior**.
+El **encabezado** muestra el semáforo real (`Falta N requisitos para poder presentar`, o
+`Se puede presentar` cuando ya no falta ninguno obligatorio). Un dato **opcional** que
+sólo precisa el relato —hora del despido, frase textual, testigos— nunca bloquea, pero sí
+se te señala.
+
+Al terminar, **✨ Generar demanda y editar** abre el editor con el escrito armado.
+**Descargar demanda final** entrega el `.docx` con los siete capítulos y **sólo se
+habilita cuando no queda ningún requisito obligatorio**: es el documento que se lleva al
+Tribunal. Redactar el borrador nunca está bloqueado.
 
 ---
 

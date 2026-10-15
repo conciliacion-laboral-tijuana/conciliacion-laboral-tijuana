@@ -50,6 +50,7 @@ from .laboral_calculator import (calcular_desde_expediente, recalcular_calculo,
 from .demanda_generator import generar_demanda_word, generar_demanda_html, html_a_docx, PLANTILLAS_INFO, calculo_para_demanda
 from .models import Machote
 from .marcadores import get_marcadores, get_datos_faltantes, get_completitud_stats, reemplazar_marcadores
+from . import demanda_estado as estado_demanda_mod
 from core.laboral.calculators import CONCEPTOS_DISPONIBLES
 
 
@@ -1661,8 +1662,14 @@ WIZARD_PASOS = {
         'descripcion': 'Nombre completo, CURP y contacto del trabajador.',
         'campos': ['nombre', 'curp', 'rfc', 'telefono', 'whatsapp', 'email',
                    'fecha_nacimiento', 'genero', 'como_supo', 'oficina',
-                   # Proemio de la demanda: nacionalidad y ciudad de contratación
-                   'nacionalidad', 'ciudad', 'estado'],
+                   # Proemio de la demanda: nacionalidad, ciudad de contratación
+                   # y domicilio para oír y recibir notificaciones. La dirección
+                   # faltaba en esta lista, así que el proemio salía con
+                   # «[DOMICILIO PARA NOTIFICACIONES]» y no había forma de
+                   # capturarla desde el asistente.
+                   'nacionalidad', 'ciudad', 'estado',
+                   'direccion_calle', 'direccion_numero', 'direccion_colonia',
+                   'direccion_cp'],
     },
     'laboral': {
         'titulo': 'Información laboral',
@@ -1703,6 +1710,91 @@ CRITICOS_CLIENTE = [
     {'campo': 'fecha_ingreso', 'label': 'Fecha de ingreso'},
     {'campo': 'fecha_salida', 'label': 'Fecha de salida / despido'},
 ]
+
+
+# ─── Espacio de trabajo de la demanda ────────────────────────────────────────
+#
+# Bloques del escrito que la pantalla del documento muestra juntos. Cada
+# entrada: (capítulo del estado, capítulos del motor que lo componen). El
+# índice de capítulos se arma con esto, para que el orden sea el del escrito.
+DOCUMENTO_BLOQUES = (
+    ('proemio', ('encabezado', 'proemio')),
+    ('demandados', ('demandados',)),
+    ('prestaciones', ('prestaciones',)),
+    ('jornada', ('jornada',)),
+    ('hechos', ('hechos',)),
+    ('pruebas', ('pruebas',)),
+    ('derecho', ('derecho',)),
+    ('firma', ('cierre',)),
+)
+
+
+def _bloques_demanda():
+    """Título, descripción y espacio de cada bloque de captura."""
+    bloques = {}
+    for clave, info in WIZARD_PASOS.items():
+        bloques[clave] = {
+            'titulo': info['titulo'],
+            'descripcion': info['descripcion'],
+            'espacio': estado_demanda_mod.espacio_de_bloque(clave, 'datos'),
+        }
+    bloques['representacion'] = {
+        'titulo': 'Representación legal',
+        'descripcion': 'Apoderados con cédula y autorizados para oír notificaciones.',
+        'espacio': 'datos',
+    }
+    bloques['imss'] = {
+        'titulo': 'Registro ante el IMSS',
+        'descripcion': 'Sólo se alega cuando el asesor lo confirma.',
+        'espacio': 'estrategia',
+    }
+    bloques['prestaciones'] = {
+        'titulo': 'Prestaciones por periodos',
+        'descripcion': 'Captura los periodos y aprueba los importes que reclamará la demanda.',
+        'espacio': 'estrategia',
+    }
+    return bloques
+
+
+BLOQUES_DEMANDA = _bloques_demanda()
+
+
+def _espacio_de(espacio, seccion):
+    """Espacio activo: el pedido en la URL, el del bloque pedido o el primero."""
+    claves = [clave for clave, _, _ in estado_demanda_mod.ESPACIOS]
+    if espacio in claves:
+        return espacio
+    if seccion in ('documento', 'revision', 'firma'):
+        return 'documento'
+    if seccion:
+        return estado_demanda_mod.espacio_de_bloque(seccion, 'datos')
+    return 'datos'
+
+
+def _calculo_listo(expediente, calculo=None) -> bool:
+    """¿Los importes que usará la demanda están vigentes y aprobados?
+
+    Con hoja de prestaciones manda la aprobación explícita del abogado. Sin
+    hoja (flujo anterior) manda el cálculo determinista.
+    """
+    from .hoja_prestaciones import hoja_de, resultado_vigente
+    hoja = hoja_de(expediente)
+    if hoja:
+        return resultado_vigente(expediente, hoja, aprobado=True) is not None
+    if calculo is None:
+        calculo = calculo_para_demanda(expediente)
+    return bool(calculo.get('success'))
+
+
+def _url_de_hueco(expediente):
+    """Enlace de un hueco del documento al campo de captura que lo completa."""
+    base = reverse('demanda_asistente', kwargs={'pk': expediente.pk})
+
+    def url_de(requisito):
+        return (f'{base}?espacio={requisito["espacio"]}'
+                f'&seccion={requisito["bloque"]}#{requisito["ancla"]}')
+
+    return url_de
 
 
 def _es_booleano(form, campo) -> bool:
@@ -1867,13 +1959,25 @@ def demanda_vista_previa(request, pk):
                 hoja.save(update_fields=['aprobado_en', 'aprobado_por'])
     if hoja_context:
         pendiente = resultado_vigente(expediente, aprobado=True) is None
+    compacto = request.POST.get('compacto') == '1'
     respuesta = {
-        'html': generar_demanda_html(expediente),
         'guardado': guardar,
         'calculo_pendiente': pendiente,
         'faltantes': [f['label'] for f in _verificar_datos_criticos(expediente)],
         'calculo_error': '' if hoja_context else (resultado.get('error', '') if not resultado.get('success') else ''),
     }
+    if compacto:
+        # Autoguardado de los espacios de captura: no hace falta el documento
+        # completo, sólo el estado que mueve el semáforo de cada bloque.
+        from .redaccion import datos_de_expediente
+        info = estado_demanda_mod.estado(
+            expediente, calculo_listo=_calculo_listo(expediente),
+            datos=datos_de_expediente(expediente))
+        respuesta['resumen'] = info['resumen']
+        respuesta['por_bloque'] = info['por_bloque']
+        respuesta['pendientes'] = [r['etiqueta'] for r in info['pendientes']]
+    else:
+        respuesta['html'] = generar_demanda_html(expediente)
     if hoja_context and datos_hoja is None:
         detalles = []
         for key in ('captura_prestaciones', 'semanas_formset', 'vacaciones_formset'):
@@ -1896,18 +2000,25 @@ def demanda_vista_previa(request, pk):
 @login_required
 @transaction.atomic
 def demanda_asistente(request, pk):
-    """
-    Acordeón de demanda: todas las secciones en UNA sola página.
+    """Espacio de trabajo de la demanda: datos · estrategia · documento.
 
-    Secciones (acordeón):
-      · trabajador — Datos personales del actor
-      · laboral    — salario, fechas → cálculos automáticos
-      · empresa    — demandado (con autocompletado de catálogo)
-      · despido    — circunstancias del despido, testigos y documentos
-      · revision   — tipo de despido, cálculo y firma
+    Tres espacios con URL propia (`?espacio=`), cada uno con los bloques que le
+    pertenecen, en lugar de un solo acordeón de siete bloques donde todo estaba
+    en todas partes:
 
-    Un solo <form> envuelve todo el acordeón:
-      POST accion=guardar   → guarda todo y permanece en la página
+      · datos      — actor, relación laboral, patrón y representación.
+      · estrategia — modalidad de la separación, acción del art. 48, IMSS,
+                     hechos condicionales y prestaciones por periodos.
+      · documento  — la demanda capítulo por capítulo, con los huecos
+                     señalados en su lugar y el panel de coherencia.
+
+    Una sola vista para los tres espacios: la captura ya es intrincada (guarda
+    lo válido aunque algo venga mal, calcula, aprueba y finaliza) y duplicarla
+    por espacio sería peor que compartirla.
+
+      POST accion=guardar   → guarda y permanece en la página
+      POST accion=calcular  → valida y calcula las prestaciones
+      POST accion=aprobar   → aprueba los importes para la demanda
       POST accion=finalizar → valida críticos y redirige al editor de demanda
     """
     if not _puede_generar_documentos(request):
@@ -1926,6 +2037,12 @@ def demanda_asistente(request, pk):
     hoja_context = formularios(expediente, request.POST if request.method == 'POST' and constructor else None)
     errores = {}
     seccion_abierta = request.GET.get('seccion') or request.POST.get('seccion_abierta') or ''
+    espacio = _espacio_de(request.GET.get('espacio') or request.POST.get('espacio'),
+                          seccion_abierta)
+    # La captura de prestaciones vive en Estrategia: si el POST la trae, el
+    # abogado tiene que ver el desglose y los botones de calcular y aprobar.
+    if constructor:
+        espacio = 'estrategia'
 
     # Apoderados y autorizados (capítulo 1: proemio).  Viajan en el mismo POST
     # que el acordeón, con sus propios formsets.
@@ -2046,7 +2163,8 @@ def demanda_asistente(request, pk):
             if accion not in ('calcular', 'aprobar'):
                 messages.success(request, '✅ Datos guardados. Puedes continuar con otra sección.')
                 if constructor:
-                    return redirect(reverse('demanda_asistente', kwargs={'pk': expediente.pk}) + '?seccion=prestaciones')
+                    return redirect(reverse('demanda_asistente', kwargs={'pk': expediente.pk})
+                                    + '?espacio=estrategia&seccion=prestaciones')
         elif postea_acordeon and errores and datos:
             campos = ', '.join(sorted(errores))
             messages.warning(
@@ -2057,7 +2175,71 @@ def demanda_asistente(request, pk):
         elif errores:
             messages.error(request, 'Corrige los campos marcados en rojo.')
 
-    # ─── Formulario y contexto del acordeón ─────────────────────────
+    # ─── Estado de la demanda: qué falta, dónde impacta y por qué ────
+    #
+    # Una sola evaluación alimenta los tres espacios: el conteo del
+    # encabezado, el semáforo de cada bloque y los huecos del documento. Antes
+    # cada sección decidía su propio color con un solo campo y podía decir
+    # «COMPLETA» con la sección vacía.
+    from .redaccion import capitulos_html, datos_de_expediente
+
+    datos_motor = datos_de_expediente(expediente)
+    calculo_motor = calculo_para_demanda(expediente)
+    importes_listos = _calculo_listo(expediente, calculo_motor)
+    estado = estado_demanda_mod.estado(expediente, calculo_listo=importes_listos,
+                                       datos=datos_motor)
+
+    bloques = {}
+    for clave, info in BLOQUES_DEMANDA.items():
+        pendiente = estado['por_bloque'].get(
+            clave, {'total': 0, 'faltantes': [], 'obligatorios': 0, 'opcionales': 0,
+                    'faltantes_obligatorios': [], 'faltantes_opcionales': []})
+        bloques[clave] = {
+            **info, 'clave': clave,
+            'faltantes': pendiente['faltantes'],
+            'faltantes_obligatorios': pendiente['faltantes_obligatorios'],
+            'faltantes_opcionales': pendiente['faltantes_opcionales'],
+            'total_faltantes': pendiente['obligatorios'],
+            'total_opcionales': pendiente['opcionales'],
+            # Un bloque sólo está completo cuando no le falta NADA obligatorio.
+            'completo': pendiente['obligatorios'] == 0,
+        }
+    # Diccionarios por espacio: el orden de BLOQUES_DEMANDA es el de la pantalla.
+    bloques_datos = {clave: b for clave, b in bloques.items() if b['espacio'] == 'datos'}
+    bloques_estrategia = {clave: b for clave, b in bloques.items()
+                          if b['espacio'] == 'estrategia'}
+
+    # El documento sólo se arma cuando se va a ver: es el trabajo más caro.
+    documento = []
+    if espacio == 'documento':
+        html_capitulos = capitulos_html(
+            datos_motor, calculo_motor,
+            expediente.tipo_despido or 'injustificado')
+        url_de = _url_de_hueco(expediente)
+        for clave, partes in DOCUMENTO_BLOQUES:
+            html = '\n'.join(html_capitulos[parte] for parte in partes
+                             if html_capitulos.get(parte))
+            documento.append({
+                'clave': clave,
+                'info': estado['capitulos'][clave],
+                'html': estado_demanda_mod.marcar_html(
+                    html, estado['pendientes'], url_de),
+                'presente': bool(html),
+            })
+
+    bloqueos = [r['etiqueta'] for r in estado['pendientes'] if r['obligatorio']]
+
+    # Cuántos pendientes OBLIGATORIOS se capturan en cada espacio: es lo que
+    # marca las pestañas (un dato opcional no puede poner en rojo la pestaña).
+    pendientes_por_espacio = {}
+    for requisito in estado['pendientes']:
+        if not requisito.get('obligatorio'):
+            continue
+        pendientes_por_espacio[requisito['espacio']] = (
+            pendientes_por_espacio.get(requisito['espacio'], 0) + 1)
+    titulo_espacio = dict((clave, titulo) for clave, titulo, _ in
+                          estado_demanda_mod.ESPACIOS)[espacio]
+
     form = ClienteForm(instance=cliente)
     hoja = hoja_de(expediente)
     calculo = resultado_vigente(expediente, hoja) if hoja else None
@@ -2075,12 +2257,27 @@ def demanda_asistente(request, pk):
         'pasos_info': WIZARD_PASOS,
         'pasos_keys': list(WIZARD_PASOS.keys()),
         'errores': errores,
-        'seccion_abierta': seccion_abierta if seccion_abierta in WIZARD_PASOS or seccion_abierta in ('revision', 'prestaciones', 'representacion') else '',
+        'seccion_abierta': (seccion_abierta if seccion_abierta in WIZARD_PASOS
+                            or seccion_abierta in ('revision', 'prestaciones',
+                                                   'representacion', 'imss')
+                            else ''),
         'tipos_despido': Expediente.TIPO_DESPIDO_CHOICES,
         'calculo': calculo,
         'faltantes_criticos': faltantes_criticos,
         'advertencias_accion': advertencias_accion,
         'ESTADO_COLORS': ESTADO_COLORS,
+        # ─── Espacio de trabajo de la demanda ───
+        'espacio': espacio,
+        'espacios': estado_demanda_mod.ESPACIOS,
+        'estado_demanda': estado,
+        'bloques_datos': bloques_datos,
+        'bloques_estrategia': bloques_estrategia,
+        'documento': documento,
+        'bloqueos': bloqueos,
+        'importes_listos': importes_listos,
+        'puede_descargar': not bloqueos,
+        'pendientes_por_espacio': pendientes_por_espacio,
+        'titulo_espacio': titulo_espacio,
     })
 
 
@@ -2323,13 +2520,19 @@ def demanda_capitulos_descargar(request, pk):
             'Valida, calcula y aprueba las prestaciones vigentes antes de generar '
             'la demanda.'
         )
-        return redirect('demanda_asistente', pk=expediente.pk)
+        return redirect(reverse('demanda_asistente', kwargs={'pk': expediente.pk})
+                        + '?espacio=estrategia&seccion=prestaciones')
 
-    faltantes = _verificar_datos_criticos(expediente)
+    # El escrito que se presenta no puede salir con huecos ni con datos que el
+    # motor sustituye en silencio. La lista sale del MISMO estado que muestra
+    # la pantalla del documento: lo que el abogado ve es lo que le bloquea.
+    faltantes = estado_demanda_mod.bloqueos(
+        expediente, calculo_listo=_calculo_listo(expediente))
     if faltantes:
-        for f in faltantes:
-            messages.error(request, f'⚠️ No se puede descargar: falta {f["label"]}.')
-        return redirect('demanda_asistente', pk=expediente.pk)
+        for etiqueta in faltantes:
+            messages.error(request, f'⚠️ No se puede descargar: falta {etiqueta}.')
+        return redirect(reverse('demanda_asistente', kwargs={'pk': expediente.pk})
+                        + '?espacio=documento')
 
     try:
         from .redaccion import generar_demanda_capitulos_docx

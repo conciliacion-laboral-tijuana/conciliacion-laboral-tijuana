@@ -46,9 +46,10 @@ class ConstructorNavegador(StaticLiveServerTestCase):
             page.route('**/*', asset)
             on_page_error = lambda err: errors.append(str(err))
             page.on('pageerror', on_page_error)
-            page.goto(self.live_server_url + f'/expedientes/{exp.pk}/demanda/asistente/')
-            page.wait_for_function("document.getElementById('demanda-preview-status').textContent !== 'Cargando vista previa…'")
-            page.locator('[data-acordeon-toggle="prestaciones"]').click()
+            page.goto(self.live_server_url + f'/expedientes/{exp.pk}/demanda/asistente/?espacio=estrategia')
+            # La hoja de prestaciones vive en el espacio Estrategia y se abre
+            # por defecto mientras no haya importes aprobados.
+            page.wait_for_selector('#sec-prestaciones #agregar-semana', state='attached')
             page.locator('#id_prestaciones-salario_integrado').fill('650')
             page.locator('summary', has_text='Generar semanas por horario habitual').click()
             for key, value in {'desde':'2026-06-29', 'hasta':'2026-07-01', 'entrada':'07:00', 'ordinaria':'15:00', 'salida':'17:00', 'salario':'600'}.items():
@@ -79,8 +80,8 @@ class ConstructorNavegador(StaticLiveServerTestCase):
                 Path('work/e2e-constructor-fallo.html').write_text(page.content())
                 print('URL:', page.url, 'Errores JS:', errors)
                 print('Errores visibles:', page.locator('.errorlist').all_text_contents())
-                print('Validez:', page.evaluate("Array.from(document.getElementById('acordeonForm').elements).filter(e=>e.willValidate && !e.validity.valid).map(e=>[e.name,e.value,e.validationMessage])"))
-                print('Estado:', page.locator('#demanda-preview-status').text_content())
+                print('Validez:', page.evaluate("Array.from(document.getElementById('demandaForm').elements).filter(e=>e.willValidate && !e.validity.valid).map(e=>[e.name,e.value,e.validationMessage])"))
+                print('Estado:', page.locator('#dem-guardado').text_content())
                 print('Hoja:', list(HojaPrestaciones.objects.values('datos','huella')))
                 raise
             hoja = HojaPrestaciones.objects.get(expediente=exp)

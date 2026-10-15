@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Propuesta: espacio de trabajo de la demanda</title>
+<style>
+  :root{
+    --tinta:#1f2937; --gris:#6b7280; --linea:#e5e7eb; --fondo:#f6f7f9;
+    --azul:#1d4ed8; --azul-suave:#eff6ff; --ambar:#b45309; --ambar-suave:#fffbeb;
+    --verde:#15803d; --verde-suave:#f0fdf4; --rojo:#b91c1c; --rojo-suave:#fef2f2;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--fondo);color:var(--tinta);
+       font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+  .aviso-maqueta{background:#111827;color:#e5e7eb;font-size:12px;padding:8px 20px;letter-spacing:.02em}
+  .aviso-maqueta strong{color:#fff}
+  .barra{background:#fff;border-bottom:1px solid var(--linea);padding:12px 20px;
+         display:flex;align-items:center;gap:20px;flex-wrap:wrap}
+  .marca{font-weight:700}
+  .marca span{color:var(--gris);font-weight:400;font-size:12px;display:block}
+  .tabs{display:flex;gap:6px;margin-left:auto}
+  .tab{border:1px solid var(--linea);background:#fff;border-radius:8px;padding:7px 14px;
+       cursor:pointer;font-size:13px;font-weight:600;color:var(--gris);display:flex;align-items:center;gap:8px}
+  .tab:hover{background:var(--fondo)}
+  .tab[aria-selected="true"]{background:var(--azul);border-color:var(--azul);color:#fff}
+  .tab .punto{width:16px;height:16px;border-radius:50%;background:var(--linea);color:var(--tinta);
+              font-size:10px;font-weight:700;display:grid;place-items:center}
+  .tab[aria-selected="true"] .punto{background:rgba(255,255,255,.25);color:#fff}
+  .tab .punto.ok{background:#dcfce7;color:var(--verde)}
+  .tab .punto.pend{background:#fee2e2;color:var(--rojo)}
+
+  .cabecera{padding:18px 20px 0;max-width:1400px;margin:0 auto}
+  .titulo{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap}
+  .titulo h1{margin:0;font-size:20px}
+  .titulo p{margin:0;color:var(--gris);font-size:13px}
+  .chip{font-size:12px;font-weight:600;border-radius:999px;padding:3px 10px}
+  .chip.ambar{background:var(--ambar-suave);color:var(--ambar);border:1px solid #fde68a}
+  .chip.verde{background:var(--verde-suave);color:var(--verde);border:1px solid #bbf7d0}
+
+  .panel{display:none;max-width:1400px;margin:0 auto;padding:18px 20px 60px}
+  .panel.activo{display:block}
+  .dos{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:20px;align-items:start}
+  .tres{display:grid;grid-template-columns:250px minmax(0,1fr) 300px;gap:18px;align-items:start}
+  @media (max-width:1120px){.dos,.tres{grid-template-columns:minmax(0,1fr)}}
+
+  .tarjeta{background:#fff;border:1px solid var(--linea);border-radius:12px;padding:16px}
+  .tarjeta + .tarjeta{margin-top:14px}
+  .tarjeta h2{margin:0 0 2px;font-size:15px}
+  .tarjeta h2 small{font-weight:400;color:var(--gris);font-size:12px;display:block;margin-top:2px}
+  .campos{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-top:14px}
+  label{display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:4px}
+  input,select,textarea{width:100%;border:1px solid var(--linea);border-radius:8px;padding:8px 10px;
+                        font:inherit;font-size:13px;background:#fff}
+  textarea{resize:vertical;min-height:64px}
+  .ayuda{font-size:11px;color:var(--gris);margin-top:4px}
+  .ancho{grid-column:1/-1}
+
+  .checklist{position:sticky;top:16px}
+  .checklist ol{margin:12px 0 0;padding:0;list-style:none}
+  .checklist li{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-top:1px solid var(--linea);font-size:13px}
+  .checklist li:first-child{border-top:0}
+  .marca-estado{flex:0 0 20px;height:20px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:700}
+  .marca-estado.ok{background:#dcfce7;color:var(--verde)}
+  .marca-estado.falta{background:#fee2e2;color:var(--rojo)}
+  .checklist .detalle{color:var(--gris);font-size:11.5px}
+
+  /* Columna vertebral del documento */
+  .indice ol{margin:10px 0 0;padding:0;list-style:none;counter-reset:cap}
+  .indice li{counter-increment:cap}
+  .indice button{width:100%;text-align:left;background:none;border:1px solid transparent;border-radius:9px;
+                 padding:8px 10px;cursor:pointer;font:inherit;font-size:13px;display:flex;gap:9px;align-items:flex-start}
+  .indice button:hover{background:var(--fondo)}
+  .indice button[aria-current="true"]{background:var(--azul-suave);border-color:#bfdbfe}
+  .indice .num{flex:0 0 18px;height:18px;border-radius:50%;background:#f3f4f6;color:#374151;
+               font-size:10px;font-weight:700;display:grid;place-items:center;margin-top:2px}
+  .indice .num.ok{background:#dcfce7;color:var(--verde)}
+  .indice .num.falta{background:#fee2e2;color:var(--rojo)}
+  .indice .rot{display:block;font-weight:600}
+  .indice .sub{display:block;color:var(--gris);font-size:11px}
+  .indice .fijo{background:#eef2ff;color:#3730a3}
+
+  .hoja{background:#fff;border:1px solid var(--linea);border-radius:12px;padding:34px 42px;
+        font-family:Georgia,"Times New Roman",serif;font-size:13.5px;line-height:1.75;color:#111}
+  .hoja h3{font-size:12.5px;letter-spacing:.09em;text-transform:uppercase;text-align:center;
+           margin:26px 0 10px;padding-bottom:6px;border-bottom:1px solid #d1d5db}
+  .hoja h3:first-of-type{margin-top:6px}
+  .hoja p{margin:0 0 9px;text-align:justify}
+  .hoja .juramento{font-weight:700}
+  .hueco{background:var(--ambar-suave);border:1px dashed #f59e0b;border-radius:5px;padding:0 6px;
+         color:var(--ambar);font-family:-apple-system,"Segoe UI",sans-serif;font-size:11.5px;
+         font-weight:600;white-space:nowrap;cursor:pointer}
+  .hueco:hover{background:#fef3c7}
+  .hueco.bloque{display:inline-block;margin:4px 6px 4px 0;padding:5px 10px;border-radius:8px}
+  .fijo-txt{color:#4b5563}
+  .nota-margen{font-family:-apple-system,"Segoe UI",sans-serif;font-size:11.5px;color:var(--gris);
+               border-left:3px solid var(--linea);padding-left:10px;margin:14px 0}
+  .centrado{text-align:center;font-weight:700;margin-top:26px}
+
+  .decision{background:#fff;border:1px solid var(--linea);border-radius:12px;padding:14px}
+  .decision + .decision{margin-top:12px}
+  .decision h4{margin:0 0 3px;font-size:13px}
+  .decision p{margin:0 0 9px;font-size:11.5px;color:var(--gris)}
+  .opciones{display:grid;gap:6px}
+  .op{border:1px solid var(--linea);border-radius:8px;padding:8px 10px;font-size:12.5px;
+      display:flex;gap:8px;align-items:flex-start;background:#fff;cursor:pointer}
+  .op:hover{border-color:#93c5fd}
+  .op.marcada{border-color:var(--azul);background:var(--azul-suave)}
+  .aviso{font-size:11.5px;border-radius:8px;padding:9px 11px;margin-top:10px}
+  .aviso.legal{background:var(--azul-suave);color:#1e3a8a;border:1px solid #bfdbfe}
+  .aviso.ojo{background:var(--ambar-suave);color:#92400e;border:1px solid #fde68a}
+  .aviso.bien{background:var(--verde-suave);color:#166534;border:1px solid #bbf7d0}
+  .mini{font-size:11.5px;color:var(--gris);margin:8px 0 0}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:8px}
+  th,td{text-align:left;padding:7px 6px;border-bottom:1px solid var(--linea)}
+  th{color:var(--gris);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+  td.n,th.n{text-align:right}
+  .acciones{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;margin-top:16px}
+  button.btn{border-radius:9px;padding:9px 16px;font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+  .btn-linea{background:#fff;border:1px solid var(--linea);color:#374151}
+  .btn-azul{background:var(--azul);border:1px solid var(--azul);color:#fff}
+  .btn-verde{background:#047857;border:1px solid #047857;color:#fff}
+  .pie{max-width:1400px;margin:0 auto;padding:0 20px 40px;color:var(--gris);font-size:12px}
+  .leyenda{display:flex;gap:16px;flex-wrap:wrap;font-size:11.5px;color:var(--gris);margin-top:10px}
+  .leyenda span{display:flex;align-items:center;gap:6px}
+  .muestra{width:11px;height:11px;border-radius:3px;display:inline-block}
+</style>
+</head>
+<body>
+
+<div class="aviso-maqueta">
+  <strong>Maqueta de propuesta</strong> — no es la aplicación: es el re-planteamiento del creador de demanda para revisión del abogado.
+</div>
+
+<div class="barra">
+  <div class="marca">Despacho Laboral<span>Espacio de trabajo de la demanda</span></div>
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" aria-selected="false" data-panel="datos"><span class="punto ok">✓</span> 1. Datos del caso</button>
+    <button class="tab" role="tab" aria-selected="false" data-panel="estrategia"><span class="punto pend">3</span> 2. Estrategia y prestaciones</button>
+    <button class="tab" role="tab" aria-selected="true" data-panel="documento"><span class="punto pend">4</span> 3. Documento</button>
+  </div>
+</div>
+
+<div class="cabecera">
+  <div class="titulo">
+    <h1>Juan Pérez López</h1>
+    <p>Expediente 2026-0142 · Conciliación sin acuerdo · Despido injustificado</p>
+    <span class="chip ambar">Faltan 3 datos y 1 decisión para poder presentar</span>
+  </div>
+  <div class="leyenda">
+    <span><i class="muestra" style="background:#fffbeb;border:1px dashed #f59e0b"></i> dato que falta: se captura aquí mismo</span>
+    <span><i class="muestra" style="background:#eef2ff;border:1px solid #c7d2fe"></i> texto fijo de la plantilla del despacho</span>
+    <span><i class="muestra" style="background:#dcfce7;border:1px solid #bbf7d0"></i> viene del cálculo aprobado</span>
+  </div>
+</div>
+
+<!-- ═══════════════ 1. DATOS DEL CASO ═══════════════ -->
+<section class="panel" id="panel-datos">
+  <div class="dos">
+    <div>
+      <div class="tarjeta">
+        <h2>Actor <small>Sólo datos. Aquí no se decide nada jurídico.</small></h2>
+        <div class="campos">
+          <div><label>Nombre completo</label><input value="Juan Pérez López"></div>
+          <div><label>CURP</label><input placeholder="18 caracteres"></div>
+          <div><label>Nacionalidad</label><input value="Mexicana"></div>
+          <div><label>Ciudad de contratación</label><input value="Tijuana, Baja California"></div>
+          <div><label>Teléfono</label><input value="664 123 4567"></div>
+          <div class="ancho"><label>Domicilio para emplazamientos</label><input placeholder="Calle, número, colonia, CP"></div>
+        </div>
+      </div>
+
+      <div class="tarjeta">
+        <h2>Relación laboral <small>Lo que alimenta el cálculo y el capítulo de prestaciones.</small></h2>
+        <div class="campos">
+          <div><label>Puesto</label><input value="Operador de montacargas"></div>
+          <div><label>Salario mensual</label><input value="12,400.00"></div>
+          <div><label>Periodo de pago</label><select><option>Semanal</option><option selected>Quincenal</option><option>Mensual</option></select></div>
+          <div><label>Fecha de ingreso</label><input value="2019-03-04"></div>
+          <div><label>Fecha de separación</label><input value="2026-01-28"></div>
+          <div><label>Tipo de contrato</label><input value="Por tiempo indeterminado"></div>
+          <div class="ancho"><label>Actividades desempeñadas</label><textarea>Manejo de montacargas, carga y descarga de tráiler, revisión de tarimas.</textarea></div>
+        </div>
+        <p class="ayuda">El salario se captura mensual; el motor deriva el diario y el integrado. La frecuencia real va en «periodo de pago».</p>
+      </div>
+
+      <div class="tarjeta">
+        <h2>Patrón demandado <small>Con buscador del catálogo de empresas.</small></h2>
+        <div class="campos">
+          <div class="ancho"><label>Buscar en catálogo</label><input placeholder="Razón social o RFC…"></div>
+          <div><label>Nombre comercial</label><input value="Transportes del Pacífico"></div>
+          <div><label>Razón social</label><input value="Transportes del Pacífico, S.A. de C.V."></div>
+          <div><label>Tipo de persona</label><select><option selected>Moral</option><option>Física</option></select></div>
+          <div class="ancho"><label>Domicilio</label><input value="Blvd. Industrial 1420, Col. Nueva Tijuana, CP 22435"></div>
+        </div>
+      </div>
+
+      <div class="tarjeta">
+        <h2>Representación legal <small>Apoderados y autorizados del proemio.</small></h2>
+        <p class="mini">En el despacho son siempre los mismos: se reutilizan de un expediente anterior con un clic.</p>
+        <table>
+          <tr><th>Apoderado</th><th>Cédula</th></tr>
+          <tr><td>Lic. María Fernanda Ruiz Soto</td><td>12345678</td></tr>
+          <tr><td>Lic. Alberto Sandoval Ibarra</td><td>87654321</td></tr>
+        </table>
+        <div class="acciones">
+          <button class="btn btn-linea">Copiar del expediente anterior</button>
+          <button class="btn btn-linea">Agregar apoderado</button>
+        </div>
+      </div>
+
+      <div class="acciones">
+        <button class="btn btn-linea" data-ir="estrategia">Continuar → Estrategia y prestaciones</button>
+      </div>
+    </div>
+
+    <aside class="checklist">
+      <div class="tarjeta">
+        <h2>Estado del caso</h2>
+        <ol>
+          <li><span class="marca-estado ok">✓</span><div><strong>Actor</strong><span class="detalle">Falta CURP y domicilio para emplazamientos.</span></div></li>
+          <li><span class="marca-estado ok">✓</span><div><strong>Relación laboral</strong><span class="detalle">Completa: salario, ingreso y separación.</span></div></li>
+          <li><span class="marca-estado ok">✓</span><div><strong>Patrón</strong><span class="detalle">Tomado del catálogo de empresas.</span></div></li>
+          <li><span class="marca-estado ok">✓</span><div><strong>Representación</strong><span class="detalle">2 apoderados con cédula.</span></div></li>
+          <li><span class="marca-estado falta">!</span><div><strong>Separación</strong><span class="detalle">Depende de la estrategia: modalidad y acción.</span></div></li>
+        </ol>
+      </div>
+      <div class="tarjeta">
+        <h2>Por qué está separado así</h2>
+        <p class="mini">Capturar datos y decidir la estrategia son dos trabajos distintos. Mezclados en una sola pantalla obligan al abogado a resolver derecho mientras teclea un CURP.</p>
+      </div>
+    </aside>
+  </div>
+</section>
+
+<!-- ═══════════════ 2. ESTRATEGIA Y PRESTACIONES ═══════════════ -->
+<section class="panel" id="panel-estrategia">
+  <div class="dos">
+    <div>
+      <div class="tarjeta">
+        <h2>Modalidad de la separación <small>Determina cómo se redacta el hecho central.</small></h2>
+        <div class="campos">
+          <div class="ancho">
+            <div class="opciones">
+              <label class="op marcada"><input type="radio" name="mod" checked> <span><strong>Despido verbal, sin aviso escrito</strong><br><span class="ayuda">Activa el alegato del artículo 47 LFT: sin aviso escrito se presume injustificada.</span></span></label>
+              <label class="op"><input type="radio" name="mod"> <span><strong>Se entregó documento de terminación</strong><br><span class="ayuda">Se transcribe la causa que consigna el documento.</span></span></label>
+              <label class="op"><input type="radio" name="mod"> <span><strong>Se le negó la entrada</strong><br><span class="ayuda">Se redacta como separación de hecho.</span></span></label>
+            </div>
+          </div>
+          <div><label>Quién la comunicó</label><input value="Ing. Ricardo Beltrán, jefe de almacén"></div>
+          <div><label>Dónde ocurrió</label><input value="Andén 3, nave B"></div>
+          <div><label>Hora</label><input value="14:45"></div>
+          <div class="ancho"><label>Qué le dijeron (frase textual)</label><textarea>«Ya no lo necesitamos, el lunes ya no te presentes.»</textarea></div>
+        </div>
+      </div>
+
+      <div class="tarjeta">
+        <h2>Acción preferida (art. 48 LFT) <small>Reinstalación o indemnización: no son acumulables.</small></h2>
+        <div class="opciones" style="grid-template-columns:1fr 1fr">
+          <label class="op marcada"><input type="radio" name="accion" checked> <span><strong>Indemnización constitucional</strong><br><span class="ayuda">Tres meses de salario + salarios vencidos.</span></span></label>
+          <label class="op"><input type="radio" name="accion"> <span><strong>Reinstalación</strong><br><span class="ayuda">No procede con menos de un año de antigüedad (art. 49 fr. I).</span></span></label>
+        </div>
+        <p class="aviso ojo"><strong>Antigüedad: 6 años 10 meses.</strong> Ambas acciones proceden; la elección la confirmó el cliente por escrito.</p>
+      </div>
+
+      <div class="tarjeta">
+        <h2>Situaciones que agregan hechos <small>Marcar aquí cambia el redactado, no sólo una bandera.</small></h2>
+        <div class="opciones">
+          <label class="op"><input type="checkbox"> <span>Le hicieron firmar renuncia o documentos en blanco <span class="ayuda">— agrega la impugnación anticipada de renuncia.</span></span></label>
+          <label class="op marcada"><input type="checkbox" checked> <span>Le ofrecieron una cantidad al separarlo <span class="ayuda">— la patronal reconoció el despido. Monto: $8,500.00</span></span></label>
+          <label class="op"><input type="checkbox"> <span>Hubo discriminación <span class="ayuda">— agrega el hecho condicional. Requiere tipo y detalle.</span></span></label>
+          <label class="op"><input type="checkbox" checked> <span>Registro ante el IMSS <span class="ayuda">— confirmado: estuvo dado de alta con salario inferior al real.</span></span></label>
+        </div>
+        <p class="aviso legal">Ninguna casilla alega un hecho por sí sola: el motor de redacción sólo incorpora el bloque cuando el dato está confirmado.</p>
+      </div>
+
+      <div class="tarjeta">
+        <h2>Prestaciones <small>Resultado del cálculo aprobado. El abogado revisa, no teclea importes.</small></h2>
+        <table>
+          <tr><th>Concepto y periodo</th><th class="n">Calculado</th><th class="n">Pagado</th><th class="n">Pendiente</th></tr>
+          <tr><td>Aguinaldo 2026 (28 días)</td><td class="n">$11,573.33</td><td class="n">$0.00</td><td class="n">$11,573.33</td></tr>
+          <tr><td>Vacaciones y prima vacacional</td><td class="n">$18,240.00</td><td class="n">$4,100.00</td><td class="n">$14,140.00</td></tr>
+          <tr><td>Prima de antigüedad (12 días por año)</td><td class="n">$59,520.00</td><td class="n">$0.00</td><td class="n">$59,520.00</td></tr>
+          <tr><td>Indemnización constitucional (90 días)</td><td class="n">$111,600.00</td><td class="n">$0.00</td><td class="n">$111,600.00</td></tr>
+          <tr><td><strong>Total a reclamar</strong></td><td class="n">—</td><td class="n">—</td><td class="n"><strong>$196,833.33</strong></td></tr>
+        </table>
+        <p class="aviso bien">Cálculo aprobado por la Lic. Ruiz el 12 feb 2026, 10:41. Cambiar cualquier dato del caso vuelve a marcar la demanda como no presentable.</p>
+        <div class="acciones">
+          <button class="btn btn-linea">Hoja de prestaciones por periodos (detalle fino)</button>
+          <button class="btn btn-linea">Recalcular</button>
+        </div>
+      </div>
+
+      <div class="acciones">
+        <button class="btn btn-linea" data-ir="datos">← Datos del caso</button>
+        <button class="btn btn-azul" data-ir="documento">Continuar → Documento</button>
+      </div>
+    </div>
+
+    <aside class="checklist">
+      <div class="tarjeta">
+        <h2>Por qué está separado así</h2>
+        <p class="mini">Aquí van las decisiones que un abogado debe firmar: modalidad, acción del 48, hechos condicionales, pruebas y el cálculo que se aprueba. Cada decisión muestra su consecuencia legal y su efecto en el documento.</p>
+      </div>
+      <div class="tarjeta">
+        <h2>Bloqueantes para presentar</h2>
+        <ol>
+          <li><span class="marca-estado ok">✓</span><div><strong>Prestaciones aprobadas</strong><span class="detalle">Huella vigente al 12 feb 2026.</span></div></li>
+          <li><span class="marca-estado ok">✓</span><div><strong>Acción del artículo 48</strong><span class="detalle">Indemnización, confirmada.</span></div></li>
+          <li><span class="marca-estado ok">✓</span><div><strong>Registro IMSS confirmado</strong><span class="detalle">Sin confirmar no se alega.</span></div></li>
+          <li><span class="marca-estado falta">!</span><div><strong>Pruebas documentales</strong><span class="detalle">Falta enlistar recibos de nómina y gafete.</span></div></li>
+        </ol>
+      </div>
+    </aside>
+  </div>
+</section>
+
+<!-- ═══════════════ 3. DOCUMENTO ═══════════════ -->
+<section class="panel activo" id="panel-documento">
+  <div class="tres">
+    <aside class="tarjeta indice">
+      <h2>La demanda, capítulo por capítulo</h2>
+      <ol>
+        <li><button aria-current="true"><span class="num ok">1</span><span><span class="rot">Proemio</span><span class="sub">Falta domicilio de la actora</span></span></button></li>
+        <li><button><span class="num ok">2</span><span><span class="rot">Demandados</span><span class="sub">Fuente de trabajo y moral</span></span></button></li>
+        <li><button><span class="num ok">3</span><span><span class="rot">Prestaciones</span><span class="sub">$196,833.33 · aprobado</span></span></button></li>
+        <li><button><span class="num ok">4</span><span><span class="rot">Jornada y horas extras</span><span class="sub">Tabla semanal</span></span></button></li>
+        <li><button><span class="num falta">5</span><span><span class="rot">Hechos</span><span class="sub">Falta hora del despido</span></span></button></li>
+        <li><button><span class="num falta">6</span><span><span class="rot">Pruebas</span><span class="sub">Falta enlistar documental</span></span></button></li>
+        <li><button><span class="num fijo">7</span><span><span class="rot">Derecho</span><span class="sub">Texto fijo del despacho</span></span></button></li>
+      </ol>
+      <p class="mini">Los capítulos en morado no se capturan: son la plantilla del despacho y sólo se verifican.</p>
+    </aside>
+
+    <div>
+      <div class="hoja">
+        <p class="centrado">H. JUNTA LOCAL DE CONCILIACIÓN Y ARBITRAJE<br>DEL ESTADO DE BAJA CALIFORNIA</p>
+        <p class="juramento">JUAN PÉREZ LÓPEZ, por mi propio derecho, señalando como domicilio para oír y recibir toda clase de notificaciones
+          <span class="hueco" title="Se captura aquí mismo">+ domicilio para emplazamientos</span>, y autorizando en los términos del artículo 692 fracción I de la Ley Federal del Trabajo a los
+          Licenciados <span class="fijo-txt">María Fernanda Ruiz Soto y Alberto Sandoval Ibarra</span>, con cédulas profesionales
+          <span class="fijo-txt">12345678 y 87654321</span> respectivamente, ante Usted con el debido respeto comparezco a exponer:</p>
+
+        <p>Que por medio del presente escrito y en la <strong>VÍA ORDINARIA LABORAL</strong> vengo a demandar de
+          <span class="fijo-txt">TRANSPORTES DEL PACÍFICO, S.A. DE C.V.</span>, con domicilio en
+          <span class="fijo-txt">Blvd. Industrial 1420, Col. Nueva Tijuana</span>, el pago de las prestaciones que a continuación se enumeran.</p>
+
+        <h3>Capítulo de prestaciones</h3>
+        <p>Reclamo el pago de las siguientes prestaciones, cuyo importe total asciende a
+          <strong>$196,833.33 (CIENTO NOVENTA Y SEIS MIL OCHOCIENTOS TREINTA Y TRES PESOS 33/100 M.N.)</strong>
+          <span class="fijo-txt">— cifra y letra provienen del cálculo aprobado, no se escriben a mano.</span></p>
+
+        <h3>Capítulo de hechos</h3>
+        <p><strong>1.</strong> Con fecha <span class="fijo-txt">4 de marzo de 2019</span> ingresé a prestar mis servicios personales y subordinados a la demandada, desempeñando el puesto de
+          <span class="fijo-txt">Operador de montacargas</span>, con un salario mensual de <span class="fijo-txt">$12,400.00</span>, con una jornada de
+          <span class="fijo-txt">lunes a viernes de 8:00 a 18:00 horas</span>.</p>
+        <p><strong>2.</strong> El día <span class="fijo-txt">28 de enero de 2026</span>, aproximadamente a las
+          <span class="hueco" title="Campo: hora del despido">+ hora del despido</span>, el Ingeniero <span class="fijo-txt">Ricardo Beltrán</span>, jefe de almacén, me manifestó de manera verbal lo siguiente: «Ya no lo necesitamos, el lunes ya no te presentes», sin que mediara causa justificada alguna y <strong>sin que se me entregara aviso escrito</strong>, por lo que resulta aplicable la presunción del artículo 47 de la Ley Federal del Trabajo.</p>
+        <p><strong>3.</strong> Al momento de mi separación, la demandada me ofreció la cantidad de <span class="fijo-txt">$8,500.00</span>, lo que constituye un reconocimiento de la existencia de la relación laboral y de mi separación.</p>
+        <p class="nota-margen">Los hechos 4 y 5 (IMSS y pruebas documentales) están pendientes: aparecerán aquí en cuanto se complete lo señalado.</p>
+
+        <h3>Pruebas</h3>
+        <p><span class="hueco bloque">+ enlistar prueba documental</span> <span class="hueco bloque">+ confirmar testigos</span>
+          <span class="fijo-txt">Se ofrecen además la confesional a cargo de la demandada, la testimonial y la presuncional en su doble aspecto.</span></p>
+
+        <h3>Capítulo de derecho</h3>
+        <p class="fijo-txt">Son aplicables los artículos 1, 2, 3, 5, 18, 20, 46, 47, 48, 49, 50, 76, 80, 87, 89, 123 apartado A fracción XXII y demás relativos de la Ley Federal del Trabajo…</p>
+
+        <p class="centrado">PROTESTO LO NECESARIO<br><br>Tijuana, Baja California, a ____ de ____________ de 2026</p>
+        <p class="centrado" style="font-weight:400">
+          <span class="fijo-txt">JUAN PÉREZ LÓPEZ</span><br>
+          <span style="font-size:11px;color:#9ca3af">El nombre del actor se toma del expediente: no puede quedar el de una demanda anterior</span>
+        </p>
+      </div>
+
+      <div class="acciones">
+        <button class="btn btn-linea">Edición libre del texto</button>
+        <button class="btn btn-linea">Guardar como machote</button>
+        <button class="btn btn-verde">Descargar Word para firma</button>
+      </div>
+      <p class="mini">Descargar sólo se habilita cuando no quedan huecos. Si algo se edita a mano, el sistema deja de garantizar que el texto coincida con el cálculo: se marca en el expediente.</p>
+    </div>
+
+    <aside>
+      <div class="decision">
+        <h4>Huecos de este capítulo</h4>
+        <p>Lo que falta, sin buscarlo en seis pestañas.</p>
+        <div class="opciones">
+          <label class="op"><span><strong>Domicilio para emplazamientos</strong><br><span class="ayuda">Actor · obligatorio</span></span></label>
+          <label class="op"><span><strong>Hora del despido</strong><br><span class="ayuda">Hechos · «aproximadamente las ___ horas»</span></span></label>
+          <label class="op"><span><strong>Prueba documental</strong><br><span class="ayuda">Pruebas · un documento por línea</span></span></label>
+        </div>
+      </div>
+      <div class="decision">
+        <h4>Coherencia verificada</h4>
+        <p>Contrastes que hoy hay que revisar a mano.</p>
+        <p class="aviso bien">El nombre del actor coincide arriba, en el proemio y en la firma.</p>
+        <p class="aviso bien">Los importes del capítulo de prestaciones coinciden con el cálculo aprobado.</p>
+        <p class="aviso ojo">Dice «sin aviso escrito», pero la estrategia no tiene marcado el documento de terminación: confirma que así fue.</p>
+      </div>
+      <div class="decision">
+        <h4>Fijos del despacho</h4>
+        <p>Artículos, juramento y ofrecimiento de pruebas: se editan una vez en el machote, no caso por caso.</p>
+      </div>
+    </aside>
+  </div>
+</section>
+
+<p class="pie">Comparar con la pantalla actual: un solo formulario con siete bloques numerados 1-4, 5, 5 y 6; vista previa en un iframe a la mitad de la pantalla; y tres puertas distintas — «Demanda», «Asistente de Demanda» y «Generador Demandas» — que llevan a lugares distintos del mismo trabajo.</p>
+
+<script>
+  var tabs = document.querySelectorAll('.tab');
+  function abrir(nombre){
+    tabs.forEach(function(t){ t.setAttribute('aria-selected', String(t.dataset.panel === nombre)); });
+    document.querySelectorAll('.panel').forEach(function(p){
+      p.classList.toggle('activo', p.id === 'panel-' + nombre);
+    });
+    window.scrollTo({top:0, behavior:'smooth'});
+  }
+  tabs.forEach(function(t){ t.addEventListener('click', function(){ abrir(t.dataset.panel); }); });
+  document.querySelectorAll('[data-ir]').forEach(function(b){
+    b.addEventListener('click', function(){ abrir(b.dataset.ir); });
+  });
+  if (location.hash) abrir(location.hash.slice(1));
+</script>
+</body>
+</html>

@@ -21,19 +21,28 @@ siete capítulos. El texto extraído está en el `.txt` de la misma carpeta.
 
 ## Cómo usarlo
 
-Desde el **Acordeón de Demanda**: botón *Descargar demanda final*.
-O por URL: `GET /expedientes/<pk>/demanda/capitulos/` → `.docx`.
+Desde el **espacio Documento** del espacio de trabajo de la demanda (botón
+*Descargar demanda final*). O por URL: `GET /expedientes/<pk>/demanda/capitulos/` → `.docx`.
 
-Antes de descargar se exige lo mismo que ya exigía el flujo anterior:
-datos críticos del cliente y prestaciones calculadas y aprobadas.
+La pantalla **Documento** muestra el mismo escrito que se descarga, capítulo por
+capítulo, con los datos que faltan señalados como huecos enlazados al campo que los
+completa. Para eso `salida.capitulos_html()` devuelve los capítulos por separado
+(`generar_demanda_capitulos_html()` los vuelve a unir en el mismo orden).
 
-### Sección 5 del acordeón: Representación legal
+Antes de descargar se exige lo mismo que ya exigía el flujo anterior (datos críticos del
+cliente y prestaciones calculadas y aprobadas) **más** que no quede ningún hueco
+obligatorio: antes el `.docx` salía con `[DOMICILIO PARA NOTIFICACIONES]` y otros
+marcadores dentro del escrito que se presenta. Redactar el borrador no se bloquea; lo que
+se bloquea es el documento que se lleva al Tribunal. La lista de lo que bloquea sale de
+`expedientes/demanda_estado.py`, la misma que alimenta el semáforo de la pantalla.
 
-Los **apoderados** (con cédula profesional) y los **autorizados** para oír y
-recibir notificaciones se capturan en su propia sección del acordeón y son los
-que arma el proemio. Como en un despacho suelen ser siempre los mismos, el botón
-**Copiar del expediente anterior** los reutiliza: toma los del expediente más
-reciente que los tenga y agrega sólo los que falten (no duplica).
+### Bloque de representación legal
+
+Los **apoderados** (con cédula profesional) y los **autorizados** para oír y recibir
+notificaciones se capturan en su propio bloque del espacio **Datos** y son los que arma el
+proemio. Como en un despacho suelen ser siempre los mismos, el botón **Copiar del
+expediente anterior** los reutiliza: toma los del expediente más reciente que los tenga y
+agrega sólo los que falten (no duplica).
 
 También se administran desde el admin de Django, y se muestran en el proemio en
 el orden capturado («con número de cédula profesional X, Y y Z respectivamente»).
@@ -66,8 +75,23 @@ expedientes/redaccion/
 ├── derecho.py       # capítulo 7
 ├── demanda.py       # ensamblado + texto plano
 ├── adaptador.py     # ÚNICO módulo que conoce Django
-└── salida.py        # DOCX (python-docx directo) y HTML
+└── salida.py        # DOCX (python-docx directo) y HTML, por capítulo
 ```
+
+Alrededor del motor, una sola pieza decide **qué le falta a la demanda** y qué
+afirmará el escrito:
+
+```
+expedientes/demanda_estado.py
+├── REQUISITOS     # cada dato que el documento necesita: campo, capítulo,
+│                    marcador literal del motor y sustituto silencioso
+├── estado()       # huecos + decisiones + por bloque + por capítulo + resumen
+├── coherencias()  # lo que el documento va a afirmar (y las sustituciones)
+└── marcar_html()  # convierte los marcadores en enlaces al campo que falta
+```
+
+Es la única fuente de verdad del semáforo del encabezado, del estado de cada bloque, de
+los huecos del documento y del guard de la descarga: no pueden contradecirse.
 
 **Regla de oro:** el motor de redacción NUNCA calcula ni inventa montos. Los
 importes vienen del motor legal determinista (`core/laboral` + `LegalConfig` +
@@ -91,12 +115,18 @@ Modelos nuevos: `ApoderadoLegal` (proemio, con cédula) y
 
 > ⚠️ `Cliente.salario` es **mensual**. El motor deriva el salario diario y el
 > diario integrado; la frecuencia real del pago va en `periodo_pago`.
-> El campo está etiquetado explícitamente y el acordeón muestra el aviso
+> El campo está etiquetado explícitamente y el espacio **Datos** muestra el aviso
 > «Captura el importe MENSUAL» con la conversión (`semanal × 4.33`).
 
-Todos estos campos se capturan en el acordeón (secciones 1, 2 y 4) y no sólo
-existen en la base: la prueba `test_campos_nuevos_de_la_hoja_de_datos_se_guardan`
-verifica que persistan al guardar.
+Todos estos campos se capturan en los espacios **Datos** (actor, relación laboral y
+patrón) y **Estrategia** (separación, IMSS y prestaciones), y no sólo existen en la base:
+la prueba `test_campos_nuevos_de_la_hoja_de_datos_se_guardan` verifica que persistan al
+guardar, y `expedientes/tests_espacio_demanda.py` verifica que cada uno se capture en la
+pantalla que le toca.
+
+> El **domicilio del actor** se agregó a `WIZARD_PASOS['trabajador']`: el proemio lo exige
+> y la pantalla no lo capturaba, así que el escrito salía con el marcador
+> `[DOMICILIO PARA NOTIFICACIONES]`.
 
 ## Banderas vs. motor legal
 

@@ -404,12 +404,23 @@ impossible action.
   the `importar_machotes` command or web import, preserving markers where possible.
 - Template library is managed from the Django admin or the machotes UI.
 
-### 6.5 Demanda Laboral generator (`demanda_generator.py`)
+### 6.5 Demanda Laboral generator (by chapters)
 
 - Generates a **professional Mexican labor lawsuit document** (Word `.docx`) with all
   case data, integrated calculations, print/filing-ready formatting.
-- A **step-by-step wizard** (`demanda_asistente`) guides through sections of the demanda;
-  a **direct generator** produces the document in one click.
+- A **three-space workspace** (`demanda_asistente`), each space holding only what it owns:
+  - `?espacio=datos` — actor (including the address for service), employment relationship,
+    employer and legal representation.
+  - `?espacio=estrategia` — separation type and modality, art. 48 LFT action, fact-adding
+    situations, IMSS confirmation and the per-period benefits sheet with its approval step.
+  - `?espacio=documento` — the actual filing **chapter by chapter**, with missing data shown
+    as clickable gaps that jump to the field that completes them, a chapter outline with
+    status, and a **coherence panel** (including the engine's silent substitutions).
+- A single source of truth (`expedientes/demanda_estado.py`) drives the header gauge, each
+  block's status, the document gaps and the download guard, so they cannot disagree.
+- The `.docx` download is **only enabled when no required item is missing**; drafting the
+  document is never blocked.
+- A **direct generator** produces the document in one click.
 - Downloads as `.docx` for editing/signing.
 
 ---

@@ -388,18 +388,26 @@ class FlujoCompletoDemandaTests(TestCase):
         self.assertIn('asistente', resp.url, 'Debe redirigir al asistente para completar datos')
 
     def test_wizard_completo_genera_demanda_y_guarda_machote(self):
-        """El acordeón guarda datos, valida críticos y genera la demanda; machotes con marcadores."""
+        """El espacio de trabajo guarda datos, valida críticos y genera la demanda; machotes con marcadores."""
         url = reverse('demanda_asistente', args=[self.expediente.pk])
 
-        # GET muestra las 5 secciones del acordeón
+        # Los tres espacios se anuncian; el de datos trae sus bloques
         resp = self.client.get(url)
         self.assertEqual(resp.status_code, 200)
         body = resp.content.decode('utf-8', errors='replace')
-        self.assertIn('acordeon-seccion', body, 'El acordeón debe renderizar secciones')
-        self.assertIn('sec-despido', body, 'Debe existir la sección de despido/pruebas')
-        self.assertIn('circunstancias_despido', body, 'La sección despido debe capturar circunstancias')
+        for espacio in ('datos', 'estrategia', 'documento'):
+            self.assertIn(f'espacio={espacio}', body, f'falta la pestaña {espacio}')
+        self.assertIn('sec-trabajador', body, 'El espacio de datos debe traer sus bloques')
+        self.assertIn('bloque-cabecera', body, 'Cada bloque muestra su estado')
 
-        # Guardar datos (todas las secciones) desde el acordeón
+        # La captura de la separación vive en Estrategia, no en Datos
+        resp = self.client.get(url + '?espacio=estrategia')
+        body = resp.content.decode('utf-8', errors='replace')
+        self.assertIn('sec-despido', body, 'Debe existir el bloque de la separación')
+        self.assertIn('circunstancias_despido', body,
+                      'El bloque de la separación captura las circunstancias')
+
+        # Guardar datos (todas las secciones) desde el espacio de trabajo
         resp = self.client.post(url, {
             'accion': 'guardar',
             'nombre': self.cliente.nombre,

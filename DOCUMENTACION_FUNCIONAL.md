@@ -329,9 +329,9 @@ en todos los casos.
 
 ### 5.7 Narrativa del despido (art. 47 LFT)
 
-Los HECHOS de la demanda se arman con campos **estructurados** capturados en el acordeón, no con
-un solo texto libre. Cada modalidad tiene redactado propio, porque la forma de la separación tiene
-consecuencia jurídica:
+Los HECHOS de la demanda se arman con campos **estructurados** capturados en el espacio
+**Estrategia y prestaciones**, no con un solo texto libre. Cada modalidad tiene redactado
+propio, porque la forma de la separación tiene consecuencia jurídica:
 
 | Modalidad | Redactado | Nota legal |
 |-----------|-----------|------------|
@@ -362,9 +362,9 @@ acciones excluyentes. El campo `Cliente.accion_preferida` captura la elección y
 | `reinstalacion` en despido justificado o renuncia voluntaria | **No procede** (art. 46 LFT) |
 | `indemnizacion` | Siempre procede si el tipo de separación genera responsabilidad |
 
-Cuando la elección es la reinstalación pero no procede, la pantalla del acordeón muestra una
+Cuando la elección es la reinstalación pero no procede, la pantalla de **Estrategia** muestra una
 advertencia (`advertencias_accion`) antes de generar la demanda, para que el asesor no formule una
-acción imposible.
+acción imposible. La misma comprobación aparece en el panel de coherencia del documento.
 
 ### 5.4 Cálculo por caso (`CalculoLaboral`)
 
@@ -430,13 +430,34 @@ acción imposible.
 - La biblioteca de plantillas se administra desde el admin de Django o desde la interfaz
   de machotes.
 
-### 6.5 Generador de Demanda Laboral (`demanda_generator.py`)
+### 6.5 Generador de Demanda Laboral por capítulos
 
 - Genera una **demanda laboral mexicana profesional** (Word `.docx`) con todos los datos
   del caso, cálculos integrados y formato listo para imprimir y firmar.
-- Un **asistente paso a paso** (`demanda_asistente`) guía por las secciones de la demanda;
-  un **generador directo** produce el documento en un solo clic.
+- **Espacio de trabajo en tres pantallas** (`demanda_asistente`), cada una con lo que le
+  toca en lugar de un solo formulario con todo:
+  - `?espacio=datos` — actor (con domicilio para notificaciones), relación laboral, patrón
+    y representación legal.
+  - `?espacio=estrategia` — tipo y modalidad de la separación, acción del artículo 48 LFT,
+    situaciones que agregan hechos, confirmación del IMSS y las prestaciones por periodos
+    con su cálculo y aprobación.
+  - `?espacio=documento` — el escrito real **capítulo por capítulo**, con los datos que
+    faltan como **huecos enlazados** al campo que los completa, el índice de capítulos con
+    su estado y el panel de **coherencia** (incluidas las sustituciones silenciosas del
+    motor: jornada por defecto, domicilio del patrón, aviso atribuido a un genérico).
+- El **estado** de la demanda es una sola fuente de verdad (`expedientes/demanda_estado.py`):
+  alimenta el semáforo del encabezado, el estado de cada bloque, los huecos del documento
+  y el guard de la descarga, para que no puedan contradecirse.
+- La descarga del `.docx` (`demanda_capitulos_descargar`) **sólo se habilita cuando no
+  queda ningún requisito obligatorio**: antes salía con `[DOMICILIO PARA NOTIFICACIONES]`
+  u otros marcadores dentro. Redactar el borrador nunca se bloquea.
+- Un **generador directo** produce el documento en un solo clic y el editor permite
+  retocar el texto antes de firmarlo.
 - Se descarga como `.docx` para edición/firma.
+
+> El motor de redacción separa el HTML por capítulos (`redaccion.salida.capitulos_html`)
+> para que la pantalla del documento pueda señalar en cuál falta algo. Los siete capítulos
+> son los del estándar del despacho: ver `docs/DEMANDA_POR_CAPITULOS.md`.
 
 ---
 

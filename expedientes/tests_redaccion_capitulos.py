@@ -365,6 +365,10 @@ class DescargaCapitulosTest(TestCase):
         cls.ajeno.profile.rol = 'asesor'
         cls.ajeno.profile.save()
 
+        # Este cliente representa un caso PRESENTABLE: el guard de descarga exige
+        # que no queden huecos obligatorios (domicilio del actor para
+        # notificaciones, modalidad de la separación, etc.), no sólo los datos
+        # críticos y el cálculo aprobado.
         cls.cliente = Cliente.objects.create(
             nombre='GUSTAVO GUTIERREZ PEREZ',
             curp='GUPG850315HBCRRS08',
@@ -378,6 +382,11 @@ class DescargaCapitulosTest(TestCase):
             empresa_razon_social='JEIMEX, S.A. DE C.V.',
             empresa_calle='Boulevard Héroes de la Independencia',
             empresa_numero='10351',
+            direccion_calle='Calle Segunda',
+            direccion_numero='2200',
+            direccion_colonia='Zona Centro',
+            direccion_cp='22000',
+            modalidad_despido='verbal',
         )
         cls.exp = Expediente.objects.create(
             cliente=cls.cliente, asesor=cls.user, tipo_despido='injustificado',
@@ -400,6 +409,25 @@ class DescargaCapitulosTest(TestCase):
         )
         self.assertIn('attachment', respuesta['Content-Disposition'])
         self.assertEqual(respuesta.content[:2], b'PK', 'no es un DOCX válido')
+
+    def test_no_descarga_si_falta_un_hueco_obligatorio(self):
+        """Sin domicilio del actor el .docx salía con «[DOMICILIO PARA NOTIFICACIONES]».
+
+        El guard ya no se limita a los datos críticos y al cálculo aprobado:
+        bloquea el escrito que se presenta mientras quede cualquier hueco
+        obligatorio, y manda a la pantalla donde se ve la lista.
+        """
+        self.cliente.direccion_calle = ''
+        self.cliente.direccion_numero = ''
+        self.cliente.direccion_colonia = ''
+        self.cliente.direccion_cp = ''
+        self.cliente.save(update_fields=['direccion_calle', 'direccion_numero',
+                                         'direccion_colonia', 'direccion_cp'])
+
+        respuesta = self.client.get(self._url())
+
+        self.assertEqual(respuesta.status_code, 302)
+        self.assertIn('espacio=documento', respuesta['Location'])
 
     def test_el_docx_trae_los_encabezados_de_capitulo(self):
         import io

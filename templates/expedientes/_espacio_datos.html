@@ -1,0 +1,359 @@
+{% load svg_tags %}
+{# Espacio 1 · Datos del caso: actor, relación laboral, patrón y representación.
+   Aquí NO se decide nada jurídico: las decisiones viven en Estrategia. #}
+<div class="dem-layout">
+  <div>
+
+    {# ─── Actor ──────────────────────────────────────────────────────── #}
+    <section class="bloque {% if not bloques_datos.trabajador.completo %}incompleto{% endif %}" id="sec-trabajador">
+      {% include 'expedientes/_bloque_cabecera.html' with bloque=bloques_datos.trabajador %}
+      <div class="bloque-cuerpo">
+        <div class="bloque-campos">
+          <div class="ancho">
+            <label for="{{ form.nombre.id_for_label }}">{{ form.nombre.label }} <span class="requerido">*</span></label>
+            {{ form.nombre }}
+            {% for e in errores.nombre %}<p class="text-xs text-red-600 mt-1">{{ e }}</p>{% endfor %}
+            <p class="ayuda">Este nombre aparecerá en la carátula, en el proemio, en las pruebas y en la firma.</p>
+          </div>
+          <div>
+            <label for="{{ form.curp.id_for_label }}">{{ form.curp.label }} <span class="requerido">*</span></label>
+            {{ form.curp }}
+            {% for e in errores.curp %}<p class="text-xs text-red-600 mt-1">{{ e }}</p>{% endfor %}
+          </div>
+          <div>
+            <label for="{{ form.rfc.id_for_label }}">{{ form.rfc.label }}</label>
+            {{ form.rfc }}
+          </div>
+          <div>
+            <label for="{{ form.fecha_nacimiento.id_for_label }}">{{ form.fecha_nacimiento.label }}</label>
+            {{ form.fecha_nacimiento }}
+          </div>
+          <div>
+            <label for="{{ form.genero.id_for_label }}">{{ form.genero.label }}</label>
+            {{ form.genero }}
+          </div>
+          <div>
+            <label for="{{ form.nacionalidad.id_for_label }}">{{ form.nacionalidad.label }}</label>
+            {{ form.nacionalidad }}
+            <p class="ayuda">Aparece en el proemio: «con nacionalidad mexicana».</p>
+          </div>
+          <div>
+            <label for="{{ form.telefono.id_for_label }}">{{ form.telefono.label }}</label>
+            {{ form.telefono }}
+          </div>
+          <div>
+            <label for="{{ form.whatsapp.id_for_label }}">{{ form.whatsapp.label }}</label>
+            {{ form.whatsapp }}
+          </div>
+          <div>
+            <label for="{{ form.email.id_for_label }}">{{ form.email.label }}</label>
+            {{ form.email }}
+          </div>
+        </div>
+
+        {# Domicilio: el proemio lo exige y antes no se capturaba en esta pantalla. #}
+        <div id="grupo-domicilio-actor" class="mt-5 pt-4 border-t border-gray-200">
+          <h3 class="text-sm font-semibold text-gray-700 mb-1">
+            Domicilio para oír y recibir notificaciones <span class="requerido">*</span>
+          </h3>
+          <p class="ayuda mb-2">Es el domicilio donde el Tribunal notificará al actor. Sin él, el proemio sale con un hueco.</p>
+          <div class="bloque-campos">
+            <div class="ancho">
+              <label for="{{ form.direccion_calle.id_for_label }}">{{ form.direccion_calle.label }}</label>
+              {{ form.direccion_calle }}
+            </div>
+            <div>
+              <label for="{{ form.direccion_numero.id_for_label }}">{{ form.direccion_numero.label }}</label>
+              {{ form.direccion_numero }}
+            </div>
+            <div>
+              <label for="{{ form.direccion_colonia.id_for_label }}">{{ form.direccion_colonia.label }}</label>
+              {{ form.direccion_colonia }}
+            </div>
+            <div>
+              <label for="{{ form.direccion_cp.id_for_label }}">{{ form.direccion_cp.label }}</label>
+              {{ form.direccion_cp }}
+            </div>
+          </div>
+        </div>
+
+        <div class="bloque-campos mt-5 pt-4 border-t border-gray-200">
+          <div>
+            <label for="{{ form.ciudad.id_for_label }}">{{ form.ciudad.label }}</label>
+            {{ form.ciudad }}
+            <p class="ayuda">Ciudad donde fue contratado (hecho 1).</p>
+          </div>
+          <div>
+            <label for="{{ form.estado.id_for_label }}">{{ form.estado.label }}</label>
+            {{ form.estado }}
+          </div>
+          <div>
+            <label for="{{ form.como_supo.id_for_label }}">{{ form.como_supo.label }}</label>
+            {{ form.como_supo }}
+          </div>
+          <div>
+            <label for="{{ form.oficina.id_for_label }}">{{ form.oficina.label }}</label>
+            {{ form.oficina }}
+            {% for e in errores.oficina %}<p class="text-xs text-red-600 mt-1">{{ e }}</p>{% endfor %}
+          </div>
+        </div>
+      </div>
+    </section>
+
+    {# ─── Relación laboral ───────────────────────────────────────────── #}
+    <section class="bloque {% if not bloques_datos.laboral.completo %}incompleto{% endif %}" id="sec-laboral">
+      {% include 'expedientes/_bloque_cabecera.html' with bloque=bloques_datos.laboral %}
+      <div class="bloque-cuerpo">
+        <div class="bloque-campos">
+          <div>
+            <label for="{{ form.puesto.id_for_label }}">{{ form.puesto.label }} <span class="requerido">*</span></label>
+            {{ form.puesto }}
+          </div>
+          <div>
+            <label for="{{ form.tipo_contrato.id_for_label }}">{{ form.tipo_contrato.label }}</label>
+            {{ form.tipo_contrato }}
+          </div>
+          <div class="ancho">
+            <label for="{{ form.actividades.id_for_label }}">{{ form.actividades.label }}</label>
+            {{ form.actividades }}
+            <p class="ayuda">Funciones que desempeñaba: se narran en el hecho del contrato. Puedes capturarlas como lista A), B), C)…</p>
+          </div>
+          <div>
+            <label for="{{ form.salario.id_for_label }}">{{ form.salario.label }} <span class="requerido">*</span></label>
+            {{ form.salario }}
+            {% for e in errores.salario %}<p class="text-xs text-red-600 mt-1">{{ e }}</p>{% endfor %}
+            <p class="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1 mt-1">
+              <i class="fas fa-exclamation-triangle"></i> Captura el importe <strong>MENSUAL</strong>.
+              Si le pagan por semana: <strong>semanal × 4.33</strong>. El motor deriva el salario diario.
+            </p>
+          </div>
+          <div>
+            <label for="{{ form.periodo_pago.id_for_label }}">{{ form.periodo_pago.label }}</label>
+            {{ form.periodo_pago }}
+          </div>
+          <div>
+            <label for="{{ form.fecha_ingreso.id_for_label }}">{{ form.fecha_ingreso.label }} <span class="requerido">*</span></label>
+            {{ form.fecha_ingreso }}
+            {% for e in errores.fecha_ingreso %}<p class="text-xs text-red-600 mt-1">{{ e }}</p>{% endfor %}
+          </div>
+          <div>
+            <label for="{{ form.fecha_salida.id_for_label }}">{{ form.fecha_salida.label }} <span class="requerido">*</span></label>
+            {{ form.fecha_salida }}
+            {% for e in errores.fecha_salida %}<p class="text-xs text-red-600 mt-1">{{ e }}</p>{% endfor %}
+          </div>
+          <div id="id_horario_entrada_grupo">
+            <label for="{{ form.horario_entrada.id_for_label }}">{{ form.horario_entrada.label }}</label>
+            {{ form.horario_entrada }}
+          </div>
+          <div>
+            <label for="{{ form.horario_salida.id_for_label }}">{{ form.horario_salida.label }}</label>
+            {{ form.horario_salida }}
+          </div>
+          <div id="id_dias_trabajo_grupo">
+            <label for="{{ form.dias_trabajo.id_for_label }}">{{ form.dias_trabajo.label }}</label>
+            {{ form.dias_trabajo }}
+            <p class="ayuda">Si lo dejas vacío, los hechos AFIRMARÁN «lunes a viernes».</p>
+          </div>
+          <div>
+            <label for="{{ form.dia_descanso.id_for_label }}">{{ form.dia_descanso.label }}</label>
+            {{ form.dia_descanso }}
+          </div>
+          <div>
+            <label for="{{ form.horas_semanales.id_for_label }}">{{ form.horas_semanales.label }}</label>
+            {{ form.horas_semanales }}
+          </div>
+          <div>
+            <label for="{{ form.jornada.id_for_label }}">{{ form.jornada.label }}</label>
+            {{ form.jornada }}
+          </div>
+        </div>
+      </div>
+    </section>
+
+    {# ─── Patrón demandado ───────────────────────────────────────────── #}
+    <section class="bloque {% if not bloques_datos.empresa.completo %}incompleto{% endif %}" id="sec-empresa">
+      {% include 'expedientes/_bloque_cabecera.html' with bloque=bloques_datos.empresa %}
+      <div class="bloque-cuerpo">
+        <div class="bloque-campos">
+          {% include 'expedientes/_empresa_buscador.html' with empresa_actual=cliente.empresa_razon_social|default:cliente.empresa %}
+          <div class="ancho">
+            <label for="{{ form.empresa.id_for_label }}">{{ form.empresa.label }} <span class="requerido">*</span></label>
+            {{ form.empresa }}
+            {% for e in errores.empresa %}<p class="text-xs text-red-600 mt-1">{{ e }}</p>{% endfor %}
+          </div>
+          <div class="ancho">
+            <label for="{{ form.empresa_razon_social.id_for_label }}">{{ form.empresa_razon_social.label }} <span class="requerido">*</span></label>
+            {{ form.empresa_razon_social }}
+            {% for e in errores.empresa_razon_social %}<p class="text-xs text-red-600 mt-1">{{ e }}</p>{% endfor %}
+          </div>
+          <div>
+            <label for="{{ form.empresa_actividad.id_for_label }}">{{ form.empresa_actividad.label }}</label>
+            {{ form.empresa_actividad }}
+          </div>
+          <div>
+            <label for="{{ form.tipo_persona_citado.id_for_label }}">{{ form.tipo_persona_citado.label }}</label>
+            {{ form.tipo_persona_citado }}
+          </div>
+          <div>
+            <label for="{{ form.empresa_telefono.id_for_label }}">{{ form.empresa_telefono.label }}</label>
+            {{ form.empresa_telefono }}
+          </div>
+        </div>
+
+        <div id="grupo-domicilio-empresa" class="mt-5 pt-4 border-t border-gray-200">
+          <h3 class="text-sm font-semibold text-gray-700 mb-1">
+            Domicilio del patrón <span class="requerido">*</span>
+          </h3>
+          <p class="ayuda mb-2">
+            Sin la calle, el capítulo de demandados ubica al patrón sólo en
+            «Tijuana, Baja California»: si el centro de trabajo está en otro
+            municipio, el emplazamiento se dirige mal.
+          </p>
+          <div class="bloque-campos">
+            <div class="ancho">
+              <label for="{{ form.empresa_calle.id_for_label }}">{{ form.empresa_calle.label }}</label>
+              {{ form.empresa_calle }}
+            </div>
+            <div>
+              <label for="{{ form.empresa_numero.id_for_label }}">{{ form.empresa_numero.label }}</label>
+              {{ form.empresa_numero }}
+            </div>
+            <div>
+              <label for="{{ form.empresa_colonia.id_for_label }}">{{ form.empresa_colonia.label }}</label>
+              {{ form.empresa_colonia }}
+            </div>
+            <div>
+              <label for="{{ form.empresa_cp.id_for_label }}">{{ form.empresa_cp.label }}</label>
+              {{ form.empresa_cp }}
+            </div>
+            <div class="ancho">
+              <label for="{{ form.empresa_referencias.id_for_label }}">{{ form.empresa_referencias.label }}</label>
+              {{ form.empresa_referencias }}
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    {# ─── Representación legal ───────────────────────────────────────── #}
+    <section class="bloque {% if not bloques_datos.representacion.completo %}incompleto{% endif %}" id="sec-representacion">
+      {% include 'expedientes/_bloque_cabecera.html' with bloque=bloques_datos.representacion %}
+      <div class="bloque-cuerpo">
+        <p class="aviso legal">
+          Estos datos aparecen en el <strong>proemio</strong>: los apoderados se listan con su
+          número de cédula profesional y los autorizados en los términos de los artículos
+          692 fracción I, 693 y 696 de la Ley Federal del Trabajo. En un despacho suelen ser
+          siempre los mismos: captúralos una vez y reutilízalos con
+          <strong>Copiar del expediente anterior</strong>.
+        </p>
+
+        {{ apoderados_formset.management_form }}
+        {{ autorizados_formset.management_form }}
+
+        <div class="mt-4">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="text-sm font-semibold text-gray-700">{% svg 'edit' %} Apoderados legales</h3>
+            <button type="submit" name="accion" value="representacion" formnovalidate
+                    formaction="{% url 'copiar_representacion' expediente.pk %}"
+                    class="text-xs px-3 py-1.5 border border-blue-600 text-blue-700 rounded-lg hover:bg-blue-50 font-semibold">
+              <i class="fas fa-copy"></i> Copiar del expediente anterior
+            </button>
+          </div>
+          <div class="space-y-2">
+            {% for f in apoderados_formset %}
+            <div class="grid grid-cols-1 sm:grid-cols-12 gap-2 items-start p-2 border border-gray-200 rounded-lg">
+              <div class="sm:col-span-6">
+                <label class="text-xs text-gray-500 mb-0.5">Nombre completo</label>
+                {{ f.nombre }}
+                {% for e in f.nombre.errors %}<p class="text-red-600 text-xs mt-0.5">{{ e }}</p>{% endfor %}
+              </div>
+              <div class="sm:col-span-3">
+                <label class="text-xs text-gray-500 mb-0.5">Cédula profesional</label>
+                {{ f.cedula_profesional }}
+              </div>
+              <div class="sm:col-span-1">
+                <label class="text-xs text-gray-500 mb-0.5">Orden</label>
+                {{ f.orden }}
+              </div>
+              <div class="sm:col-span-2 flex items-center gap-2 pt-4">
+                {% if f.instance.pk %}{{ f.DELETE }}<span class="text-xs text-gray-500">Eliminar</span>{% endif %}
+              </div>
+              {{ f.id }}
+            </div>
+            {% empty %}
+            <p class="text-xs text-gray-500 p-3 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+              Sin apoderados capturados. Usa <strong>Agregar apoderado</strong> o copia los del expediente anterior.
+            </p>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="mt-5">
+          <h3 class="text-sm font-semibold text-gray-700 mb-2">{% svg 'mail' %} Autorizados para oír y recibir notificaciones</h3>
+          <div class="space-y-2">
+            {% for f in autorizados_formset %}
+            <div class="grid grid-cols-1 sm:grid-cols-12 gap-2 items-start p-2 border border-gray-200 rounded-lg">
+              <div class="sm:col-span-9">
+                <label class="text-xs text-gray-500 mb-0.5">Nombre completo</label>
+                {{ f.nombre }}
+                {% for e in f.nombre.errors %}<p class="text-red-600 text-xs mt-0.5">{{ e }}</p>{% endfor %}
+              </div>
+              <div class="sm:col-span-1">
+                <label class="text-xs text-gray-500 mb-0.5">Orden</label>
+                {{ f.orden }}
+              </div>
+              <div class="sm:col-span-2 flex items-center gap-2 pt-4">
+                {% if f.instance.pk %}{{ f.DELETE }}<span class="text-xs text-gray-500">Eliminar</span>{% endif %}
+              </div>
+              {{ f.id }}
+            </div>
+            {% empty %}
+            <p class="text-xs text-gray-500 p-3 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+              Sin autorizados capturados.
+            </p>
+            {% endfor %}
+          </div>
+        </div>
+
+        <p class="ayuda mt-3">
+          Para agregar más de uno, guarda y vuelve a entrar: los renglones nuevos aparecen al final.
+          Márcalos como eliminados y guarda para quitarlos.
+        </p>
+      </div>
+    </section>
+
+  </div>
+
+  {# ─── Lateral: estado del caso ─────────────────────────────────────── #}
+  <aside class="dem-lateral">
+    <div class="panel-lateral">
+      <h3>Estado del caso</h3>
+      <p>Sólo datos: aquí no se decide nada jurídico.</p>
+      <ul class="lista-estado">
+        {% for clave, b in bloques_datos.items %}
+        <li>
+          <span class="marca {% if b.completo %}ok{% else %}falta{% endif %}">
+            {% if b.completo %}✓{% else %}!{% endif %}
+          </span>
+          <span>
+            <strong>{{ b.titulo }}</strong>
+            <span class="detalle">
+              {% if not b.completo %}Falta: {{ b.faltantes_obligatorios|join:' · ' }}.
+              {% elif b.total_opcionales %}Se puede precisar: {{ b.faltantes_opcionales|join:' · ' }}.
+              {% else %}Completo.{% endif %}
+            </span>
+          </span>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    <div class="panel-lateral">
+      <h3>Por qué está separado así</h3>
+      <p>
+        Capturar datos y decidir la estrategia son dos trabajos distintos. Mezclados en una
+        sola pantalla obligan a resolver derecho mientras se teclea un CURP.
+        Las decisiones están en <strong>Estrategia</strong> y el texto en <strong>Documento</strong>.
+      </p>
+    </div>
+  </aside>
+</div>

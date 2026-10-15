@@ -166,7 +166,7 @@ valores vigentes). El modelo `CalculoLaboral.recalcular()` hace lo mismo por pro
 ## 3.4 Acción preferida y modalidad del despido
 
 Estos dos datos **no** están en Configuraciones Legales: son de cada cliente y se capturan en el
-**acordeón de demanda**, sección 4.
+espacio **Estrategia y prestaciones** de la demanda.
 
 ### Modalidad de la separación
 

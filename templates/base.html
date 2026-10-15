@@ -596,6 +596,8 @@
     <div class="max-w-7xl mx-auto px-3" style="padding-top: 8px; padding-bottom: 8px;">
         <ul id="appleNav">
             {% if user.profile.rol == 'abogada' %}
+            {# Menú mínimo a propósito (ver tests_abogada.test_menu_sencillo_y_otros_roles):
+               la abogada entra a crear demandas, no a la operación del despacho. #}
             <li class="{% if request.resolver_match.url_name == 'dashboard_abogada' or request.resolver_match.url_name == 'demanda_asistente' or request.resolver_match.url_name == 'demanda_editor' %}active{% endif %}"><a href="{% url 'dashboard_abogada' %}">Crear demanda</a></li>
             {% else %}
             <li class="{% if request.resolver_match.url_name == 'expediente_list' %}active{% endif %}">
@@ -613,13 +615,6 @@
             {% if user.profile.rol == 'asesor' %}
             <li class="{% if request.resolver_match.url_name == 'dashboard_asesor' %}active{% endif %}">
                 <a href="{% url 'dashboard_asesor' %}">Mi Dashboard</a>
-            </li>
-            {% elif user.profile.rol == 'abogada' %}
-            <li class="{% if request.resolver_match.url_name == 'dashboard_abogada' %}active{% endif %}">
-                <a href="{% url 'dashboard_abogada' %}">Mi Dashboard</a>
-            </li>
-            <li class="{% if request.resolver_match.url_name == 'machotes_catalogo' or request.resolver_match.url_name == 'machote_importar_web' %}active{% endif %}">
-                <a href="{% url 'machotes_catalogo' %}">Machotes</a>
             </li>
             {% elif user.profile.rol == 'admin' or user.profile.rol == 'superadmin' %}
             <li class="{% if request.resolver_match.url_name == 'dashboard_admin' %}active{% endif %}">
@@ -648,11 +643,7 @@
                 <a href="{% url 'superadmin_dashboard' %}">Superadmin</a>
             </li>
             {% endif %}
-            {% if user.profile.rol == 'abogada' %}
-            <li class="{% if request.resolver_match.url_name == 'expediente_list' and request.GET.estado == 'demanda' %}active{% endif %}">
-                <a href="{% url 'expediente_list' %}?estado=demanda">Generador Demandas</a>
-            </li>
-            {% elif user.profile.rol == 'superadmin' or user.is_staff %}
+            {% if user.profile.rol == 'superadmin' or user.is_staff %}
             <li>
                 <a href="{% url 'admin:index' %}">Admin</a>
             </li>
