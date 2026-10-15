@@ -53,6 +53,16 @@ jobs:
         # límites del art. 49).
         run: uv run python manage.py test expedientes.tests_demanda --settings=config.settings_test --verbosity 2
 
+      - name: Run tests de la demanda por capítulos (redacción)
+        # Estructura de los 7 capítulos del estándar del despacho
+        # (docs/referencia/demanda_injustificado_estandar.pdf), condiciones que
+        # activan bloques, montos en número y letra contra el motor legal,
+        # orden de los artículos del capítulo de derecho, tabla de jornada,
+        # los 5 tipos de separación, la regla de los 15 años del art. 162
+        # fr. III, la representación legal y verificación del documento final
+        # contra el estándar (EstandarCompletoTest).
+        run: uv run python manage.py test expedientes.tests_redaccion_capitulos --settings=config.settings_test --verbosity 2
+
       - name: Verify demandas cálculos (script CLI)
         # El script usa la BD de desarrollo por defecto (sqlite); se ejecutan
         # las migraciones primero para que las tablas existan.

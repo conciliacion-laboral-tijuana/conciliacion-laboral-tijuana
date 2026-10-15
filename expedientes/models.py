@@ -62,6 +62,11 @@ class Cliente(models.Model):
     # Datos personales complementarios (para conciliación)
     fecha_nacimiento = models.DateField('Fecha de nacimiento', null=True, blank=True)
     genero = models.CharField('Género', max_length=10, choices=GENERO_CHOICES, default='masculino')
+    nacionalidad = models.CharField('Nacionalidad', max_length=50, blank=True, default='mexicana',
+                                    help_text='Se usa en el proemio de la demanda; por defecto mexicana')
+    ciudad = models.CharField('Ciudad', max_length=100, blank=True, default='Tijuana',
+                              help_text='Ciudad donde se prestaron los servicios (hecho 1 de la demanda)')
+    estado = models.CharField('Estado', max_length=100, blank=True, default='Baja California')
 
     # Dirección particular (detallada)
     direccion_calle = models.CharField('Calle', max_length=200, blank=True)
@@ -91,13 +96,30 @@ class Cliente(models.Model):
 
     # Datos laborales
     puesto = models.CharField('Puesto', max_length=100, blank=True)
-    salario = models.DecimalField('Salario', max_digits=10, decimal_places=2, null=True, blank=True)
+    actividades = models.TextField(
+        'Funciones y responsabilidades', blank=True,
+        help_text='Qué hacía el trabajador (hecho del puesto en la demanda). '
+                  'Se puede capturar en párrafos o como lista A), B), C)…')
+    salario = models.DecimalField(
+        'Salario MENSUAL', max_digits=10, decimal_places=2, null=True, blank=True,
+        help_text='IMPORTANTE: captura el importe MENSUAL, no el diario ni el '
+                  'semanal. El motor legal deriva de aquí el salario diario y el '
+                  'diario integrado (arts. 84 y 89 LFT). La frecuencia real del '
+                  'pago va en "Periodo de pago".')
     periodo_pago = models.CharField('Periodo de pago', max_length=10, choices=PERIODO_PAGO_CHOICES,
                                      default='mensual', help_text='¿Cada cuándo le pagan?')
     horas_semanales = models.PositiveIntegerField('Horas semanales', null=True, blank=True, default=40,
                                                     help_text='Horas trabajadas por semana')
     jornada = models.CharField('Jornada', max_length=10, choices=JORNADA_CHOICES, default='diurna',
                                 help_text='Tipo de jornada laboral')
+    horario_entrada = models.CharField('Hora de entrada', max_length=5, blank=True,
+                                        help_text='Formato HH:MM, ej. 07:00 (hecho de jornada)')
+    horario_salida = models.CharField('Hora de salida', max_length=5, blank=True,
+                                       help_text='Formato HH:MM, ej. 17:00')
+    dias_trabajo = models.CharField('Días de trabajo', max_length=100, blank=True,
+                                     help_text='Ej. lunes a viernes (hecho de jornada)')
+    dia_descanso = models.CharField('Día(s) de descanso', max_length=100, blank=True,
+                                     help_text='Ej. sábado y domingo')
     zona_salarial = models.CharField(
         'Zona salarial', max_length=12, choices=ZONA_SALARIAL_CHOICES, default='frontera',
         help_text='Zona Libre de la Frontera Norte (Tijuana, Mexicali, Ciudad Juárez…) o resto '
@@ -135,6 +157,30 @@ class Cliente(models.Model):
     despido_otra_modalidad = models.TextField(
         'Otra modalidad: explicación', blank=True,
         help_text='Describa la modalidad cuando no sea verbal, documento ni negada la entrada')
+    hora_despido = models.CharField(
+        'Hora del despido', max_length=5, blank=True,
+        help_text='Formato HH:MM, ej. 14:45 (hecho del despido)')
+    despido_persona_puesto = models.CharField(
+        'Puesto de quien comunicó la separación', max_length=150, blank=True,
+        help_text='Ej. personal de Recursos Humanos, líder de línea, gerente')
+    hubo_ofrecimiento = models.BooleanField(
+        'Hubo ofrecimiento de pago al separarlo', default=False,
+        help_text='Si la patronal ofreció una cantidad al momento del despido (para el hecho y el petitorio)')
+    monto_ofrecido = models.DecimalField(
+        'Monto ofrecido', max_digits=12, decimal_places=2, null=True, blank=True,
+        help_text='Cantidad que la patronal ofreció al separarlo, si la hubo')
+    se_firmo_renuncia = models.BooleanField(
+        'Firmó renuncia / documentos en blanco', default=False,
+        help_text='Si le hicieron firmar renuncia o documentos en blanco: activa el hecho '
+                  'de impugnación anticipada de renuncia en la demanda')
+    hubo_discriminacion = models.BooleanField(
+        'Hubo discriminación', default=False,
+        help_text='Activa el hecho condicional de discriminación')
+    tipo_discriminacion = models.CharField(
+        'Tipo de discriminación', max_length=50, blank=True,
+        help_text='Ej. Embarazo, Edad, Discapacidad, Género, Religión')
+    detalle_discriminacion = models.TextField(
+        'Detalle de la discriminación', blank=True)
     lugar_trabajo = models.CharField(
         'Centro de trabajo', max_length=200, blank=True,
         help_text='Nombre o dirección del centro de trabajo donde prestaba servicios')
@@ -160,6 +206,17 @@ class Cliente(models.Model):
     testigos = models.TextField(
         'Testigos de los hechos', blank=True,
         help_text='Nombres y datos de personas que pueden corroborar los hechos (una por línea si son varios)')
+    TIPO_CONTRATO_CHOICES = [
+        ('indefinido', 'Por tiempo indefinido'),
+        ('determinado', 'Por tiempo determinado'),
+        ('obra', 'Por obra o tiempo determinado'),
+        ('capacitacion', 'Capacitación inicial'),
+        ('otro', 'Otro'),
+    ]
+    tipo_contrato = models.CharField(
+        'Tipo de contrato', max_length=20, choices=TIPO_CONTRATO_CHOICES,
+        blank=True, default='indefinido',
+        help_text='Se usa en el hecho del contrato individual de trabajo')
     documentos_prueba = models.TextField(
         'Documentos disponibles (prueba documental)', blank=True,
         help_text='Documentos que tiene el cliente: contratos, recibos, mensajes, cartas, etc. (uno por línea si son varios)')
@@ -585,6 +642,55 @@ class SolicitudConciliacion(models.Model):
             if field:
                 items.append(label)
         return items
+
+
+class ApoderadoLegal(models.Model):
+    """Apoderado legal del trabajador que firma la demanda.
+
+    El estándar del despacho los lista en el proemio con su número de cédula
+    profesional.  Son datos del DESPACHO (los mismos abogados en todos los
+    casos), no del cliente, por eso se capturan por expediente y se pueden
+    precargar desde los ajustes del usuario.
+    """
+
+    expediente = models.ForeignKey(
+        'Expediente', on_delete=models.CASCADE, related_name='apoderados',
+        verbose_name='Expediente')
+    nombre = models.CharField('Nombre completo', max_length=200)
+    cedula_profesional = models.CharField(
+        'Cédula profesional', max_length=20, blank=True,
+        help_text='Número de cédula expedida por la Dirección General de Profesiones')
+    orden = models.PositiveIntegerField('Orden', default=1,
+                                         help_text='Orden de aparición en el proemio')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Apoderado legal'
+        verbose_name_plural = 'Apoderados legales'
+        ordering = ['orden', 'nombre']
+
+    def __str__(self):
+        cedula = f' (céd. {self.cedula_profesional})' if self.cedula_profesional else ''
+        return f'{self.nombre}{cedula}'
+
+
+class AutorizadoNotificacion(models.Model):
+    """Persona autorizada para oír y recibir notificaciones (arts. 692, 693 y 696 LFT)."""
+
+    expediente = models.ForeignKey(
+        'Expediente', on_delete=models.CASCADE, related_name='autorizados',
+        verbose_name='Expediente')
+    nombre = models.CharField('Nombre completo', max_length=200)
+    orden = models.PositiveIntegerField('Orden', default=1)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Autorizado para notificaciones'
+        verbose_name_plural = 'Autorizados para notificaciones'
+        ordering = ['orden', 'nombre']
+
+    def __str__(self):
+        return self.nombre
 
 
 class Documento(models.Model):

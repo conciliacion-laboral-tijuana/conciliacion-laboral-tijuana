@@ -1,7 +1,28 @@
 from django.contrib import admin
 from django.utils import timezone
 
-from .models import Cliente, Expediente, Documento, Movimiento, Nota, SolicitudConciliacion, WhatsAppMessage, LegalConfig, CalculoLaboral, Machote, Aviso, SolicitudTransferencia, Notificacion, TareaConciliacion, Empresa
+from .models import Cliente, Expediente, Documento, Movimiento, Nota, SolicitudConciliacion, WhatsAppMessage, LegalConfig, CalculoLaboral, Machote, Aviso, SolicitudTransferencia, Notificacion, TareaConciliacion, Empresa, ApoderadoLegal, AutorizadoNotificacion
+
+
+@admin.register(ApoderadoLegal)
+class ApoderadoLegalAdmin(admin.ModelAdmin):
+    """Apoderados que firman la demanda (aparecen en el proemio con su cédula)."""
+
+    list_display = ['nombre', 'cedula_profesional', 'expediente', 'orden']
+    list_filter = ['created_at']
+    search_fields = ['nombre', 'cedula_profesional', 'expediente__numero']
+    autocomplete_fields = ['expediente']
+    ordering = ['expediente', 'orden']
+
+
+@admin.register(AutorizadoNotificacion)
+class AutorizadoNotificacionAdmin(admin.ModelAdmin):
+    """Autorizados para oír y recibir notificaciones (arts. 692, 693 y 696 LFT)."""
+
+    list_display = ['nombre', 'expediente', 'orden']
+    search_fields = ['nombre', 'expediente__numero']
+    autocomplete_fields = ['expediente']
+    ordering = ['expediente', 'orden']
 
 
 @admin.register(Empresa)

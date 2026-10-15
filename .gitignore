@@ -48,6 +48,7 @@ Thumbs.db
 
 # Archivos de test / capturas
 test_*.py
+probar_*.py
 *_test.png
 diagnostico_*.png
 test_v2_*.png

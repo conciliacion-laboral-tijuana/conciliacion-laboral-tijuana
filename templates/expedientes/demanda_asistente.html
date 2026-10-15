@@ -104,6 +104,20 @@
           {{ form.oficina }}
           {% if errores.oficina %}<p class="text-red-500 text-xs mt-1">{{ errores.oficina.0 }}</p>{% endif %}
         </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.nacionalidad.label }}</label>
+          {{ form.nacionalidad }}
+          <p class="text-xs text-gray-400 mt-0.5">Aparece en el proemio: «con nacionalidad mexicana».</p>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.ciudad.label }}</label>
+          {{ form.ciudad }}
+          <p class="text-xs text-gray-400 mt-0.5">Ciudad donde fue contratado (hecho 1 de la demanda).</p>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.estado.label }}</label>
+          {{ form.estado }}
+        </div>
       </div>
     </div>
     </div>
@@ -116,11 +130,39 @@
           <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.puesto.label }}</label>
           {{ form.puesto }}
         </div>
+        <div class="md:col-span-3">
+          <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.actividades.label }}</label>
+          {{ form.actividades }}
+          <p class="text-xs text-gray-400 mt-0.5">Funciones que desempeñaba. Se usa en el hecho del puesto. Puedes capturarlas como lista A), B), C)…</p>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.tipo_contrato.label }}</label>
+          {{ form.tipo_contrato }}
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.horario_entrada.label }}</label>
+          {{ form.horario_entrada }}
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.horario_salida.label }}</label>
+          {{ form.horario_salida }}
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.dias_trabajo.label }}</label>
+          {{ form.dias_trabajo }}
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.dia_descanso.label }}</label>
+          {{ form.dia_descanso }}
+        </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.salario.label }} <span class="text-red-500">*</span></label>
           {{ form.salario }}
           {% if errores.salario %}<p class="text-red-500 text-xs mt-1">{{ errores.salario.0 }}</p>{% endif %}
-          <p class="text-xs text-gray-400 mt-0.5">Necesario para los cálculos automáticos.</p>
+          <p class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1 mt-1">
+            <i class="fas fa-exclamation-triangle"></i> Captura el importe <strong>MENSUAL</strong>.
+            Si le pagan por semana, convierte: <strong>semanal × 4.33</strong>. El motor calcula el salario diario a partir de este dato.
+          </p>
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.periodo_pago.label }}</label>
@@ -269,6 +311,72 @@
                    placeholder="Causa que consigna el documento (si hubo)"
                    value="{{ cliente.despido_documento_motivo }}">
           </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Hora del despido</label>
+            <input type="text" name="hora_despido" class="input w-full" maxlength="5"
+                   placeholder="14:45" value="{{ cliente.hora_despido }}">
+            <p class="text-xs text-gray-400 mt-0.5">Se cita en el hecho de la separación: «aproximadamente las 14:45 horas».</p>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Puesto de quien comunicó la separación</label>
+            <input type="text" name="despido_persona_puesto" class="input w-full"
+                   placeholder="Ej: personal de Recursos Humanos, líder de línea"
+                   value="{{ cliente.despido_persona_puesto }}">
+          </div>
+        </div>
+
+        <!-- Condicionales que cambian el redactado de la demanda -->
+        <div class="p-4 bg-gray-50 border border-gray-200 rounded-lg space-y-3">
+          <h3 class="text-sm font-semibold text-gray-700">Situaciones que agregan hechos a la demanda</h3>
+
+          <label class="flex items-start gap-2 text-sm text-gray-700">
+            <input type="checkbox" name="se_firmo_renuncia" value="on"
+                   class="mt-0.5 rounded border-gray-300 text-blue-600"
+                   {% if cliente.se_firmo_renuncia %}checked{% endif %}>
+            <span>
+              Le hicieron firmar una renuncia o documentos en blanco
+              <span class="block text-xs text-gray-500">Agrega el hecho de impugnación anticipada de renuncia
+              (como en el caso de las hojas firmadas al ingreso). Es un alegato preventivo.</span>
+            </span>
+          </label>
+
+          <label class="flex items-start gap-2 text-sm text-gray-700">
+            <input type="checkbox" name="hubo_ofrecimiento" value="on"
+                   class="mt-0.5 rounded border-gray-300 text-blue-600"
+                   {% if cliente.hubo_ofrecimiento %}checked{% endif %}>
+            <span>
+              Le ofrecieron una cantidad al separarlo
+              <span class="block text-xs text-gray-500">Indica que la patronal reconoció la existencia del despido.</span>
+            </span>
+          </label>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Monto ofrecido (si lo hubo)</label>
+            <input type="number" step="0.01" min="0" name="monto_ofrecido" class="input w-full"
+                   placeholder="0.00" value="{{ cliente.monto_ofrecido|default:'' }}">
+          </div>
+
+          <label class="flex items-start gap-2 text-sm text-gray-700">
+            <input type="checkbox" name="hubo_discriminacion" value="on"
+                   class="mt-0.5 rounded border-gray-300 text-blue-600"
+                   {% if cliente.hubo_discriminacion %}checked{% endif %}>
+            <span>
+              Hubo discriminación
+              <span class="block text-xs text-gray-500">Agrega el hecho condicional de trato discriminatorio.</span>
+            </span>
+          </label>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Tipo de discriminación</label>
+              <input type="text" name="tipo_discriminacion" class="input w-full"
+                     placeholder="Ej: Embarazo, Edad, Género" value="{{ cliente.tipo_discriminacion }}">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Detalle de la discriminación</label>
+              <textarea name="detalle_discriminacion" rows="2" class="input w-full">{{ cliente.detalle_discriminacion }}</textarea>
+            </div>
+          </div>
         </div>
 
         <div>
@@ -331,6 +439,103 @@
 
 <!-- ─── 5. Revisión final: tipo de despido, cálculo y firma ──── -->
     {% include 'expedientes/_hoja_prestaciones.html' %}
+
+    <!-- ─── 5. Representación legal (apoderados y autorizados) ─────── -->
+    {% include 'expedientes/_acordeon_header.html' with sec_id='representacion' num=5 titulo='Representación legal' descripcion='Apoderados con cédula profesional y personas autorizadas para oír notificaciones (proemio).' completa=apoderados_formset.total_form_count %}
+    <div class="acordeon-body">
+      <div class="p-6 space-y-5">
+
+        <div class="p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-2">
+          <h3 class="text-sm font-semibold text-blue-900">¿Quiénes firman y reciben notificaciones?</h3>
+          <p class="text-xs text-blue-700">
+            Estos datos aparecen en el <strong>proemio</strong> (página 1 de la demanda): los apoderados
+            se listan con su número de cédula profesional y los autorizados en los términos de los
+            artículos 692 fracción I, 693 y 696 de la Ley Federal del Trabajo.
+          </p>
+          <p class="text-xs text-blue-700">
+            En un despacho suelen ser siempre los mismos: captúralos una vez y el botón
+            <strong>Copiar del expediente anterior</strong> los reutiliza en los siguientes casos.
+          </p>
+        </div>
+
+        {{ apoderados_formset.management_form }}
+        {{ autorizados_formset.management_form }}
+
+        <!-- Apoderados legales -->
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="text-sm font-semibold text-gray-700">{% svg 'edit' %} Apoderados legales</h3>
+            <button type="submit" name="accion" value="representacion"
+                    formnovalidate
+                    formaction="{% url 'copiar_representacion' expediente.pk %}"
+                    class="text-xs px-3 py-1.5 border border-blue-600 text-blue-700 rounded-lg hover:bg-blue-50 font-semibold">
+              <i class="fas fa-copy"></i> Copiar del expediente anterior
+            </button>
+          </div>
+          <div class="space-y-2">
+            {% for f in apoderados_formset %}
+            <div class="grid grid-cols-1 sm:grid-cols-12 gap-2 items-start p-2 border border-gray-200 rounded-lg">
+              <div class="sm:col-span-6">
+                <label class="block text-xs text-gray-500 mb-0.5">Nombre completo</label>
+                {{ f.nombre }}
+                {% for e in f.nombre.errors %}<p class="text-red-500 text-xs mt-0.5">{{ e }}</p>{% endfor %}
+              </div>
+              <div class="sm:col-span-3">
+                <label class="block text-xs text-gray-500 mb-0.5">Cédula profesional</label>
+                {{ f.cedula_profesional }}
+              </div>
+              <div class="sm:col-span-1">
+                <label class="block text-xs text-gray-500 mb-0.5">Orden</label>
+                {{ f.orden }}
+              </div>
+              <div class="sm:col-span-2 flex items-center gap-2 pt-4">
+                {% if f.instance.pk %}{{ f.DELETE }}<span class="text-xs text-gray-500">Eliminar</span>{% endif %}
+              </div>
+              {{ f.id }}
+            </div>
+            {% empty %}
+            <p class="text-xs text-gray-400 p-3 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+              Sin apoderados capturados. Usa <strong>Agregar apoderado</strong> o copia los del expediente anterior.
+            </p>
+            {% endfor %}
+          </div>
+        </div>
+
+        <!-- Autorizados para notificaciones -->
+        <div>
+          <h3 class="text-sm font-semibold text-gray-700 mb-2">{% svg 'mail' %} Autorizados para oír y recibir notificaciones</h3>
+          <div class="space-y-2">
+            {% for f in autorizados_formset %}
+            <div class="grid grid-cols-1 sm:grid-cols-12 gap-2 items-start p-2 border border-gray-200 rounded-lg">
+              <div class="sm:col-span-9">
+                <label class="block text-xs text-gray-500 mb-0.5">Nombre completo</label>
+                {{ f.nombre }}
+                {% for e in f.nombre.errors %}<p class="text-red-500 text-xs mt-0.5">{{ e }}</p>{% endfor %}
+              </div>
+              <div class="sm:col-span-1">
+                <label class="block text-xs text-gray-500 mb-0.5">Orden</label>
+                {{ f.orden }}
+              </div>
+              <div class="sm:col-span-2 flex items-center gap-2 pt-4">
+                {% if f.instance.pk %}{{ f.DELETE }}<span class="text-xs text-gray-500">Eliminar</span>{% endif %}
+              </div>
+              {{ f.id }}
+            </div>
+            {% empty %}
+            <p class="text-xs text-gray-400 p-3 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+              Sin autorizados capturados.
+            </p>
+            {% endfor %}
+          </div>
+        </div>
+
+        <p class="text-xs text-gray-400">
+          Para agregar más de uno, guarda y vuelve a entrar: los renglones nuevos aparecen al final.
+          Márcalos como eliminados y guarda para quitarlos.
+        </p>
+      </div>
+    </div>
+    </div>
 
     {% include 'expedientes/_acordeon_header.html' with sec_id='revision' num=6 titulo='Revisión final' descripcion='Tipo de despido, importes revisados y verificación de la firma.' completa=expediente.tipo_despido %}
     <div class="acordeon-body">
@@ -398,6 +603,11 @@
       <div class="flex items-center justify-between gap-3">
         <p class="text-xs text-gray-500 hidden sm:block">Borrador con guardado automático. También puedes pulsar <strong>Guardar datos</strong>. {% if errores %}<span class="text-red-600 font-medium">Hay campos con error.</span>{% endif %}</p>
         <div class="flex items-center gap-2 ml-auto">
+          <a href="{% url 'demanda_capitulos_descargar' expediente.pk %}"
+             class="px-4 py-2.5 border border-rose-600 text-rose-700 rounded-lg hover:bg-rose-50 transition-colors text-sm font-semibold flex items-center gap-1.5"
+             title="Descarga la demanda completa con todos los capítulos (proemio, prestaciones, hechos, pruebas y derecho) lista para presentar">
+            <i class="fas fa-file-word text-xs"></i> Descargar demanda final
+          </a>
           <button type="submit" name="accion" value="guardar"
                   class="px-5 py-2.5 border border-blue-600 text-blue-700 rounded-lg hover:bg-blue-50 transition-colors text-sm font-semibold flex items-center gap-1.5">
             <i class="fas fa-save text-xs"></i> Guardar datos

@@ -31,11 +31,13 @@ from django.views.generic import (
 
 from .forms import (ClienteForm, DocumentoForm, ExpedienteForm, NotaForm,
                        SolicitudConciliacionForm, WhatsAppMessageForm,
-                       CalculoLaboralForm, SimulacionForm, MachoteForm)
+                       CalculoLaboralForm, SimulacionForm, MachoteForm,
+                       formularios_representacion, apoderados_de_referencia)
 from .models import (Cliente, Documento, Expediente, Movimiento, Nota,
                       SolicitudConciliacion, WhatsAppMessage, TareaConciliacion,
                       CalculoLaboral, LegalConfig, Aviso,
-                      SolicitudTransferencia, Notificacion, Empresa)
+                      SolicitudTransferencia, Notificacion, Empresa,
+                      ApoderadoLegal, AutorizadoNotificacion)
 from .signals import registrar_movimiento
 
 
@@ -1658,13 +1660,18 @@ WIZARD_PASOS = {
         'titulo': 'Trabajador (actor)',
         'descripcion': 'Nombre completo, CURP y contacto del trabajador.',
         'campos': ['nombre', 'curp', 'rfc', 'telefono', 'whatsapp', 'email',
-                   'fecha_nacimiento', 'genero', 'como_supo', 'oficina'],
+                   'fecha_nacimiento', 'genero', 'como_supo', 'oficina',
+                   # Proemio de la demanda: nacionalidad y ciudad de contratación
+                   'nacionalidad', 'ciudad', 'estado'],
     },
     'laboral': {
         'titulo': 'Información laboral',
-        'descripcion': 'Puesto, salario y fechas de ingreso/salida (requeridos para los cálculos).',
+        'descripcion': 'Puesto, salario, jornada y fechas de ingreso/salida (requeridos para los cálculos).',
         'campos': ['puesto', 'salario', 'periodo_pago', 'horas_semanales', 'jornada',
                    'fecha_ingreso', 'fecha_salida', 'zona_salarial',
+                   # Hechos del contrato y de la jornada en la demanda
+                   'actividades', 'tipo_contrato',
+                   'horario_entrada', 'horario_salida', 'dias_trabajo', 'dia_descanso',
                    'imss_confirmado', 'tuvo_imss', 'imss_salario_inferior', 'imss_salario_diario', 'imss_documento'],
     },
     'empresa': {
@@ -1680,7 +1687,11 @@ WIZARD_PASOS = {
         'campos': ['modalidad_despido', 'hubo_documento_despido', 'despido_comunicado_por',
                    'despido_lugar', 'despido_frase', 'despido_documento_motivo',
                    'despido_otra_modalidad', 'lugar_trabajo', 'accion_preferida',
-                   'circunstancias_despido', 'testigos', 'documentos_prueba'],
+                   'circunstancias_despido', 'testigos', 'documentos_prueba',
+                   # Hechos condicionales de la demanda
+                   'hora_despido', 'despido_persona_puesto',
+                   'se_firmo_renuncia', 'hubo_ofrecimiento', 'monto_ofrecido',
+                   'hubo_discriminacion', 'tipo_discriminacion', 'detalle_discriminacion'],
     },
 }
 
@@ -1916,8 +1927,33 @@ def demanda_asistente(request, pk):
     errores = {}
     seccion_abierta = request.GET.get('seccion') or request.POST.get('seccion_abierta') or ''
 
+    # Apoderados y autorizados (capítulo 1: proemio).  Viajan en el mismo POST
+    # que el acordeón, con sus propios formsets.
+    postea_representacion = (
+        request.method == 'POST'
+        and ('apoderados-TOTAL_FORMS' in request.POST
+             or 'autorizados-TOTAL_FORMS' in request.POST)
+    )
+    representacion_context = formularios_representacion(
+        expediente, request.POST if postea_representacion else None
+    )
+
     if request.method == 'POST':
         accion = request.POST.get('accion', 'guardar')
+
+        if postea_representacion:
+            apoderados_formset = representacion_context['apoderados_formset']
+            autorizados_formset = representacion_context['autorizados_formset']
+            if apoderados_formset.is_valid() and autorizados_formset.is_valid():
+                apoderados_formset.save()
+                autorizados_formset.save()
+            else:
+                for fs, etiqueta in ((apoderados_formset, 'apoderados'),
+                                     (autorizados_formset, 'autorizados')):
+                    for formset_errores in fs.errors:
+                        for campo, mensajes in formset_errores.items():
+                            errores[f'{etiqueta}.{campo}'] = list(mensajes)
+                seccion_abierta = seccion_abierta or 'representacion'
 
         # ─── Validar y guardar los campos del acordeón ────────────────
         form = ClienteForm(request.POST, instance=cliente)
@@ -2031,6 +2067,7 @@ def demanda_asistente(request, pk):
 
     return render(request, 'expedientes/demanda_asistente.html', {
         **hoja_context,
+        **representacion_context,
         'calculo_aprobado': bool(resultado_vigente(expediente, hoja, aprobado=True)),
         'expediente': expediente,
         'cliente': cliente,
@@ -2038,13 +2075,78 @@ def demanda_asistente(request, pk):
         'pasos_info': WIZARD_PASOS,
         'pasos_keys': list(WIZARD_PASOS.keys()),
         'errores': errores,
-        'seccion_abierta': seccion_abierta if seccion_abierta in WIZARD_PASOS or seccion_abierta in ('revision', 'prestaciones') else '',
+        'seccion_abierta': seccion_abierta if seccion_abierta in WIZARD_PASOS or seccion_abierta in ('revision', 'prestaciones', 'representacion') else '',
         'tipos_despido': Expediente.TIPO_DESPIDO_CHOICES,
         'calculo': calculo,
         'faltantes_criticos': faltantes_criticos,
         'advertencias_accion': advertencias_accion,
         'ESTADO_COLORS': ESTADO_COLORS,
     })
+
+
+@login_required
+@require_POST
+def copiar_representacion(request, pk):
+    """Copia apoderados y autorizados del expediente anterior que los tenga.
+
+    En un despacho los apoderados son siempre los mismos, así que se precargan
+    del caso previo para no teclearlos en cada demanda.  No sobreescribe: sólo
+    agrega los que falten por nombre.
+    """
+    if not _puede_generar_documentos(request):
+        messages.error(request, 'No tienes permiso para editar la representación.')
+        return redirect('dashboard_asesor')
+    expediente = get_object_or_404(get_expedientes_queryset(request.user), pk=pk)
+
+    apoderados, autorizados = apoderados_de_referencia(expediente)
+    if not apoderados and not autorizados:
+        messages.warning(
+            request,
+            'No hay un expediente anterior con apoderados capturados para copiar. '
+            'Captúralos una vez y los siguientes casos podrán reutilizarlos.'
+        )
+        return redirect(reverse('demanda_asistente', kwargs={'pk': expediente.pk})
+                        + '?seccion=representacion')
+
+    existentes_ap = set(expediente.apoderados.values_list('nombre', flat=True))
+    existentes_aut = set(expediente.autorizados.values_list('nombre', flat=True))
+    orden_ap = expediente.apoderados.count()
+    orden_aut = expediente.autorizados.count()
+
+    nuevos_ap = nuevos_aut = 0
+    for apoderado in apoderados:
+        if apoderado.nombre in existentes_ap:
+            continue
+        orden_ap += 1
+        ApoderadoLegal.objects.create(
+            expediente=expediente,
+            nombre=apoderado.nombre,
+            cedula_profesional=apoderado.cedula_profesional,
+            orden=orden_ap,
+        )
+        nuevos_ap += 1
+    for autorizado in autorizados:
+        if autorizado.nombre in existentes_aut:
+            continue
+        orden_aut += 1
+        AutorizadoNotificacion.objects.create(
+            expediente=expediente,
+            nombre=autorizado.nombre,
+            orden=orden_aut,
+        )
+        nuevos_aut += 1
+
+    if nuevos_ap or nuevos_aut:
+        messages.success(
+            request,
+            f'✅ Se copiaron {nuevos_ap} apoderado(s) y {nuevos_aut} '
+            f'autorizado(s) del expediente anterior. Revisa el proemio antes de descargar.'
+        )
+    else:
+        messages.info(request, 'Los apoderados del expediente anterior ya estaban capturados.')
+
+    return redirect(reverse('demanda_asistente', kwargs={'pk': expediente.pk})
+                    + '?seccion=representacion')
 
 
 @login_required
@@ -2196,6 +2298,67 @@ def demanda_descargar(request, pk):
         logger.exception("Error generando demanda editada para expediente %s", expediente.numero)
         messages.error(request, 'Error al generar la demanda. Intenta de nuevo.')
         return redirect('demanda_editor', pk=expediente.pk)
+
+
+@login_required
+def demanda_capitulos_descargar(request, pk):
+    """Descarga la demanda con el formato de CAPÍTULOS del estándar del despacho.
+
+    A diferencia del editor Quill, esta salida se arma completa desde los datos
+    del expediente (proemio, demandados, prestaciones, anexo de jornada, hechos,
+    pruebas y derecho) sin pasar por el editor, que es lo que el abogado puede
+    mandar directo a la plataforma del Tribunal.
+
+    Ver docs/referencia/demanda_injustificado_estandar.pdf
+    """
+    if not _puede_generar_documentos(request):
+        messages.error(request, 'No tienes permiso para descargar documentos legales.')
+        return redirect('dashboard_asesor')
+    expediente = get_object_or_404(get_expedientes_queryset(request.user), pk=pk)
+
+    from .hoja_prestaciones import hoja_de, resultado_vigente
+    if hoja_de(expediente) and resultado_vigente(expediente, aprobado=True) is None:
+        messages.error(
+            request,
+            'Valida, calcula y aprueba las prestaciones vigentes antes de generar '
+            'la demanda.'
+        )
+        return redirect('demanda_asistente', pk=expediente.pk)
+
+    faltantes = _verificar_datos_criticos(expediente)
+    if faltantes:
+        for f in faltantes:
+            messages.error(request, f'⚠️ No se puede descargar: falta {f["label"]}.')
+        return redirect('demanda_asistente', pk=expediente.pk)
+
+    try:
+        from .redaccion import generar_demanda_capitulos_docx
+
+        doc = generar_demanda_capitulos_docx(expediente)
+        response = HttpResponse(
+            content_type='application/vnd.openxmlformats-officedocument.'
+                         'wordprocessingml.document'
+        )
+        nombre_cliente = re.sub(r'[^\w\-]', '_', expediente.cliente.nombre)
+        response['Content-Disposition'] = (
+            f'attachment; filename="Demanda_{expediente.numero}_{nombre_cliente}.docx"'
+        )
+        doc.save(response)
+
+        registrar_movimiento(
+            expediente=expediente,
+            usuario=request.user,
+            accion='actualizacion',
+            detalle='Demanda generada por capítulos (proemio, prestaciones, '
+                    'hechos, pruebas y derecho)'
+        )
+        return response
+
+    except Exception:
+        logger.exception('Error generando la demanda por capítulos del expediente %s',
+                         expediente.numero)
+        messages.error(request, 'Error al generar la demanda. Intenta de nuevo.')
+        return redirect('demanda_asistente', pk=expediente.pk)
 
 
 @login_required

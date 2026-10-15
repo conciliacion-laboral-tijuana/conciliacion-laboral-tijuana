@@ -1,6 +1,9 @@
 from django import forms
+from django.forms import inlineformset_factory
+
 from .models import (Expediente, Cliente, Documento, Nota, SolicitudConciliacion,
-                    WhatsAppMessage, CalculoLaboral, Machote)
+                    WhatsAppMessage, CalculoLaboral, Machote,
+                    ApoderadoLegal, AutorizadoNotificacion)
 from django.contrib.auth.models import User
 
 
@@ -22,7 +25,14 @@ class ClienteForm(forms.ModelForm):
                    'despido_documento_motivo', 'despido_otra_modalidad',
                    'lugar_trabajo', 'accion_preferida',
                    'como_supo', 'oficina',
-                   'asesoria_gratuita_ofrecida', 'asesoria_gratuita_agendada', 'fecha_asesoria_gratuita']
+                   'asesoria_gratuita_ofrecida', 'asesoria_gratuita_agendada', 'fecha_asesoria_gratuita',
+                   # Campos de la demanda por capítulos (proemio, hechos y pruebas)
+                   'nacionalidad', 'ciudad', 'estado',
+                   'actividades', 'tipo_contrato',
+                   'horario_entrada', 'horario_salida', 'dias_trabajo', 'dia_descanso',
+                   'hora_despido', 'despido_persona_puesto',
+                   'hubo_ofrecimiento', 'monto_ofrecido', 'se_firmo_renuncia',
+                   'hubo_discriminacion', 'tipo_discriminacion', 'detalle_discriminacion']
         widgets = {
             'imss_salario_diario': forms.NumberInput(attrs={'class': 'input', 'min': '0.01', 'step': '0.01'}),
             'imss_documento': forms.TextInput(attrs={'class': 'input'}),
@@ -69,6 +79,22 @@ class ClienteForm(forms.ModelForm):
             'asesoria_gratuita_ofrecida': forms.CheckboxInput(attrs={'class': 'w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500'}),
             'asesoria_gratuita_agendada': forms.CheckboxInput(attrs={'class': 'w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500'}),
             'fecha_asesoria_gratuita': forms.DateInput(attrs={'class': 'input', 'type': 'date'}),
+            # ─── Campos de la demanda por capítulos ───────────────────────
+            'nacionalidad': forms.TextInput(attrs={'class': 'input', 'placeholder': 'mexicana'}),
+            'ciudad': forms.TextInput(attrs={'class': 'input', 'placeholder': 'Tijuana'}),
+            'estado': forms.TextInput(attrs={'class': 'input', 'placeholder': 'Baja California'}),
+            'actividades': forms.Textarea(attrs={'class': 'input', 'rows': 5,
+                                                 'placeholder': 'Funciones que desempeñaba. Puedes usar una lista A), B), C)…'}),
+            'tipo_contrato': forms.Select(attrs={'class': 'input'}),
+            'horario_entrada': forms.TextInput(attrs={'class': 'input', 'placeholder': '07:00', 'maxlength': '5'}),
+            'horario_salida': forms.TextInput(attrs={'class': 'input', 'placeholder': '17:00', 'maxlength': '5'}),
+            'dias_trabajo': forms.TextInput(attrs={'class': 'input', 'placeholder': 'lunes a viernes'}),
+            'dia_descanso': forms.TextInput(attrs={'class': 'input', 'placeholder': 'sábado y domingo'}),
+            'hora_despido': forms.TextInput(attrs={'class': 'input', 'placeholder': '14:45', 'maxlength': '5'}),
+            'despido_persona_puesto': forms.TextInput(attrs={'class': 'input', 'placeholder': 'Ej: personal de Recursos Humanos'}),
+            'monto_ofrecido': forms.NumberInput(attrs={'class': 'input', 'step': '0.01', 'min': '0'}),
+            'tipo_discriminacion': forms.TextInput(attrs={'class': 'input', 'placeholder': 'Ej: Embarazo, Edad, Género'}),
+            'detalle_discriminacion': forms.Textarea(attrs={'class': 'input', 'rows': 3}),
         }
 
 
@@ -487,3 +513,94 @@ class WhatsAppMessageForm(forms.ModelForm):
 class NuevaDemandaForm(forms.Form):
     nombre = forms.CharField(label='Nombre completo del cliente', max_length=200,
                              widget=forms.TextInput(attrs={'class': 'input'}))
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# REPRESENTACIÓN LEGAL (capítulo 1 de la demanda: proemio)
+# ══════════════════════════════════════════════════════════════════════════
+
+class ApoderadoLegalForm(forms.ModelForm):
+    """Apoderado que firma la demanda, con su cédula profesional.
+
+    El proemio los lista "con número de cédula profesional X, Y y Z
+    respectivamente", así que el ORDEN importa: define el orden en que se leen.
+    """
+
+    class Meta:
+        model = ApoderadoLegal
+        fields = ['nombre', 'cedula_profesional', 'orden']
+        widgets = {
+            'nombre': forms.TextInput(attrs={
+                'class': 'input', 'placeholder': 'Ej: Ricardo Peñaloza Cruz'}),
+            'cedula_profesional': forms.TextInput(attrs={
+                'class': 'input', 'placeholder': 'Ej: 7593879'}),
+            'orden': forms.NumberInput(attrs={'class': 'input', 'min': '1'}),
+        }
+
+
+class AutorizadoNotificacionForm(forms.ModelForm):
+    """Persona autorizada para oír y recibir notificaciones (arts. 692, 693 y 696 LFT)."""
+
+    class Meta:
+        model = AutorizadoNotificacion
+        fields = ['nombre', 'orden']
+        widgets = {
+            'nombre': forms.TextInput(attrs={
+                'class': 'input', 'placeholder': 'Ej: Adriana Carolina Luna Peñaloza'}),
+            'orden': forms.NumberInput(attrs={'class': 'input', 'min': '1'}),
+        }
+
+
+ApoderadoLegalFormSet = inlineformset_factory(
+    Expediente, ApoderadoLegal, form=ApoderadoLegalForm,
+    extra=1, can_delete=True,
+)
+
+AutorizadoNotificacionFormSet = inlineformset_factory(
+    Expediente, AutorizadoNotificacion, form=AutorizadoNotificacionForm,
+    extra=1, can_delete=True,
+)
+
+
+def formularios_representacion(expediente, post=None):
+    """Formsets de apoderados y autorizados ligados al expediente.
+
+    Devuelve un dict listo para el contexto de la plantilla.
+    """
+    prefijos = {'apoderados': 'apoderados', 'autorizados': 'autorizados'}
+    if post is not None:
+        return {
+            'apoderados_formset': ApoderadoLegalFormSet(
+                post, instance=expediente, prefix='apoderados'),
+            'autorizados_formset': AutorizadoNotificacionFormSet(
+                post, instance=expediente, prefix='autorizados'),
+        }
+    return {
+        'apoderados_formset': ApoderadoLegalFormSet(
+            instance=expediente, prefix=prefijos['apoderados']),
+        'autorizados_formset': AutorizadoNotificacionFormSet(
+            instance=expediente, prefix=prefijos['autorizados']),
+    }
+
+
+def apoderados_de_referencia(expediente):
+    """Apoderados del expediente más reciente que los tenga.
+
+    Sirven para precargar el proemio: en un despacho los apoderados suelen ser
+    siempre los mismos, así que se copian del caso anterior en un clic en vez de
+    teclearlos en cada demanda.
+    """
+    anterior = (
+        Expediente.objects
+        .filter(apoderados__isnull=False)
+        .exclude(pk=expediente.pk)
+        .order_by('-created_at')
+        .distinct()
+        .first()
+    )
+    if anterior is None:
+        return [], []
+    return (
+        list(anterior.apoderados.all()),
+        list(anterior.autorizados.all()),
+    )
