@@ -15,8 +15,10 @@ NOTIFICACIONES]` dentro.
 
 from datetime import date
 from decimal import Decimal
+from pathlib import Path
 import re
 
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
@@ -124,6 +126,27 @@ class EspacioEstrategiaTest(BaseEspacioDemanda):
         self.assertIn('id="calculo-final-resumen"', body)
         self.assertIn('value="calcular"', body)
 
+    def test_el_bloque_de_prestaciones_dice_que_falta_para_calcular(self):
+        """El mensaje «aparecerán después de validar y calcular» tiene que decir
+        qué falta, dónde se captura y con qué botón se resuelve — no dejar al
+        abogado buscando entre más de cien campos."""
+        body = self._get('estrategia')
+
+        self.assertIn('Para calcular los importes', body)
+        self.assertIn('Ir a capturarlo', body)
+        # El botón está junto al mensaje, además del que cierra el bloque
+        self.assertGreaterEqual(body.count('value="calcular"'), 2)
+        # Cada pendiente enlaza al campo concreto que lo completa
+        self.assertIn('#id_prestaciones-salario_integrado', body)
+        self.assertIn('#id_prestaciones-datos_confirmados', body)
+        self.assertIn('#id_prestaciones-extras_estado', body)
+
+    def test_la_lista_de_calculo_no_promete_un_boton_que_fallaria(self):
+        """Con requisitos pendientes no puede decir que ya está todo."""
+        body = self._get('estrategia')
+
+        self.assertNotIn('Ya está todo para calcular', body)
+
     def test_la_confirmacion_del_imss_tiene_su_propio_bloque(self):
         """Estaba dentro de «Información laboral», que es un dato, no una decisión."""
         body = self._get('estrategia')
@@ -205,6 +228,50 @@ class EspacioDocumentoTest(BaseEspacioDemanda):
         self.assertNotIn('aria-disabled="true"', body)
         self.assertIn('Se puede presentar', body)
         self.assertNotIn('[DOMICILIO PARA NOTIFICACIONES]', body)
+
+
+class ComentariosDePlantillaTest(BaseEspacioDemanda):
+    """`{# ... #}` sólo vale en UNA línea; en varias se imprime como texto.
+
+    Así se colaron seis comentarios míos en el encabezado de casi todas las
+    pantallas (cuatro de ellos dentro de estas plantillas), porque parecían
+    comentarios y se estaban viendo como texto. Para comentar varias líneas hay
+    que usar `{% comment %} … {% endcomment %}`.
+    """
+
+    def test_ningun_comentario_de_una_linea_quedo_abierto(self):
+        """Barrido de TODAS las plantillas, no sólo las de esta pantalla."""
+        raiz = Path(settings.BASE_DIR) / 'templates'
+        plantillas = sorted(raiz.rglob('*.html'))
+        # Si el barrido no encuentra plantillas, la prueba pasaría sin revisar nada.
+        self.assertGreater(len(plantillas), 50, 'no se encontraron plantillas que revisar')
+
+        abiertos = []
+        for ruta in plantillas:
+            for numero, linea in enumerate(
+                    ruta.read_text(encoding='utf-8').splitlines(), 1):
+                if '{#' not in linea:
+                    continue
+                if '#}' not in linea.split('{#', 1)[1]:
+                    abiertos.append(f'{ruta.relative_to(raiz)}:{numero}')
+
+        self.assertEqual(
+            abiertos, [],
+            'Estos comentarios {# #} ocupan varias líneas y se imprimen como '
+            'texto; usa {% comment %}: ' + ', '.join(abiertos))
+
+    def test_ninguna_pantalla_imprime_comentarios_de_plantilla(self):
+        for espacio in ESPACIOS:
+            self.assertNotIn('{#', self._get(espacio), f'comentario visible en {espacio}')
+
+    def test_el_menu_de_la_abogada_no_imprime_comentarios(self):
+        """El encabezado lo comparten todas las pantallas del sistema."""
+        respuesta = self.client.get(reverse('dashboard_abogada'))
+
+        self.assertEqual(respuesta.status_code, 200)
+        cuerpo = respuesta.content.decode('utf-8')
+        self.assertNotIn('{#', cuerpo)
+        self.assertIn('Crear demanda', cuerpo)
 
 
 class AutoguardadoTest(BaseEspacioDemanda):

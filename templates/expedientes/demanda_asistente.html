@@ -256,6 +256,10 @@
   {% if not puede_descargar %}
   <p class="text-xs text-amber-800 mt-3">
     <strong>Para poder presentarla falta:</strong> {{ bloqueos|join:' · ' }}.
+    Se captura en
+    <a class="underline font-semibold" href="{% url 'demanda_asistente' expediente.pk %}?espacio=datos">Datos del caso</a>
+    y en
+    <a class="underline font-semibold" href="{% url 'demanda_asistente' expediente.pk %}?espacio=estrategia">Estrategia y prestaciones</a>.
     Redactar el borrador y editarlo no está bloqueado; lo que se bloquea es el
     documento que se lleva al Tribunal.
   </p>

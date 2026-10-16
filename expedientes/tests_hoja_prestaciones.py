@@ -8,7 +8,8 @@ from django.urls import reverse
 
 from .models import Cliente, Expediente, HojaPrestaciones, SolicitudConciliacion
 from .hoja_prestaciones import (calcular_hoja, ciclos_para, empaquetar, desempaquetar,
-                               formularios, validar_formularios, resultado_vigente, huella)
+                               formularios, validar_formularios, resultado_vigente, huella,
+                               requisitos_para_calcular)
 from .demanda_generator import construir_hechos, calculo_para_demanda, generar_demanda_html, _filas_prestaciones
 from .laboral_calculator import calcular_desde_expediente
 
@@ -288,3 +289,80 @@ class HojaPrestacionesTests(TestCase):
         self.assertFalse(SemanaForm(row).is_valid())
         row.update(entrada_lunes='22:00', ordinaria_lunes='06:00', salida_lunes='08:00')
         self.assertTrue(SemanaForm(row).is_valid())
+
+
+class RequisitosParaCalcularTests(HojaPrestacionesTests):
+    """La pantalla enumera qué falta para calcular y enlaza a cada campo.
+
+    El defecto que esto impide: «los importes aparecerán después de validar y
+    calcular» sin decir qué faltaba ni dónde capturarlo, con el botón a más de
+    cien campos de distancia del mensaje.
+    """
+
+    def _requisitos(self, post=None):
+        return requisitos_para_calcular(self.exp, formularios(self.exp, post))
+
+    def _por_clave(self, post=None):
+        return {r['clave']: r for r in self._requisitos(post)}
+
+    def test_un_caso_nuevo_enumera_lo_que_falta(self):
+        """El fixture ya trae IMSS confirmado y fechas: el resto está pendiente."""
+        pendientes = {clave for clave, r in self._por_clave().items()
+                      if not r['cumplido']}
+
+        self.assertEqual(pendientes, {'salario_integrado', 'datos_confirmados',
+                                      'extras_estado', 'vacaciones'})
+        self.assertTrue(self._por_clave()['fechas']['cumplido'])
+
+    def test_cada_requisito_sabe_llevar_al_campo(self):
+        """Sin destino, la lista sería un diagnóstico sin salida."""
+        for requisito in self._requisitos():
+            self.assertTrue(requisito['ancla'], requisito['clave'])
+            self.assertTrue(requisito['bloque'], requisito['clave'])
+            self.assertIn(requisito['espacio'], ('datos', 'estrategia'), requisito['clave'])
+
+    def test_con_todo_capturado_no_queda_ninguno_pendiente(self):
+        """El mismo POST que calcula tiene que dejar la lista en verde."""
+        pendientes = [r for r in self._requisitos(self.payload()) if not r['cumplido']]
+
+        self.assertEqual(pendientes, [])
+
+    def test_sin_confirmar_el_imss_lo_reclama_y_lleva_a_su_bloque(self):
+        self.cliente.imss_confirmado = False
+        self.cliente.save(update_fields=['imss_confirmado'])
+
+        requisito = self._por_clave()['imss_confirmado']
+
+        self.assertFalse(requisito['cumplido'])
+        self.assertEqual(requisito['ancla'], 'sec-imss')
+        self.assertEqual(requisito['bloque'], 'imss')
+
+    def test_sin_fechas_lo_reclama_en_el_espacio_de_datos(self):
+        self.cliente.fecha_ingreso = None
+        self.cliente.save(update_fields=['fecha_ingreso'])
+
+        requisito = self._por_clave()['fechas']
+
+        self.assertFalse(requisito['cumplido'])
+        self.assertEqual(requisito['espacio'], 'datos')
+        self.assertEqual(requisito['bloque'], 'laboral')
+
+    def test_con_horas_extras_pide_detallar_las_semanas(self):
+        datos = desempaquetar(self.datos())
+        datos['config']['extras_estado'] = 'si'
+        datos['semanas'] = []
+
+        requisito = self._por_clave(self.payload(empaquetar(datos)))['semanas']
+
+        self.assertFalse(requisito['cumplido'])
+
+    def test_sin_horas_extras_no_se_pide_detallar_semanas(self):
+        claves = set(self._por_clave().keys())
+        self.assertNotIn('semanas', claves)
+
+    def test_las_vacaciones_cuentan_los_periodos_confirmados(self):
+        """No basta con que existan: cada aniversario se confirma por separado."""
+        requisito = self._por_clave()['vacaciones']
+
+        self.assertFalse(requisito['cumplido'])
+        self.assertIn('0 de', requisito['ayuda'])

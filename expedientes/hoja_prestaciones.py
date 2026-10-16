@@ -190,6 +190,127 @@ def formularios(expediente, post=None):
     }
 
 
+def _es_verdadero(valor) -> bool:
+    """Casilla marcada, admitiendo True/'on'/'1'."""
+    if isinstance(valor, bool):
+        return valor
+    return str(valor or '').strip().lower() in ('1', 'true', 'on', 'si', 'sí', 'yes')
+
+
+def requisitos_para_calcular(expediente, forms_context) -> list:
+    """Qué falta para poder calcular los importes, en orden de captura.
+
+    La pantalla de prestaciones decía «los importes aparecerán después de
+    validar y calcular» sin decir QUÉ falta ni DÓNDE se captura, y el botón que
+    lo resuelve quedaba al final de más de cien campos. Esto lo enumera.
+
+    Cada requisito es un dict con: clave, etiqueta, cumplido, ayuda y el destino
+    del enlace (espacio, bloque, ancla).
+    """
+    cliente = expediente.cliente
+    config = forms_context['captura_prestaciones']
+    hoja = forms_context.get('hoja')
+    guardado = (hoja.datos.get('config') or {}) if hoja else {}
+
+    def valor(campo):
+        """Valor tal como está en pantalla (lo enviado manda)."""
+        if config.is_bound:
+            return config.data.get(config.add_prefix(campo))
+        if campo in config.initial:
+            return config.initial[campo]
+        return guardado.get(campo)
+
+    def cuantos_marcados(formset, campo) -> int:
+        total = 0
+        for form in formset.forms:
+            if form.is_bound:
+                if form.data.get(form.add_prefix(campo)):
+                    total += 1
+            elif form.initial.get(campo):
+                total += 1
+        return total
+
+    def cuantas_semanas(formset) -> int:
+        total = 0
+        for form in formset.forms:
+            if form.is_bound:
+                if form.data.get(form.add_prefix('DELETE')):
+                    continue
+                if form.data.get(form.add_prefix('semana')):
+                    total += 1
+            elif form.initial.get('semana'):
+                total += 1
+        return total
+
+    semanas = forms_context['semanas_formset']
+    vacaciones = forms_context['vacaciones_formset']
+    extras = str(valor('extras_estado') or '')
+    n_vacaciones = len(vacaciones.forms)
+    n_confirmados = cuantos_marcados(vacaciones, 'confirmado')
+    n_semanas = cuantas_semanas(semanas)
+    minimo_integrado = (cliente.salario or 0) / 30
+
+    requisitos = [
+        {
+            'clave': 'imss_confirmado',
+            'etiqueta': 'Confirmar si el trabajador estuvo dado de alta en el IMSS',
+            'cumplido': bool(cliente.imss_confirmado),
+            'ayuda': 'Sin esta confirmación el cálculo se detiene: no se presume el alta.',
+            'espacio': 'estrategia', 'bloque': 'imss', 'ancla': 'sec-imss',
+        },
+        {
+            'clave': 'fechas',
+            'etiqueta': 'Fechas de ingreso y de separación',
+            'cumplido': bool(cliente.fecha_ingreso and cliente.fecha_salida),
+            'ayuda': 'Con ellas se construyen la antigüedad y los periodos de vacaciones.',
+            'espacio': 'datos', 'bloque': 'laboral', 'ancla': 'id_fecha_ingreso',
+        },
+        {
+            'clave': 'salario_integrado',
+            'etiqueta': 'Salario diario integrado revisado',
+            'cumplido': bool(valor('salario_integrado')),
+            'ayuda': 'Es la base de las indemnizaciones y no puede ser menor que el '
+                     f'salario diario (${minimo_integrado:,.2f}).',
+            'espacio': 'estrategia', 'bloque': 'prestaciones',
+            'ancla': 'id_prestaciones-salario_integrado',
+        },
+        {
+            'clave': 'datos_confirmados',
+            'etiqueta': 'Confirmar que los datos no son estimaciones',
+            'cumplido': _es_verdadero(valor('datos_confirmados')),
+            'ayuda': 'Periodos, salarios, pagos y reglas aplicables revisados.',
+            'espacio': 'estrategia', 'bloque': 'prestaciones',
+            'ancla': 'id_prestaciones-datos_confirmados',
+        },
+        {
+            'clave': 'extras_estado',
+            'etiqueta': 'Indicar si hay horas extras pendientes',
+            'cumplido': extras in ('si', 'no'),
+            'ayuda': 'No puede quedarse en «Pendiente de confirmar»: o no hay, o se '
+                     'detallan por semana.',
+            'espacio': 'estrategia', 'bloque': 'prestaciones',
+            'ancla': 'id_prestaciones-extras_estado',
+        },
+        {
+            'clave': 'semanas',
+            'etiqueta': 'Detallar las semanas con horas extras',
+            'cumplido': n_semanas > 0,
+            'ayuda': 'Una fila por semana, con su salario diario y su umbral de horas dobles.',
+            'espacio': 'estrategia', 'bloque': 'prestaciones', 'ancla': 'sec-prestaciones',
+            'aplica': extras == 'si',
+        },
+        {
+            'clave': 'vacaciones',
+            'etiqueta': ('Confirmar los periodos de vacaciones' if n_vacaciones != 1
+                         else 'Confirmar el periodo de vacaciones'),
+            'cumplido': bool(n_vacaciones) and n_confirmados == n_vacaciones,
+            'ayuda': f'{n_confirmados} de {n_vacaciones} periodos revisados y confirmados.',
+            'espacio': 'estrategia', 'bloque': 'prestaciones', 'ancla': 'sec-prestaciones',
+        },
+    ]
+    return [requisito for requisito in requisitos if requisito.get('aplica', True)]
+
+
 def validar_formularios(expediente, forms_context, final=False):
     config, semanas, vacaciones = (forms_context[key] for key in
                                   ('captura_prestaciones', 'semanas_formset', 'vacaciones_formset'))

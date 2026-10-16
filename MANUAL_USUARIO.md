@@ -474,10 +474,13 @@ desde el expediente con **Asistente de Demanda**.
   - **Acción preferida** del artículo 48 LFT: reinstalación o indemnización.
   - **Situaciones que agregan hechos:** renuncia firmada, ofrecimiento, discriminación.
   - **Registro ante el IMSS:** sólo se alega si tú lo confirmas.
-  - **Prestaciones por periodos:** captura los periodos y las horas extras, presiona
-    **Validar datos y calcular prestaciones**, revisa el desglose y presiona **Usar estos
-    cálculos en la demanda**. Mientras no los apruebes, los numerales del escrito salen
-    **sin cifra**.
+  - **Prestaciones por periodos:** los importes **no se escriben a mano, se calculan**.
+    Arriba del bloque verás la lista de **lo que falta para calcular** (confirmar el IMSS,
+    el salario diario integrado revisado, si hay horas extras, confirmar los periodos de
+    vacaciones…), cada uno con un enlace **Ir a capturarlo** y con el botón
+    **Validar datos y calcular prestaciones** a la mano. Cuando la lista está completa,
+    calcula, revisa el desglose y presiona **Usar estos cálculos en la demanda**. Mientras
+    no los apruebes, los numerales del escrito salen **sin cifra**.
 - **3. Documento** — la demanda real, **capítulo por capítulo** (proemio, demandados,
   prestaciones, jornada, hechos, pruebas, derecho y firma):
   - Los datos que faltan aparecen como **recuadros ámbar**: haz clic y te lleva al campo

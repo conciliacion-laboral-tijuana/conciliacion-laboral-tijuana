@@ -1,6 +1,8 @@
-{# Cabecera de un bloque de captura del espacio de demanda.
-   Parámetro: bloque (dict con titulo, descripcion, completo, total_faltantes,
-   total_opcionales y las listas de faltantes). #}
+{% comment %}
+  Cabecera de un bloque de captura del espacio de demanda.
+  Parámetro: bloque (dict con titulo, descripcion, completo, total_faltantes,
+  total_opcionales y las listas de faltantes).
+{% endcomment %}
 <div class="bloque-cabecera" data-bloque="{{ bloque.clave }}">
   <div>
     <h2>{{ bloque.titulo }}</h2>

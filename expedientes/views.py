@@ -2031,7 +2031,8 @@ def demanda_asistente(request, pk):
     cliente = expediente.cliente
 
     from .hoja_prestaciones import (formularios, validar_formularios, hoja_de,
-                                   calcular_hoja, resultado_vigente, huella, empaquetar)
+                                   calcular_hoja, resultado_vigente, huella, empaquetar,
+                                   requisitos_para_calcular)
     from .models import HojaPrestaciones
     constructor = request.POST.get('hoja_calculos') == '1' or bool(hoja_de(expediente))
     hoja_context = formularios(expediente, request.POST if request.method == 'POST' and constructor else None)
@@ -2142,8 +2143,9 @@ def demanda_asistente(request, pk):
                 faltantes = _verificar_datos_criticos(expediente)
                 pendiente = _calculo_demanda_pendiente(expediente, calculo_para_demanda(expediente))
                 if pendiente:
-                    messages.error(request, 'Las prestaciones cambiaron o están pendientes de revisión. Valida, calcula y aprueba los importes antes de finalizar.')
-                    seccion_abierta = 'revision'
+                    messages.error(request, 'Las prestaciones cambiaron o están pendientes de revisión. Valida, calcula y aprueba los importes en «Estrategia y prestaciones» antes de finalizar.')
+                    # Se le deja donde está el trabajo pendiente, no en el documento.
+                    seccion_abierta = 'prestaciones'
                 elif faltantes:
                     for f in faltantes:
                         messages.error(request, f'Falta: {f["label"]}. Completa el dato para generar la demanda.')
@@ -2229,6 +2231,11 @@ def demanda_asistente(request, pk):
 
     bloqueos = [r['etiqueta'] for r in estado['pendientes'] if r['obligatorio']]
 
+    # Qué falta para poder calcular los importes: la pantalla lo enumera en el
+    # mismo bloque, en lugar de mandar al abogado a buscarlo entre 130 campos.
+    requisitos_calculo = requisitos_para_calcular(expediente, hoja_context)
+    calculo_listo_captura = all(r['cumplido'] for r in requisitos_calculo)
+
     # Cuántos pendientes OBLIGATORIOS se capturan en cada espacio: es lo que
     # marca las pestañas (un dato opcional no puede poner en rojo la pestaña).
     pendientes_por_espacio = {}
@@ -2278,6 +2285,8 @@ def demanda_asistente(request, pk):
         'puede_descargar': not bloqueos,
         'pendientes_por_espacio': pendientes_por_espacio,
         'titulo_espacio': titulo_espacio,
+        'requisitos_calculo': requisitos_calculo,
+        'calculo_listo_captura': calculo_listo_captura,
     })
 
 

@@ -596,8 +596,10 @@
     <div class="max-w-7xl mx-auto px-3" style="padding-top: 8px; padding-bottom: 8px;">
         <ul id="appleNav">
             {% if user.profile.rol == 'abogada' %}
-            {# Menú mínimo a propósito (ver tests_abogada.test_menu_sencillo_y_otros_roles):
-               la abogada entra a crear demandas, no a la operación del despacho. #}
+            {% comment %}
+              Menú mínimo a propósito (ver tests_abogada.test_menu_sencillo_y_otros_roles):
+              la abogada entra a crear demandas, no a la operación del despacho.
+            {% endcomment %}
             <li class="{% if request.resolver_match.url_name == 'dashboard_abogada' or request.resolver_match.url_name == 'demanda_asistente' or request.resolver_match.url_name == 'demanda_editor' %}active{% endif %}"><a href="{% url 'dashboard_abogada' %}">Crear demanda</a></li>
             {% else %}
             <li class="{% if request.resolver_match.url_name == 'expediente_list' %}active{% endif %}">
