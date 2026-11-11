@@ -41,6 +41,9 @@ marcadores dentro del escrito que se presenta. Redactar el borrador no se bloque
 se bloquea es el documento que se lleva al Tribunal. La lista de lo que bloquea sale de
 `expedientes/demanda_estado.py`, la misma que alimenta el semáforo de la pantalla.
 
+> Para capturar los datos del actor, la relación laboral, el patrón y la separación
+> **hablando** (en lugar de teclearlos), ver [`docs/CAPTURA_POR_VOZ.md`](CAPTURA_POR_VOZ.md).
+
 ### Bloque de representación legal
 
 Los **apoderados** (con cédula profesional) y los **autorizados** para oír y recibir

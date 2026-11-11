@@ -77,6 +77,10 @@ urlpatterns = [
     path('expedientes/<int:pk>/solicitud/', views.solicitud_conciliacion, name='solicitud_conciliacion'),
     # Asistente paso a paso para llenar la demanda
     path('expedientes/<int:pk>/demanda/asistente/', views.demanda_asistente, name='demanda_asistente'),
+    # Captura de datos por voz (dictado guiado)
+    path('expedientes/<int:pk>/captura-voz/', views.captura_voz, name='captura_voz'),
+    path('expedientes/<int:pk>/captura-voz/interpretar/',
+         views.captura_voz_interpretar, name='captura_voz_interpretar'),
     # Representación legal (apoderados y autorizados del proemio)
     path('expedientes/<int:pk>/demanda/copiar-representacion/',
          views.copiar_representacion, name='copiar_representacion'),

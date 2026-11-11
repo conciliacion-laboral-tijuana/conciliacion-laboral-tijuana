@@ -1,0 +1,151 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Captura por voz · {{ expediente.numero }}{% endblock %}
+
+{% block content %}
+<style>
+  :root{
+    --tinta:#1f2937; --gris:#6b7280; --linea:#e5e7eb; --fondo:#f6f7f9;
+    --azul:#1d4ed8; --azul-suave:#eff6ff; --verde:#047857; --verde-suave:#ecfdf5;
+    --ambar:#b45309; --ambar-suave:#fffbeb; --rojo:#b91c1c; --rojo-suave:#fef2f2;
+  }
+  .voz-wrap{max-width:760px;margin:0 auto;padding:8px 0 40px}
+  .voz-cabecera{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  .voz-cabecera h1{margin:0;font-size:20px;font-weight:700;color:var(--tinta)}
+  .voz-cabecera p{margin:2px 0 0;font-size:13px;color:var(--gris)}
+  .voz-volver{font-size:12.5px;font-weight:600;color:var(--azul);text-decoration:none}
+  .voz-volver:hover{text-decoration:underline}
+
+  .voz-card{margin-top:16px;background:#fff;border:1px solid var(--linea);border-radius:14px;
+            padding:22px 24px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+  .voz-progreso{display:flex;align-items:center;justify-content:space-between;gap:10px;
+                font-size:12px;color:var(--gris);font-weight:600}
+  .voz-barra{height:6px;background:#eef0f3;border-radius:999px;margin:8px 0 18px;overflow:hidden}
+  .voz-barra > div{height:100%;width:0;background:var(--azul);border-radius:999px;transition:width .25s ease}
+  .voz-grupo{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.08em;
+             text-transform:uppercase;color:#3730a3;background:#eef2ff;border:1px solid #e0e7ff;
+             border-radius:999px;padding:3px 9px}
+  .voz-pregunta{font-size:21px;line-height:1.35;font-weight:700;color:var(--tinta);margin:12px 0 4px}
+  .voz-ayuda{margin:0 0 14px;font-size:13px;color:var(--gris)}
+  .voz-transcripcion{min-height:22px;font-size:14px;color:#374151;background:var(--fondo);
+                     border:1px dashed var(--linea);border-radius:9px;padding:10px 12px;
+                     margin-bottom:10px;font-style:italic}
+  .voz-transcripcion:empty{display:none}
+  .voz-input{width:100%;font-size:17px;padding:12px 14px;border:1px solid #cbd5e1;
+             border-radius:10px;color:var(--tinta);background:#fff}
+  .voz-input:focus{outline:none;border-color:var(--azul);box-shadow:0 0 0 3px rgba(29,78,216,.12)}
+  .voz-opciones{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .voz-opcion{border:1px solid var(--linea);background:#fff;border-radius:9px;padding:9px 12px;
+              font-size:13px;font-weight:600;color:#374151;cursor:pointer}
+  .voz-opcion:hover{border-color:#93c5fd;background:var(--azul-suave)}
+  .voz-opcion.marcada{border-color:var(--azul);background:var(--azul-suave);color:var(--azul)}
+  .voz-estado{margin:12px 0 0;font-size:13px;font-weight:600;color:var(--gris);min-height:20px}
+  .voz-estado.ok{color:var(--verde)}
+  .voz-estado.aviso{color:var(--ambar)}
+  .voz-estado.error{color:var(--rojo)}
+
+  .voz-acciones{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px;align-items:center}
+  .voz-btn{display:inline-flex;align-items:center;gap:8px;border-radius:10px;padding:11px 16px;
+           font-size:14px;font-weight:700;cursor:pointer;border:1px solid var(--linea);
+           background:#fff;color:#374151}
+  .voz-btn:hover{background:var(--fondo)}
+  .voz-btn.primary{background:var(--azul);border-color:var(--azul);color:#fff}
+  .voz-btn.primary:hover{background:#1e40af}
+  .voz-btn.success{background:var(--verde);border-color:var(--verde);color:#fff}
+  .voz-btn.success:hover{background:#065f46}
+  .voz-btn.rec{background:#be123c;border-color:#be123c;color:#fff}
+  .voz-btn.rec:hover{background:#9f1239}
+  .voz-btn[disabled]{opacity:.5;pointer-events:none}
+  .voz-btn.ghost{color:var(--gris)}
+
+  .voz-resumen{margin-top:16px;background:#fff;border:1px solid var(--linea);border-radius:14px;padding:22px 24px}
+  .voz-resumen h2{margin:0 0 4px;font-size:18px}
+  .voz-resumen p{margin:0 0 14px;font-size:13px;color:var(--gris)}
+  .voz-resumen ul{list-style:none;margin:0;padding:0}
+  .voz-resumen li{display:flex;justify-content:space-between;gap:14px;padding:9px 0;
+                  border-top:1px solid var(--linea);font-size:13.5px}
+  .voz-resumen li:first-child{border-top:0}
+  .voz-resumen .dato{color:var(--gris)}
+  .voz-resumen .valor{font-weight:600;color:var(--tinta);text-align:right}
+  .voz-resumen .vacio{color:#9ca3af;font-style:italic;font-weight:500}
+
+  .voz-error{margin-top:14px;background:var(--rojo-suave);border:1px solid #fecaca;color:var(--rojo);
+             border-radius:10px;padding:10px 12px;font-size:13px}
+  .voz-error ul{margin:6px 0 0;padding-left:18px}
+  .voz-nota{margin-top:14px;font-size:12px;color:var(--gris)}
+  @media (max-width:560px){
+    .voz-card,.voz-resumen{padding:16px}
+    .voz-pregunta{font-size:18px}
+    .voz-btn{flex:1 1 auto;justify-content:center}
+  }
+</style>
+
+<div class="voz-wrap">
+  <div class="voz-cabecera">
+    <div>
+      <h1>Captura por voz</h1>
+      <p>
+        {{ expediente.numero }} ·
+        {{ cliente.nombre|default:'Sin nombre capturado' }} ·
+        {% if faltantes %}faltan {{ faltantes }} dato{{ faltantes|pluralize:"s" }}{% else %}todo capturado{% endif %}
+      </p>
+    </div>
+    <a class="voz-volver" href="{% url 'demanda_asistente' expediente.pk %}?espacio=datos">
+      ← Volver a la demanda
+    </a>
+  </div>
+
+  <div class="voz-card" id="voz-panel">
+    <div class="voz-progreso">
+      <span>Dato <strong id="voz-paso">1</strong> de <span id="voz-total">1</span></span>
+      <span id="voz-capturados"></span>
+    </div>
+    <div class="voz-barra"><div id="voz-barra"></div></div>
+
+    <span class="voz-grupo" id="voz-grupo">Trabajador</span>
+    <h2 class="voz-pregunta" id="voz-pregunta">Cargando…</h2>
+    <p class="voz-ayuda" id="voz-ayuda"></p>
+
+    <div class="voz-transcripcion" id="voz-transcripcion" aria-live="polite"></div>
+    <input class="voz-input" id="voz-input" type="text" autocomplete="off"
+           aria-label="Valor del dato actual">
+    <div class="voz-opciones" id="voz-opciones" hidden></div>
+
+    <p class="voz-estado" id="voz-estado">Sin capturar</p>
+
+    <div class="voz-acciones">
+      <button type="button" class="voz-btn primary" id="voz-mic">🎤 Hablar</button>
+      <button type="button" class="voz-btn success" id="voz-confirmar">Confirmar</button>
+      <button type="button" class="voz-btn ghost" id="voz-omitir">Omitir</button>
+      <button type="button" class="voz-btn ghost" id="voz-anterior">← Anterior</button>
+    </div>
+    <p class="voz-nota" id="voz-soporte"></p>
+  </div>
+
+  <div class="voz-resumen" id="voz-resumen" hidden>
+    <h2>Revisa lo capturado</h2>
+    <p>Estos datos se guardarán en el expediente. Los que dejes vacíos se capturan después.</p>
+    <ul id="voz-resumen-lista"></ul>
+    <div class="voz-acciones">
+      <button type="button" class="voz-btn success" id="voz-guardar">Guardar datos</button>
+      <button type="button" class="voz-btn ghost" id="voz-volver">Seguir capturando</button>
+    </div>
+    <div class="voz-error" id="voz-error" hidden></div>
+  </div>
+
+  <noscript>
+    <p class="voz-nota">
+      La captura por voz necesita JavaScript. Puedes llenar los datos en
+      <a href="{% url 'demanda_asistente' expediente.pk %}?espacio=datos">el espacio Datos</a>.
+    </p>
+  </noscript>
+</div>
+
+<form id="voz-form" method="post" hidden>
+  {% csrf_token %}
+  <input type="hidden" name="accion" value="guardar">
+</form>
+
+{{ pasos|json_script:"voz-pasos" }}
+<script src="{% static 'js/captura_voz.js' %}"></script>
+{% endblock %}

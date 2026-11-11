@@ -2525,6 +2525,69 @@ def demanda_asistente(request, pk):
 
 
 @login_required
+def captura_voz(request, pk):
+    """Asistente de captura por voz del expediente.
+
+    La pantalla pregunta, uno a uno, los datos que la demanda necesita; el
+    dictado se interpreta en el navegador contra `captura_voz_interpretar` y al
+    final se guarda por la MISMA validación del acordeón
+    (`_validar_captura_demanda`), no por una ruta paralela.
+
+    GET  → la pantalla con el guion y lo ya capturado.
+    POST → guarda lo capturado y devuelve JSON con el destino.
+    """
+    if not _puede_generar_documentos(request):
+        messages.error(request, 'No tienes permiso para capturar la demanda.')
+        return redirect('dashboard_asesor')
+    expediente = get_object_or_404(get_expedientes_queryset(request.user), pk=pk)
+    cliente = expediente.cliente
+
+    if request.method == 'POST':
+        tipo_original = expediente.tipo_despido
+        errores, datos = _validar_captura_demanda(request.POST, expediente)
+        # La captura por voz no elige el tipo de separación: no puede cambiarlo.
+        expediente.tipo_despido = tipo_original
+        if datos:
+            with transaction.atomic():
+                cliente.save(update_fields=list(datos))
+        if errores:
+            return JsonResponse({'guardado': False, 'errores': errores}, status=400)
+        messages.success(
+            request,
+            '✅ Datos capturados por voz. Revisa lo que falta en el espacio Datos.'
+        )
+        return JsonResponse({
+            'guardado': True,
+            'redirect': (reverse('demanda_asistente', kwargs={'pk': expediente.pk})
+                         + '?espacio=datos'),
+        })
+
+    from .captura_voz import pasos_con_valores
+    pasos = pasos_con_valores(cliente)
+    return render(request, 'expedientes/captura_voz.html', {
+        'expediente': expediente,
+        'cliente': cliente,
+        'pasos': pasos,
+        'faltantes': sum(1 for paso in pasos if not paso['capturado']),
+    })
+
+
+@login_required
+@require_POST
+def captura_voz_interpretar(request, pk):
+    """Interpreta un dictado: «3 de mayo de 2022» → fecha ISO, etc."""
+    if not _puede_generar_documentos(request):
+        return JsonResponse({'error': 'No autorizado'}, status=403)
+    get_object_or_404(get_expedientes_queryset(request.user), pk=pk)
+    try:
+        carga = json.loads(request.body or '{}')
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Solicitud inválida.'}, status=400)
+    from .captura_voz import interpretar
+    return JsonResponse(interpretar(carga.get('campo', ''), carga.get('texto', '')))
+
+
+@login_required
 @require_POST
 def copiar_representacion(request, pk):
     """Copia apoderados y autorizados del expediente anterior que los tenga.

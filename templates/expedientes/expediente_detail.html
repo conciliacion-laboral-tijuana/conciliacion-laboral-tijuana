@@ -29,6 +29,7 @@
                 <a href="{% url 'machotes_listar' expediente.pk %}" class="btn btn-dark"><img src="{% static 'svg/file-document-multiple-outline.svg' %}" class="w-3.5 h-3.5" style="filter: brightness(0) invert(1);"> Documentos</a>
                 <a href="{% url 'demanda_editor' expediente.pk %}" class="btn btn-dark"><img src="{% static 'svg/file-edit-outline.svg' %}" class="w-3.5 h-3.5" style="filter: brightness(0) invert(1);"> Demanda</a>
                 <a href="{% url 'demanda_asistente' expediente.pk %}" class="btn btn-dark"><i class="fas fa-list-check" style="filter: brightness(0) invert(1);"></i> Asistente de Demanda</a>
+                <a href="{% url 'captura_voz' expediente.pk %}" class="btn btn-dark"><i class="fas fa-microphone" style="filter: brightness(0) invert(1);"></i> Capturar por voz</a>
                 {% endif %}
                 <a href="{% url 'solicitar_transferencia' expediente.pk %}" class="btn btn-dark"><img src="{% static 'svg/file-edit-outline.svg' %}" class="w-3.5 h-3.5" style="filter: brightness(0) invert(1);"> Transferir</a>
                 <a href="{% url 'expediente_update' expediente.pk %}" class="btn btn-dark"><img src="{% static 'svg/application-edit-outline.svg' %}" class="w-3.5 h-3.5" style="filter: brightness(0) invert(1);"> Editar</a>
