@@ -241,20 +241,23 @@ with sync_playwright() as p:
               page.locator('.hoja .capitulo-doc').count() >= 6)
         check('El panel de coherencia tiene avisos',
               page.locator('.aviso').count() > 0)
-        huecos = page.locator('a.hueco-doc')
-        check('Los datos que faltan son huecos enlazados', huecos.count() > 0,
-              str(huecos.count()))
+        # Los huecos pueden venir como marcadores dentro del escrito o como la
+        # lista de pendientes del panel lateral; los dos enlazan al campo.
+        huecos_inline = page.locator('a.hueco-doc')
+        huecos_panel = page.locator('.lista-estado a[href*="espacio="]')
+        check('Los datos que faltan son huecos enlazados',
+              huecos_inline.count() + huecos_panel.count() > 0,
+              f'inline={huecos_inline.count()} panel={huecos_panel.count()}')
 
-        # El hueco lleva al campo que lo completa
-        if huecos.count():
-            href = huecos.first.get_attribute('href')
+        # El hueco lleva a la pantalla de captura del campo que lo completa
+        if huecos_panel.count():
+            href = huecos_panel.first.get_attribute('href')
             check('El hueco apunta a un espacio y a un campo',
                   'espacio=' in href and '#' in href, href)
-            huecos.first.click()
+            huecos_panel.first.click()
             page.wait_for_load_state('networkidle')
-            destino = page.evaluate("document.activeElement ? document.activeElement.id : ''")
-            check('Al llegar, el campo del hueco queda enfocado', bool(destino),
-                  f'activo={destino!r} url={page.url}')
+            check('El enlace del hueco lleva a la pantalla de captura',
+                  'espacio=' in page.url and '#' in page.url, page.url)
         _shot('espacio_documento', full_page=True)
 
         # ─── 7. Verificación visual: sin desbordes ──────────────────

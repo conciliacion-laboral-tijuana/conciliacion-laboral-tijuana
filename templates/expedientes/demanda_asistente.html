@@ -226,7 +226,7 @@
     {% endfor %}
   </nav>
 
-  <form method="post" action="{% url 'demanda_asistente' expediente.pk %}"
+  <form method="post" action="{% url 'demanda_asistente' expediente.pk %}?espacio={{ espacio }}"
         id="demandaForm" data-espacio="{{ espacio }}"
         data-preview-url="{% url 'demanda_vista_previa' expediente.pk %}">
     {% csrf_token %}
