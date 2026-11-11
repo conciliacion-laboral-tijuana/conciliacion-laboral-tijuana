@@ -274,7 +274,9 @@
       </a>
 
       {% if espacio != 'documento' %}
-      <button type="submit" name="accion" value="guardar" class="btn-link btn-borde">
+      {# formnovalidate: la hoja de prestaciones tiene campos requeridos plegados #}
+      <button type="submit" name="accion" value="guardar" class="btn-link btn-borde"
+              formnovalidate>
         <i class="fas fa-save text-xs"></i>
         {% if espacio == 'jurisprudencia' %}Guardar jurisprudencia{% else %}Guardar datos{% endif %}
       </button>
@@ -284,7 +286,8 @@
         <i class="fas fa-file-edit text-xs"></i> Editar el texto
       </a>
 
-      <button type="submit" name="accion" value="finalizar" class="btn-link btn-verde">
+      <button type="submit" name="accion" value="finalizar" class="btn-link btn-verde"
+              formnovalidate>
         <i class="fas fa-magic text-xs"></i> Generar demanda y editar
       </button>
     </div>
