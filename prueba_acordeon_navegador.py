@@ -113,6 +113,18 @@ def _dump_html(nombre):
         pass
 
 
+def _abrir_espacio(page, espacio):
+    """Abre una pestaña del asistente esperando la navegación REAL.
+
+    El JS intercepta el clic si hay cambios pendientes de autoguardar y navega
+    después del guardado; esperar sólo `networkidle` puede leer la URL anterior
+    y hacer que las comprobaciones corran sobre la pantalla equivocada.
+    """
+    page.click(f'.dem-tab[data-espacio="{espacio}"]')
+    page.wait_for_url(re.compile(rf'espacio={espacio}'), timeout=20000)
+    page.wait_for_load_state('networkidle')
+
+
 def check(nombre, condicion, detalle=''):
     estado = 'OK ' if condicion else 'FALLO'
     print(f'[{estado}] {nombre}' + (f' — {detalle}' if detalle else ''))
@@ -182,8 +194,7 @@ with sync_playwright() as p:
               page.locator('#sec-trabajador .bloque-estado').inner_text())
 
         # ─── 4. Confirmación del IMSS (bloque propio, en Estrategia) ─
-        page.click('.dem-tab[data-espacio="estrategia"]')
-        page.wait_for_load_state('networkidle')
+        _abrir_espacio(page, 'estrategia')
         check('La pestaña lleva a Estrategia', 'espacio=estrategia' in page.url, page.url)
         for bloque in ('despido', 'imss', 'prestaciones'):
             check(f'Bloque #{bloque} en Estrategia', page.locator(f'#sec-{bloque}').count() == 1)
@@ -221,8 +232,7 @@ with sync_playwright() as p:
               page.locator('#sec-despido .bloque-estado').inner_text())
 
         # ─── 6. El documento: índice, huecos y coherencia ──────────
-        page.click('.dem-tab[data-espacio="documento"]')
-        page.wait_for_load_state('networkidle')
+        _abrir_espacio(page, 'documento')
         check('La pestaña lleva al Documento', 'espacio=documento' in page.url, page.url)
         check('El índice lista los capítulos del escrito',
               page.locator('.indice ol li').count() >= 7,
