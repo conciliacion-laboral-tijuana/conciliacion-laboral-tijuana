@@ -19,6 +19,7 @@ from docx.oxml.ns import nsdecls
 from docx.shared import Cm, Pt, RGBColor
 
 from .demanda import capitulos, encabezado_capitulo
+from . import jurisprudencia as mod_jurisprudencia
 
 # ─── Tipografía del escrito (márgenes y cuerpo) ──────────────────────────────
 FUENTE = 'Arial'
@@ -50,7 +51,31 @@ def _objeto_html(objeto) -> str:
 # Orden de los bloques en el escrito. La pantalla del documento usa el mismo
 # orden para el índice de capítulos, así que vive aquí y no en la plantilla.
 ORDEN_HTML = ('encabezado', 'proemio', 'demandados', 'prestaciones', 'jornada',
-              'hechos', 'pruebas', 'derecho', 'cierre')
+              'hechos', 'pruebas', 'derecho', 'jurisprudencia', 'cierre')
+
+
+def jurisprudencia_html(tesis: list, con_encabezado: bool = True) -> str:
+    """HTML del apartado de JURISPRUDENCIA; vacío si no hay tesis.
+
+    Lo usan la vista previa del espacio *Jurisprudencia* y el documento, para
+    que el abogado vea exactamente lo que se imprimirá.
+    """
+    if not tesis:
+        return ''
+    bloques = []
+    if con_encabezado:
+        bloques.append('<h3>JURISPRUDENCIA</h3>')
+    bloques.append(f'<p>{_e(mod_jurisprudencia.introduccion(len(tesis)))}</p>')
+    for t in tesis:
+        if t.get('argumento'):
+            bloques.append(f'<p>{_e(t["argumento"])}</p>')
+        bloques.append(
+            f'<p class="tesis-rubro">{_e(mod_jurisprudencia.rubro(t))}</p>')
+        if t.get('texto'):
+            bloques.append(f'<p class="tesis-texto">{_e(t["texto"])}</p>')
+        bloques.append(
+            f'<p class="tesis-cita">{_e(mod_jurisprudencia.cita(t))}</p>')
+    return '\n'.join(bloques)
 
 
 def capitulos_html(datos: dict, calculo: dict,
@@ -141,6 +166,9 @@ def capitulos_html(datos: dict, calculo: dict,
         derecho.append(f'<h3>{encabezado_capitulo("DERECHO")}</h3>')
         derecho.append(f'<p>{_e(cap["derecho"])}</p>')
     bloques['derecho'] = '\n'.join(derecho)
+
+    bloques['jurisprudencia'] = jurisprudencia_html(
+        cap['jurisprudencia']['tesis'])
 
     bloques['cierre'] = '\n'.join([
         '<p>&nbsp;</p>',
@@ -355,6 +383,20 @@ def generar_demanda_capitulos_docx(expediente, datos: dict | None = None,
     if cap['derecho']:
         _encabezado(doc, encabezado_capitulo('DERECHO'))
         _parrafo(doc, cap['derecho'])
+
+    # ─── Apartado de jurisprudencia ───────────────────────────────────────
+    if cap['jurisprudencia']['tesis']:
+        _encabezado(doc, cap['jurisprudencia']['encabezado'])
+        if cap['jurisprudencia']['introduccion']:
+            _parrafo(doc, cap['jurisprudencia']['introduccion'])
+        for tesis in cap['jurisprudencia']['tesis']:
+            if tesis.get('argumento'):
+                _parrafo(doc, tesis['argumento'])
+            _parrafo(doc, mod_jurisprudencia.rubro(tesis), negrita=True,
+                     espacio_antes=8)
+            if tesis.get('texto'):
+                _parrafo(doc, tesis['texto'])
+            _parrafo(doc, mod_jurisprudencia.cita(tesis), tamano=9)
 
     # ─── Cierre ───────────────────────────────────────────────────────────
     _parrafo(doc, '', justificado=False)

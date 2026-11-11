@@ -3,7 +3,8 @@ from django.forms import inlineformset_factory
 
 from .models import (Expediente, Cliente, Documento, Nota, SolicitudConciliacion,
                     WhatsAppMessage, CalculoLaboral, Machote,
-                    ApoderadoLegal, AutorizadoNotificacion, DemandadoAdicional)
+                    ApoderadoLegal, AutorizadoNotificacion, DemandadoAdicional,
+                    Jurisprudencia)
 from django.contrib.auth.models import User
 
 
@@ -611,6 +612,58 @@ def formularios_representacion(expediente, post=None):
         'autorizados_formset': AutorizadoNotificacionFormSet(
             instance=expediente, prefix=prefijos['autorizados']),
     }
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# JURISPRUDENCIA (apartado después del capítulo de derecho)
+# ══════════════════════════════════════════════════════════════════════════
+
+class JurisprudenciaForm(forms.ModelForm):
+    """Captura de una tesis nueva.
+
+    La misma forma sirve para la biblioteca del despacho y para una tesis que
+    sólo aplica al expediente en curso; la vista decide a cuál va.
+    """
+
+    class Meta:
+        model = Jurisprudencia
+        fields = ['tipo', 'tema', 'rubro', 'texto', 'organo', 'epoca',
+                  'clave_tesis', 'registro_digital', 'fuente']
+        widgets = {
+            'tipo': forms.Select(attrs={'class': 'input'}),
+            'tema': forms.Select(attrs={'class': 'input'}),
+            'rubro': forms.Textarea(attrs={
+                'class': 'input', 'rows': 2,
+                'placeholder': 'RUBRO DE LA TESIS, EN MAYÚSCULAS'}),
+            'texto': forms.Textarea(attrs={
+                'class': 'input', 'rows': 6,
+                'placeholder': 'Texto de la tesis, tal como se transcribirá en la demanda.'}),
+            'organo': forms.TextInput(attrs={
+                'class': 'input',
+                'placeholder': 'Ej: Segunda Sala de la Suprema Corte de Justicia de la Nación'}),
+            'epoca': forms.TextInput(attrs={
+                'class': 'input', 'placeholder': 'Ej: Undécima Época'}),
+            'clave_tesis': forms.TextInput(attrs={
+                'class': 'input', 'placeholder': 'Ej: 2a./J. 12/2020'}),
+            'registro_digital': forms.TextInput(attrs={
+                'class': 'input', 'placeholder': 'Ej: 2020123'}),
+            'fuente': forms.TextInput(attrs={
+                'class': 'input',
+                'placeholder': 'Semanario Judicial de la Federación'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # El rubro se valida en `clean_rubro` para poder explicar por qué es
+        # obligatorio; con `required=True` el mensaje genérico lo taparía.
+        self.fields['rubro'].required = False
+
+    def clean_rubro(self):
+        rubro = (self.cleaned_data.get('rubro') or '').strip()
+        if not rubro:
+            raise forms.ValidationError('El rubro es obligatorio: es el título con el '
+                                        'que se identifica la tesis.')
+        return rubro
 
 
 def apoderados_de_referencia(expediente):

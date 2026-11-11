@@ -18,6 +18,11 @@ siete capítulos. El texto extraído está en el `.txt` de la misma carpeta.
 | 5 | CAPÍTULO DE HECHOS | Variable |
 | 6 | PRUEBAS | Casi todo plantilla |
 | 7 | CAPÍTULO DE DERECHO | Fijo |
+| 8 | Apartado JURISPRUDENCIA (opcional) | Biblioteca + selección |
+
+El apartado 8 no viene en el estándar de 14 páginas: se agregó a petición del
+despacho. Va **después del capítulo de derecho y antes de la firma**, y sólo se
+imprime si el abogado eligió tesis para ese expediente.
 
 ## Cómo usarlo
 
@@ -61,6 +66,75 @@ El HECHO CENTRAL y los conceptos cambian según la causa, no sólo la carátula:
 
 `rescision` además agrega los artículos 51 y 52 al capítulo de derecho.
 
+## Jurisprudencia (apartado opcional)
+
+El espacio **Jurisprudencia** de la pantalla de la demanda permite cerrar el
+escrito con las tesis que sostienen la acción. No es un capítulo obligatorio:
+sin tesis seleccionadas el apartado **no aparece** (ni encabezado ni marcador) y
+la demanda se presenta sólo con los artículos.
+
+### Biblioteca vs. tesis del caso
+
+El modelo `Jurisprudencia` sirve para dos cosas, distinguidas por su campo
+`expediente`:
+
+| `expediente` | Uso | Dónde se ofrece |
+|---|---|---|
+| vacío | **Biblioteca del despacho**: se captura una vez y se reutiliza | en todos los expedientes |
+| con valor | **Tesis del caso**: sólo aplica a ese juicio | sólo en ese expediente |
+
+En la pantalla, la casilla «guardar también en la biblioteca» decide cuál de
+las dos se crea al capturar una tesis nueva. La biblioteca se administra además
+desde el admin de Django (`Jurisprudencia`), que permite editar rubro, texto,
+órgano, época, clave, registro digital y desactivar una tesis sin borrarla.
+
+### Qué se guarda y qué se imprime
+
+Cada tesis se captura con lo que la cita necesita:
+
+- `tipo` (jurisprudencia, tesis aislada o precedente), `tema` (para agrupar la
+  biblioteca), `rubro` y `texto` completo;
+- `organo`, `epoca`, `clave_tesis`, `registro_digital` y `fuente`;
+- `notas` internas, que **no** se imprimen.
+
+La selección vive en `TesisEnDemanda`: un registro por tesis elegida, con
+`orden` y `argumento`. El `argumento` es el párrafo con el que el abogado
+introduce la tesis; es opcional.
+
+El escrito imprime, por cada tesis, en este orden:
+
+```
+[argumento, si lo hay]
+“RUBRO DE LA TESIS.”                       (negritas)
+Texto de la tesis.
+Jurisprudencia. Tesis 2a./J. 12/2020. Segunda Sala de la Suprema Corte de
+Justicia de la Nación. Undécima Época. Registro digital: 2020123.
+Semanario Judicial de la Federación.
+```
+
+La cita se arma con `redaccion/jurisprudencia.py` y la comparten el DOCX, el
+HTML y el editor de texto, para que no digan cosas distintas.
+
+### Captura y guardado
+
+La selección se guarda con el botón **Guardar jurisprudencia** (o el
+*Guardar datos* inferior), no con el autoguardado: marcar y desmarcar tesis da
+de baja registros y no puede depender de un temporizador. Desmarcar una tesis de
+la biblioteca sólo borra el vínculo; desmarcar una tesis «sólo de este caso»
+borra también la tesis.
+
+Si una tesis de la biblioteca se **desactiva** después de haber sido elegida,
+sigue apareciendo en el expediente (marcada como «Desactivada») para poder
+quitarla o conservarla: el escrito imprime lo que el abogado eligió, no lo que
+esté activo en el catálogo.
+
+### Efecto en el semáforo
+
+Es un requisito **opcional**: no aparece en `bloqueos()` y no impide descargar
+el `.docx`. Mientras no haya tesis, el encabezado lo cuenta como una precisión
+del relato por afinar y el panel de coherencia avisa que el apartado va vacío.
+
+
 ## Arquitectura
 
 ```
@@ -73,6 +147,7 @@ expedientes/redaccion/
 ├── hechos.py        # capítulo 5
 ├── pruebas.py       # capítulo 6
 ├── derecho.py       # capítulo 7
+├── jurisprudencia.py # apartado 8 (opcional)
 ├── demanda.py       # ensamblado + texto plano
 ├── adaptador.py     # ÚNICO módulo que conoce Django
 └── salida.py        # DOCX (python-docx directo) y HTML, por capítulo
@@ -165,15 +240,23 @@ El motor portado no los traía y son irrenunciables:
 
 ```bash
 .venv/Scripts/python.exe manage.py test expedientes.tests_redaccion_capitulos \
-    --settings=config.settings_test
+    expedientes.tests_jurisprudencia --settings=config.settings_test
 ```
 
-53 pruebas: estructura de los siete capítulos, condiciones, montos en número y
-letra contra el cálculo, orden de los artículos, tabla de jornada, los 5 tipos de
-separación, la regla de los 15 años del art. 162 fr. III, la coherencia entre
-banderas y motor legal, la captura/guardado de los campos nuevos, el aislamiento
-por rol del endpoint de descarga, la representación legal y una verificación
-completa del documento final contra el estándar (`EstandarCompletoTest`).
+`tests_redaccion_capitulos` (56 pruebas): estructura de los siete capítulos,
+condiciones, montos en número y letra contra el cálculo, orden de los artículos,
+tabla de jornada, los 5 tipos de separación, la regla de los 15 años del art. 162
+fr. III, la coherencia entre banderas y motor legal, la captura/guardado de los
+campos nuevos, el aislamiento por rol del endpoint de descarga, la representación
+legal y una verificación completa del documento final contra el estándar
+(`EstandarCompletoTest`).
+
+`tests_jurisprudencia` (19 pruebas): el apartado sólo aparece con tesis, la
+transcripción de rubro/texto/argumento/cita, el orden, la posición después del
+capítulo de derecho, que es opcional y no bloquea la descarga, la biblioteca vs.
+las tesis del caso, la captura/edición de la selección, que no se pueda colar
+una tesis de otro expediente y que una tesis desactivada siga visible para
+poder quitarla.
 
 Para inspeccionar la salida de un caso completo:
 

@@ -10,6 +10,9 @@
   if (!form) return;
 
   const espacio = form.dataset.espacio || 'datos';
+  // El espacio de jurisprudencia da de alta y de baja tesis: se guarda con su
+  // botón, no con el autoguardado (que sólo reenvía datos del cliente).
+  const autoguarda = espacio !== 'documento' && espacio !== 'jurisprudencia';
   const chip = document.getElementById('dem-chip');
   const estadoGuardado = document.getElementById('dem-guardado');
   const csrf = form.querySelector('input[name="csrfmiddlewaretoken"]');
@@ -106,7 +109,7 @@
   }
 
   function programar() {
-    if (espacio === 'documento') return;
+    if (!autoguarda) return;
     pendiente = true;
     guardadoPendiente = true;
     aviso('Cambios pendientes de guardar…');
@@ -114,7 +117,7 @@
     temporizador = setTimeout(function () { enviar(false); }, 700);
   }
 
-  if (espacio !== 'documento') {
+  if (autoguarda) {
     form.addEventListener('input', programar);
     form.addEventListener('change', programar);
   }

@@ -59,6 +59,10 @@ def evaluar_condiciones(datos: dict) -> dict:
         ),
         'incluir_testigos': bool(_texto(datos, 'testigos')),
         'incluir_documentos': bool(_texto(datos, 'documentos_prueba')),
+        # El apartado de jurisprudencia sólo aparece si el abogado eligió tesis.
+        'incluir_jurisprudencia': any(
+            _texto(tesis, 'rubro') for tesis in (datos.get('jurisprudencia') or [])
+        ),
         'incluir_actividades': bool(_texto(datos, 'actividades')),
         'incluir_jornada': bool(
             _texto(datos, 'horario_entrada') or _texto(datos, 'horario_salida')

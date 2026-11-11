@@ -3,15 +3,15 @@ Prueba E2E del ESPACIO DE TRABAJO DE LA DEMANDA en navegador real
 (Chromium/Playwright).
 
 Antes recorría el «acordeón de demanda»: siete bloques en una sola página, un
-iframe de vista previa y un solo formulario. Ahora recorre los tres espacios
-(datos · estrategia · documento), comprueba que el semáforo de cada bloque
-refleja lo capturado, que el autoguardado funciona y que un hueco del documento
-lleva al campo que lo completa.
+iframe de vista previa y un solo formulario. Ahora recorre los cuatro espacios
+(datos · estrategia · jurisprudencia · documento), comprueba que el semáforo de
+cada bloque refleja lo capturado, que el autoguardado funciona y que un hueco
+del documento lleva al campo que lo completa.
 
 - Login con usuario temporal
 - Crea SIEMPRE un expediente temporal: la prueba captura domicilio, modalidad
   de la separación y confirmación del IMSS, así que no puede tocar un caso real
-- Captura en los tres espacios, guarda y captura screenshots
+- Captura en los cuatro espacios, guarda y captura screenshots
 - Deja todo como estaba (elimina el usuario temporal al final)
 
 Artefactos de depuración (carpeta e2e_artifacts/):
@@ -146,7 +146,7 @@ with sync_playwright() as p:
         page.goto(URL)
         page.wait_for_load_state('networkidle')
         check('Espacio de trabajo carga (HTTP 200)', 'asistente' in page.url)
-        check('Los tres espacios se anuncian', page.locator('.dem-tab').count() == 3)
+        check('Los cuatro espacios se anuncian', page.locator('.dem-tab').count() == 4)
         check('Hay un solo formulario', page.locator('form#demandaForm').count() == 1)
         for bloque in ('trabajador', 'laboral', 'empresa', 'representacion'):
             check(f'Bloque #{bloque} en Datos', page.locator(f'#sec-{bloque}').count() == 1)

@@ -33,12 +33,13 @@ from .forms import (ClienteForm, DocumentoForm, ExpedienteForm, NotaForm,
                        SolicitudConciliacionForm, WhatsAppMessageForm,
                        CalculoLaboralForm, SimulacionForm, MachoteForm,
                        formularios_representacion, apoderados_de_referencia,
-                       DemandadoAdicionalFormSet)
+                       DemandadoAdicionalFormSet, JurisprudenciaForm)
 from .models import (Cliente, Documento, Expediente, Movimiento, Nota,
                       SolicitudConciliacion, WhatsAppMessage, TareaConciliacion,
                       CalculoLaboral, LegalConfig, Aviso,
                       SolicitudTransferencia, Notificacion, Empresa,
-                      ApoderadoLegal, AutorizadoNotificacion, DemandadoAdicional)
+                      ApoderadoLegal, AutorizadoNotificacion, DemandadoAdicional,
+                      Jurisprudencia, TesisEnDemanda)
 from .signals import registrar_movimiento
 
 
@@ -1794,6 +1795,7 @@ DOCUMENTO_BLOQUES = (
     ('hechos', ('hechos',)),
     ('pruebas', ('pruebas',)),
     ('derecho', ('derecho',)),
+    ('jurisprudencia', ('jurisprudencia',)),
     ('firma', ('cierre',)),
 )
 
@@ -1864,6 +1866,133 @@ def _url_de_hueco(expediente):
                 f'&seccion={requisito["bloque"]}#{requisito["ancla"]}')
 
     return url_de
+
+
+# ─── Jurisprudencia del expediente ──────────────────────────────────────────
+
+def _guardar_jurisprudencia(expediente, post):
+    """Sincroniza la selección de tesis del expediente con lo enviado.
+
+    La selección es explícita: lo que no viene marcado se quita.  Una tesis
+    capturada para este caso se borra junto con su selección; una de la
+    biblioteca sólo se desvincula.
+
+    Returns:
+        (form, errores): el formulario de la tesis nueva (con sus errores, si
+        los hubo) y el dict de errores listo para la pantalla.
+    """
+    errores = {}
+    form = JurisprudenciaForm(post, prefix='nueva')
+
+    marcadas = set()
+    for valor in post.getlist('tesis_lib'):
+        try:
+            marcadas.add(int(valor))
+        except (TypeError, ValueError):
+            continue
+
+    actuales = {
+        seleccion.jurisprudencia_id: seleccion
+        for seleccion in expediente.tesis_en_demanda.select_related('jurisprudencia')
+    }
+
+    orden = max((s.orden for s in actuales.values()), default=0)
+    for jurisprudencia_id in marcadas - set(actuales):
+        jurisprudencia = Jurisprudencia.objects.filter(pk=jurisprudencia_id).first()
+        if jurisprudencia is None:
+            continue
+        # Una tesis de otro expediente no se puede colar por POST.
+        if jurisprudencia.expediente_id not in (None, expediente.pk):
+            continue
+        orden += 1
+        TesisEnDemanda.objects.create(
+            expediente=expediente, jurisprudencia=jurisprudencia, orden=orden)
+
+    for jurisprudencia_id, seleccion in actuales.items():
+        if jurisprudencia_id in marcadas:
+            continue
+        propia = seleccion.jurisprudencia.expediente_id == expediente.pk
+        seleccion.delete()
+        if propia:
+            Jurisprudencia.objects.filter(pk=jurisprudencia_id).delete()
+
+    for seleccion in expediente.tesis_en_demanda.select_related('jurisprudencia'):
+        jurisprudencia_id = seleccion.jurisprudencia_id
+        argumento = (post.get(f'argumento_{jurisprudencia_id}') or '').strip()
+        orden_valor = (post.get(f'orden_{jurisprudencia_id}') or '').strip()
+        actualizado = False
+        if seleccion.argumento != argumento:
+            seleccion.argumento = argumento
+            actualizado = True
+        if orden_valor.isdigit() and int(orden_valor) != seleccion.orden:
+            seleccion.orden = int(orden_valor)
+            actualizado = True
+        if actualizado:
+            seleccion.save(update_fields=['argumento', 'orden'])
+
+    # Tesis nueva: el formulario se envía siempre, así que sólo se guarda si el
+    # abogado escribió algo.
+    rubro = (post.get('nueva-rubro') or '').strip()
+    texto = (post.get('nueva-texto') or '').strip()
+    if rubro or texto:
+        if form.is_valid():
+            nueva = form.save(commit=False)
+            if post.get('nueva_guardar_en_biblioteca') not in ('on', '1', 'true', True):
+                nueva.expediente = expediente
+            nueva.save()
+            TesisEnDemanda.objects.get_or_create(
+                expediente=expediente, jurisprudencia=nueva,
+                defaults={'orden': orden + 1})
+        else:
+            errores['jurisprudencia'] = [
+                f'{campo}: {mensaje}'
+                for campo, mensajes in form.errors.items()
+                for mensaje in mensajes
+            ]
+    return form, errores
+
+
+def _contexto_jurisprudencia(expediente, datos):
+    """Biblioteca + selección del expediente, agrupadas por tema."""
+    from .redaccion import jurisprudencia_html
+
+    seleccion = {
+        tesis.jurisprudencia_id: tesis
+        for tesis in expediente.tesis_en_demanda.select_related('jurisprudencia')
+    }
+    biblioteca = list(Jurisprudencia.objects.filter(expediente__isnull=True, activa=True))
+    propias = list(Jurisprudencia.objects.filter(expediente=expediente))
+    # Una tesis desactivada que ya está en la demanda tiene que seguir viéndose:
+    # si no, el abogado no podría quitarla y el escrito la imprimiría igual.
+    visibles = {tesis.pk: tesis for tesis in biblioteca + propias}
+    for elegida in seleccion.values():
+        visibles.setdefault(elegida.jurisprudencia.pk, elegida.jurisprudencia)
+
+    orden_temas = {clave: i for i, (clave, _) in
+                   enumerate(Jurisprudencia.TEMA_CHOICES)}
+    agrupadas = {}
+    for tesis in visibles.values():
+        grupo = agrupadas.setdefault(
+            tesis.tema,
+            {'tema': tesis.get_tema_display(), 'filas': []})
+        elegida = seleccion.get(tesis.pk)
+        grupo['filas'].append({
+            'tesis': tesis,
+            'seleccion': elegida,
+            'argumento': elegida.argumento if elegida else '',
+            'orden': elegida.orden if elegida else '',
+            'propia': tesis.expediente_id is not None,
+            'inactiva': not tesis.activa,
+        })
+
+    return {
+        'tesis_por_tema': [agrupadas[clave] for clave in
+                           sorted(agrupadas, key=lambda c: orden_temas.get(c, 99))],
+        'biblioteca_total': len(biblioteca),
+        'tesis_seleccionadas': len(seleccion),
+        'jurisprudencia_preview': jurisprudencia_html(
+            datos.get('jurisprudencia') or [], con_encabezado=False),
+    }
 
 
 def _es_booleano(form, campo) -> bool:
@@ -2069,19 +2198,21 @@ def demanda_vista_previa(request, pk):
 @login_required
 @transaction.atomic
 def demanda_asistente(request, pk):
-    """Espacio de trabajo de la demanda: datos · estrategia · documento.
+    """Espacio de trabajo de la demanda: datos · estrategia · jurisprudencia ·
+    documento.
 
-    Tres espacios con URL propia (`?espacio=`), cada uno con los bloques que le
+    Cuatro espacios con URL propia (`?espacio=`), cada uno con los bloques que le
     pertenecen, en lugar de un solo acordeón de siete bloques donde todo estaba
     en todas partes:
 
-      · datos      — actor, relación laboral, patrón y representación.
-      · estrategia — modalidad de la separación, acción del art. 48, IMSS,
-                     hechos condicionales y prestaciones por periodos.
-      · documento  — la demanda capítulo por capítulo, con los huecos
-                     señalados en su lugar y el panel de coherencia.
+      · datos         — actor, relación laboral, patrón y representación.
+      · estrategia    — modalidad de la separación, acción del art. 48, IMSS,
+                        hechos condicionales y prestaciones por periodos.
+      · jurisprudencia — tesis que sostienen la acción (opcional, no bloquea).
+      · documento     — la demanda capítulo por capítulo, con los huecos
+                        señalados en su lugar y el panel de coherencia.
 
-    Una sola vista para los tres espacios: la captura ya es intrincada (guarda
+    Una sola vista para los cuatro espacios: la captura ya es intrincada (guarda
     lo válido aunque algo venga mal, calcula, aprueba y finaliza) y duplicarla
     por espacio sería peor que compartirla.
 
@@ -2103,7 +2234,12 @@ def demanda_asistente(request, pk):
                                    calcular_hoja, resultado_vigente, huella, empaquetar,
                                    requisitos_para_calcular)
     from .models import HojaPrestaciones
-    constructor = request.POST.get('hoja_calculos') == '1' or bool(hoja_de(expediente))
+    # Un POST del espacio de jurisprudencia no trae la captura de prestaciones:
+    # validarla con ese POST la declararía incompleta y borraría el cálculo. Se
+    # reconstruye sólo para mostrarla.
+    postea_jurisprudencia = 'tesis_present' in request.POST
+    constructor = (request.POST.get('hoja_calculos') == '1'
+                   or (bool(hoja_de(expediente)) and not postea_jurisprudencia))
     hoja_context = formularios(expediente, request.POST if request.method == 'POST' and constructor else None)
     errores = {}
     seccion_abierta = request.GET.get('seccion') or request.POST.get('seccion_abierta') or ''
@@ -2111,7 +2247,10 @@ def demanda_asistente(request, pk):
                           seccion_abierta)
     # La captura de prestaciones vive en Estrategia: si el POST la trae, el
     # abogado tiene que ver el desglose y los botones de calcular y aprobar.
-    if constructor:
+    # En un GET no se fuerza: pedir «documento» o «jurisprudencia» tiene que
+    # respetarse aunque el expediente ya tenga hoja de prestaciones (antes,
+    # cualquier expediente con hoja abría siempre Estrategia).
+    if request.method == 'POST' and request.POST.get('hoja_calculos') == '1':
         espacio = 'estrategia'
 
     # Apoderados y autorizados (capítulo 1: proemio).  Viajan en el mismo POST
@@ -2124,6 +2263,8 @@ def demanda_asistente(request, pk):
     representacion_context = formularios_representacion(
         expediente, request.POST if postea_representacion else None
     )
+
+    form_tesis = JurisprudenciaForm(prefix='nueva')
 
     if request.method == 'POST':
         accion = request.POST.get('accion', 'guardar')
@@ -2141,6 +2282,20 @@ def demanda_asistente(request, pk):
                         for campo, mensajes in formset_errores.items():
                             errores[f'{etiqueta}.{campo}'] = list(mensajes)
                 seccion_abierta = seccion_abierta or 'representacion'
+
+        # ─── Jurisprudencia: selección de tesis del expediente ────────
+        if postea_jurisprudencia:
+            form_tesis, errores_tesis = _guardar_jurisprudencia(
+                expediente, request.POST)
+            errores.update(errores_tesis)
+            if accion == 'guardar' and not errores:
+                messages.success(
+                    request,
+                    '✅ Jurisprudencia guardada. Revisa el apartado en el documento.'
+                )
+                return redirect(
+                    reverse('demanda_asistente', kwargs={'pk': expediente.pk})
+                    + '?espacio=jurisprudencia')
 
         # ─── Validar y guardar los campos del acordeón ────────────────
         form = ClienteForm(request.POST, instance=cliente)
@@ -2248,7 +2403,7 @@ def demanda_asistente(request, pk):
 
     # ─── Estado de la demanda: qué falta, dónde impacta y por qué ────
     #
-    # Una sola evaluación alimenta los tres espacios: el conteo del
+    # Una sola evaluación alimenta los cuatro espacios: el conteo del
     # encabezado, el semáforo de cada bloque y los huecos del documento. Antes
     # cada sección decidía su propio color con un solo campo y podía decir
     # «COMPLETA» con la sección vacía.
@@ -2300,6 +2455,12 @@ def demanda_asistente(request, pk):
 
     bloqueos = [r['etiqueta'] for r in estado['pendientes'] if r['obligatorio']]
 
+    # El espacio de jurisprudencia sólo arma su biblioteca cuando se va a ver.
+    contexto_jurisprudencia = {}
+    if espacio == 'jurisprudencia':
+        contexto_jurisprudencia = _contexto_jurisprudencia(expediente, datos_motor)
+    tesis_seleccionadas = expediente.tesis_en_demanda.count()
+
     # Qué falta para poder calcular los importes: la pantalla lo enumera en el
     # mismo bloque, en lugar de mandar al abogado a buscarlo entre 130 campos.
     requisitos_calculo = requisitos_para_calcular(expediente, hoja_context)
@@ -2326,6 +2487,9 @@ def demanda_asistente(request, pk):
     return render(request, 'expedientes/demanda_asistente.html', {
         **hoja_context,
         **representacion_context,
+        **contexto_jurisprudencia,
+        'form_tesis': form_tesis,
+        'tesis_seleccionadas': tesis_seleccionadas,
         'calculo_aprobado': bool(resultado_vigente(expediente, hoja, aprobado=True)),
         'expediente': expediente,
         'cliente': cliente,
@@ -2335,7 +2499,8 @@ def demanda_asistente(request, pk):
         'errores': errores,
         'seccion_abierta': (seccion_abierta if seccion_abierta in WIZARD_PASOS
                             or seccion_abierta in ('revision', 'prestaciones',
-                                                   'representacion', 'imss')
+                                                   'representacion', 'imss',
+                                                   'jurisprudencia')
                             else ''),
         'tipos_despido': Expediente.TIPO_DESPIDO_CHOICES,
         'calculo': calculo,

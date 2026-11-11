@@ -391,11 +391,11 @@ class FlujoCompletoDemandaTests(TestCase):
         """El espacio de trabajo guarda datos, valida críticos y genera la demanda; machotes con marcadores."""
         url = reverse('demanda_asistente', args=[self.expediente.pk])
 
-        # Los tres espacios se anuncian; el de datos trae sus bloques
+        # Los espacios se anuncian; el de datos trae sus bloques
         resp = self.client.get(url)
         self.assertEqual(resp.status_code, 200)
         body = resp.content.decode('utf-8', errors='replace')
-        for espacio in ('datos', 'estrategia', 'documento'):
+        for espacio in ('datos', 'estrategia', 'jurisprudencia', 'documento'):
             self.assertIn(f'espacio={espacio}', body, f'falta la pestaña {espacio}')
         self.assertIn('sec-trabajador', body, 'El espacio de datos debe traer sus bloques')
         self.assertIn('bloque-cabecera', body, 'Cada bloque muestra su estado')

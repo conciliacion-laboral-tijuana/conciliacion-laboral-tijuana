@@ -1,10 +1,11 @@
-"""Pruebas de los tres espacios de la pantalla de la demanda.
+"""Pruebas de los espacios de la pantalla de la demanda.
 
 Fijan el contrato visible del rediseño:
 
-  · datos      — actor (con domicilio), relación laboral, patrón y representación
-  · estrategia — separación, IMSS y prestaciones
-  · documento  — la demanda capítulo por capítulo, con los huecos enlazados
+  · datos          — actor (con domicilio), relación laboral, patrón y representación
+  · estrategia     — separación, IMSS y prestaciones
+  · jurisprudencia — biblioteca de tesis, selección por caso y vista previa
+  · documento      — la demanda capítulo por capítulo, con los huecos enlazados
 
 Lo que estas pruebas impiden que vuelva: un dato capturable en dos pantallas a
 la vez, un campo que no se puede capturar desde ninguna (el domicilio del actor

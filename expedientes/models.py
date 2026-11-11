@@ -1402,3 +1402,144 @@ class HojaPrestaciones(models.Model):
     aprobado_por = models.ForeignKey(User, on_delete=models.PROTECT, null=True, blank=True)
     aprobado_en = models.DateTimeField(null=True, blank=True)
     actualizado_en = models.DateTimeField(auto_now=True)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# JURISPRUDENCIA (apartado después del capítulo de derecho)
+# ══════════════════════════════════════════════════════════════════════════════
+
+class Jurisprudencia(models.Model):
+    """Tesis o jurisprudencia que puede invocarse en una demanda laboral.
+
+    El mismo modelo sirve para dos cosas:
+
+    · **Biblioteca del despacho** — `expediente` vacío. Se captura una vez
+      (rubro, texto, órgano, época, registro digital) y se reutiliza en todos
+      los casos.
+    · **Tesis de un caso** — `expediente` con valor. Se captura desde el
+      espacio *Jurisprudencia* para un criterio que sólo aplica a ese juicio.
+
+    Se guarda el texto completo, no sólo la cita: la demanda transcribe la
+    tesis. La cita (órgano, época, registro) se arma con los metadatos.
+    """
+
+    TIPO_CHOICES = [
+        ('jurisprudencia', 'Jurisprudencia'),
+        ('tesis_aislada', 'Tesis aislada'),
+        ('precedente', 'Precedente'),
+    ]
+
+    TEMA_CHOICES = [
+        ('despido', 'Despido injustificado'),
+        ('rescision', 'Rescisión de la relación laboral'),
+        ('indemnizacion', 'Indemnización constitucional'),
+        ('prima_antiguedad', 'Prima de antigüedad'),
+        ('salarios_caidos', 'Salarios caídos'),
+        ('horas_extras', 'Horas extras'),
+        ('vacaciones', 'Vacaciones y prima vacacional'),
+        ('aguinaldo', 'Aguinaldo'),
+        ('imss', 'Seguridad social / IMSS'),
+        ('discriminacion', 'Discriminación'),
+        ('renuncia', 'Renuncia y finiquito'),
+        ('procedimiento', 'Procedimiento laboral'),
+        ('pruebas', 'Pruebas'),
+        ('otro', 'Otro'),
+    ]
+
+    expediente = models.ForeignKey(
+        'Expediente', on_delete=models.CASCADE, null=True, blank=True,
+        related_name='tesis_propias', verbose_name='Expediente',
+        help_text='Vacío = biblioteca del despacho; con expediente = tesis sólo de ese caso.')
+    tipo = models.CharField('Tipo', max_length=20, choices=TIPO_CHOICES,
+                            default='jurisprudencia')
+    tema = models.CharField('Tema', max_length=30, choices=TEMA_CHOICES, default='otro',
+                            help_text='Sirve para agrupar la biblioteca y elegir más rápido.')
+    organo = models.CharField(
+        'Órgano / instancia', max_length=300, blank=True,
+        help_text='Ej: Segunda Sala de la Suprema Corte de Justicia de la Nación.')
+    epoca = models.CharField('Época', max_length=100, blank=True,
+                             help_text='Ej: Undécima Época.')
+    clave_tesis = models.CharField(
+        'Clave de la tesis', max_length=60, blank=True,
+        help_text='Ej: 2a./J. 12/2020. Se imprime en la cita.')
+    registro_digital = models.CharField(
+        'Registro digital', max_length=20, blank=True, db_index=True,
+        help_text='Número del Semanario Judicial de la Federación.')
+    rubro = models.TextField('Rubro', help_text='Título de la tesis, en mayúsculas.')
+    texto = models.TextField(
+        'Texto de la tesis', blank=True,
+        help_text='Se transcribe en la demanda. Si se deja vacío sólo se cita el rubro.')
+    fuente = models.CharField(
+        'Fuente', max_length=200, blank=True,
+        default='Semanario Judicial de la Federación')
+    notas = models.TextField(
+        'Notas internas', blank=True,
+        help_text='Para el despacho: no se imprimen en la demanda.')
+    activa = models.BooleanField('Activa', default=True,
+                                 help_text='Sólo las activas se ofrecen al elegir tesis.')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Jurisprudencia'
+        verbose_name_plural = 'Jurisprudencias'
+        ordering = ['tema', 'rubro']
+        indexes = [models.Index(fields=['expediente', 'tema'])]
+
+    def __str__(self):
+        return (self.rubro or '').strip()[:120]
+
+    @property
+    def es_de_biblioteca(self) -> bool:
+        return self.expediente_id is None
+
+    @property
+    def cita(self) -> str:
+        """Cita bibliográfica en una línea, como cierra cada tesis."""
+        partes = [self.get_tipo_display()]
+        if self.clave_tesis:
+            partes.append(f'Tesis {self.clave_tesis}')
+        for valor in (self.organo, self.epoca):
+            limpio = (valor or '').strip().rstrip('.')
+            if limpio:
+                partes.append(limpio)
+        cita = '. '.join(partes)
+        if self.registro_digital:
+            cita += f'. Registro digital: {self.registro_digital}'
+        if self.fuente:
+            cita += f'. {self.fuente.strip().rstrip(".")}'
+        return cita + '.'
+
+
+class TesisEnDemanda(models.Model):
+    """Una tesis seleccionada para un expediente, con su argumento y orden.
+
+    La selección es explícita y ordenada: el abogado decide qué tesis sostienen
+    *este* caso y en qué orden se leen. `argumento` es el párrafo con el que se
+    introduce la tesis en el escrito; puede quedar vacío.
+    """
+
+    expediente = models.ForeignKey(
+        Expediente, on_delete=models.CASCADE, related_name='tesis_en_demanda',
+        verbose_name='Expediente')
+    jurisprudencia = models.ForeignKey(
+        Jurisprudencia, on_delete=models.CASCADE, related_name='selecciones',
+        verbose_name='Jurisprudencia')
+    argumento = models.TextField(
+        'Cómo se aplica al caso', blank=True,
+        help_text='Párrafo que introduce la tesis. Opcional.')
+    orden = models.PositiveIntegerField('Orden', default=1)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Tesis en la demanda'
+        verbose_name_plural = 'Tesis en la demanda'
+        ordering = ['orden', 'pk']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['expediente', 'jurisprudencia'],
+                name='tesis_unica_por_expediente'),
+        ]
+
+    def __str__(self):
+        return f'{self.expediente.numero}: {self.jurisprudencia}'

@@ -1,0 +1,172 @@
+{% comment %}
+  Espacio 3 · Jurisprudencia: las tesis que sostienen la acción, elegidas de la
+  biblioteca del despacho o capturadas para este caso. Es opcional: no bloquea
+  la descarga. La selección se guarda con el botón, no con el autoguardado,
+  porque implica altas y bajas de registros.
+{% endcomment %}
+<div class="dem-layout">
+  <div>
+
+    <section class="bloque" id="sec-jurisprudencia">
+      <div class="bloque-cabecera">
+        <div>
+          <h2>Jurisprudencia que sostiene la demanda</h2>
+          <p>
+            Elige las tesis de la biblioteca del despacho. Se imprimen después
+            del capítulo de derecho, cada una con su cita y, si lo escribes, el
+            párrafo con el que se introduce.
+          </p>
+        </div>
+        <span class="bloque-estado ok">Opcional</span>
+      </div>
+
+      <div class="bloque-cuerpo">
+        <input type="hidden" name="tesis_present" value="1">
+        <p class="aviso legal">
+          La selección no bloquea la descarga: una demanda puede presentarse
+          sólo con los artículos. Si no eliges ninguna tesis, el apartado de
+          jurisprudencia no aparece en el escrito.
+        </p>
+
+        {% if tesis_por_tema %}
+          {% for grupo in tesis_por_tema %}
+            <h3 class="tesis-tema">{{ grupo.tema }}</h3>
+            {% for fila in grupo.filas %}
+              <div class="tesis-fila {% if fila.seleccion %}marcada{% endif %}">
+                <label class="tesis-check">
+                  <input type="checkbox" name="tesis_lib" value="{{ fila.tesis.pk }}"
+                         {% if fila.seleccion %}checked{% endif %}>
+                  <span>
+                    <span class="tesis-rubro">{{ fila.tesis.rubro }}</span>
+                    <span class="tesis-meta">
+                      {{ fila.tesis.get_tipo_display }}
+                      {% if fila.tesis.organo %} · {{ fila.tesis.organo }}{% endif %}
+                      {% if fila.tesis.epoca %} · {{ fila.tesis.epoca }}{% endif %}
+                      {% if fila.tesis.registro_digital %} · Registro digital {{ fila.tesis.registro_digital }}{% endif %}
+                      {% if fila.propia %}<span class="tesis-propia">Sólo de este caso</span>{% endif %}
+                      {% if fila.inactiva %}<span class="tesis-inactiva">Desactivada</span>{% endif %}
+                    </span>
+                    {% if fila.tesis.texto %}
+                      <span class="tesis-texto">{{ fila.tesis.texto|truncatechars:280 }}</span>
+                    {% endif %}
+                  </span>
+                </label>
+                <div class="tesis-uso">
+                  <label for="argumento-{{ fila.tesis.pk }}">Cómo se aplica a este caso (opcional)</label>
+                  <textarea name="argumento_{{ fila.tesis.pk }}"
+                            id="argumento-{{ fila.tesis.pk }}" rows="2"
+                            class="input w-full"
+                            placeholder="Párrafo con el que se introduce la tesis en el escrito.">{{ fila.argumento }}</textarea>
+                  <div class="tesis-orden">
+                    <label for="orden-{{ fila.tesis.pk }}">Orden</label>
+                    <input type="number" min="1" name="orden_{{ fila.tesis.pk }}"
+                           id="orden-{{ fila.tesis.pk }}" class="input"
+                           style="width:90px" value="{{ fila.orden }}">
+                    <span class="ayuda">Márcala para incluirla. El orden define cómo se lee.</span>
+                  </div>
+                </div>
+              </div>
+            {% endfor %}
+          {% endfor %}
+        {% else %}
+          <p class="ayuda">
+            La biblioteca del despacho está vacía. Captura abajo la primera tesis;
+            con la casilla «guardar en la biblioteca» quedará disponible para los
+            siguientes casos.
+          </p>
+        {% endif %}
+
+        <details class="tesis-nueva" {% if form_tesis.errors %}open{% endif %}>
+          <summary>Agregar una tesis que no está en la biblioteca</summary>
+          <p class="ayuda mt-2">
+            Captura el rubro y el texto tal como quieres que se transcriban. Los
+            metadatos arman la cita que cierra cada tesis.
+          </p>
+          <div class="bloque-campos mt-2">
+            <div>
+              <label for="{{ form_tesis.tipo.id_for_label }}">Tipo</label>
+              {{ form_tesis.tipo }}
+            </div>
+            <div>
+              <label for="{{ form_tesis.tema.id_for_label }}">Tema</label>
+              {{ form_tesis.tema }}
+            </div>
+            <div>
+              <label for="{{ form_tesis.clave_tesis.id_for_label }}">Clave de la tesis</label>
+              {{ form_tesis.clave_tesis }}
+            </div>
+            <div>
+              <label for="{{ form_tesis.registro_digital.id_for_label }}">Registro digital</label>
+              {{ form_tesis.registro_digital }}
+            </div>
+            <div>
+              <label for="{{ form_tesis.organo.id_for_label }}">Órgano / instancia</label>
+              {{ form_tesis.organo }}
+            </div>
+            <div>
+              <label for="{{ form_tesis.epoca.id_for_label }}">Época</label>
+              {{ form_tesis.epoca }}
+            </div>
+            <div class="ancho">
+              <label for="{{ form_tesis.rubro.id_for_label }}">Rubro <span class="requerido">*</span></label>
+              {{ form_tesis.rubro }}
+              {{ form_tesis.rubro.errors }}
+            </div>
+            <div class="ancho">
+              <label for="{{ form_tesis.texto.id_for_label }}">Texto de la tesis</label>
+              {{ form_tesis.texto }}
+            </div>
+            <div class="ancho">
+              <label for="{{ form_tesis.fuente.id_for_label }}">Fuente</label>
+              {{ form_tesis.fuente }}
+            </div>
+          </div>
+          <label class="flex items-center gap-2 text-sm text-gray-700 mt-3">
+            <input type="checkbox" name="nueva_guardar_en_biblioteca" value="on"
+                   class="rounded border-gray-300 text-blue-600">
+            Guardar también en la biblioteca del despacho (para reutilizarla en otros casos)
+          </label>
+        </details>
+
+        <div class="mt-4">
+          <button type="submit" name="accion" value="guardar" class="btn-link btn-azul">
+            <i class="fas fa-save text-xs"></i> Guardar jurisprudencia
+          </button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <aside>
+    <div class="panel-lateral">
+      <h3>Así se leerá en el escrito</h3>
+      <p>Se agrega después del capítulo de derecho, y sólo si eliges tesis.</p>
+      {% if jurisprudencia_preview %}
+        <div class="tesis-preview">{{ jurisprudencia_preview|safe }}</div>
+      {% else %}
+        <p class="ayuda mt-3">
+          Sin tesis seleccionadas: la demanda se presentará sólo con los
+          artículos del capítulo de derecho.
+        </p>
+      {% endif %}
+    </div>
+
+    <div class="panel-lateral">
+      <h3>Biblioteca del despacho</h3>
+      <p>
+        {{ biblioteca_total }} tesis capturadas para reutilizar en cualquier
+        expediente.
+      </p>
+      <p class="ayuda mt-2">
+        Una tesis marcada como «sólo de este caso» no se ofrece en los demás
+        expedientes.
+      </p>
+      {% if user.is_staff %}
+        <p class="mt-2">
+          <a class="underline font-semibold text-blue-700"
+             href="{% url 'admin:expedientes_jurisprudencia_changelist' %}">Administrar la biblioteca</a>
+        </p>
+      {% endif %}
+    </div>
+  </aside>
+</div>

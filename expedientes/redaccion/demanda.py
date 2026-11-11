@@ -11,6 +11,7 @@ Produce la estructura del estándar del despacho:
     CAPÍTULO DE HECHOS
     PRUEBAS
     CAPÍTULO DE DERECHO
+    [apartado] JURISPRUDENCIA   (sólo si el abogado eligió tesis)
 
 `capitulos()` devuelve la estructura como datos (para pruebas y para la UI) y
 los generadores de salida se construyen sobre ella, de modo que HTML, DOCX y
@@ -23,6 +24,7 @@ from . import demandados as mod_demandados
 from . import derecho as mod_derecho
 from . import hechos as mod_hechos
 from . import jornada as mod_jornada
+from . import jurisprudencia as mod_jurisprudencia
 from . import prestaciones as mod_prestaciones
 from . import pruebas as mod_pruebas
 from . import proemio as mod_proemio
@@ -52,6 +54,7 @@ def capitulos(datos: dict, calculo: dict, tipo_despido: str = 'injustificado') -
     renglones_prestaciones = mod_prestaciones.renglones(datos, calculo, cond)
     lista_hechos = mod_hechos.hechos(datos, calculo, cond, tipo_despido)
     lista_pruebas = mod_pruebas.pruebas(datos, cond)
+    lista_tesis = mod_jurisprudencia.tesis(datos)
 
     return {
         'caratula': {
@@ -73,6 +76,12 @@ def capitulos(datos: dict, calculo: dict, tipo_despido: str = 'injustificado') -
         ],
         'pruebas': lista_pruebas,
         'derecho': mod_derecho.derecho(datos, cond, tipo_despido),
+        'jurisprudencia': {
+            'encabezado': mod_jurisprudencia.encabezado(),
+            'introduccion': (mod_jurisprudencia.introduccion(len(lista_tesis))
+                             if lista_tesis else ''),
+            'tesis': lista_tesis,
+        },
         'condiciones': cond,
     }
 
@@ -141,6 +150,18 @@ def generar_texto_completo(datos: dict, calculo: dict,
     if cap['derecho']:
         bloques.append(encabezado_capitulo('DERECHO'))
         bloques.append(cap['derecho'])
+
+    if cap['jurisprudencia']['tesis']:
+        bloques.append(cap['jurisprudencia']['encabezado'])
+        if cap['jurisprudencia']['introduccion']:
+            bloques.append(cap['jurisprudencia']['introduccion'])
+        for tesis in cap['jurisprudencia']['tesis']:
+            if tesis.get('argumento'):
+                bloques.append(tesis['argumento'])
+            bloques.append(mod_jurisprudencia.rubro(tesis))
+            if tesis.get('texto'):
+                bloques.append(tesis['texto'])
+            bloques.append(mod_jurisprudencia.cita(tesis))
 
     return '\n\n'.join(b for b in bloques if b)
 

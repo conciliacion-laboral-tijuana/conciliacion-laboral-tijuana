@@ -187,7 +187,7 @@ class DemandaEnVivoTests(BaseDemanda):
         self.assertEqual(self.client.post(self.url, {}).status_code, 404)
 
     def test_assistant_has_sandboxed_live_preview_and_correct_capture_names(self):
-        """Los tres espacios capturan con los nombres correctos y el documento es el real.
+        """Los espacios capturan con los nombres correctos y el documento es el real.
 
         Antes esta prueba exigía un iframe con `sandbox=""` y `demanda_live.js`
         (una vista previa generada por OTRO motor, distinta del .docx que se

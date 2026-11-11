@@ -61,6 +61,9 @@ def datos_de_expediente(expediente) -> dict:
     datos['apoderados'] = _apoderados(expediente)
     datos['autorizados'] = _autorizados(expediente)
 
+    # ─── Jurisprudencia seleccionada para este caso ───────────────────────
+    datos['jurisprudencia'] = _jurisprudencia(expediente)
+
     # ─── Demandada ────────────────────────────────────────────────────────
     razon_social = _texto(cliente.empresa_razon_social) or _texto(cliente.empresa)
     datos['demandada_razon_social'] = razon_social
@@ -224,6 +227,41 @@ def _autorizados(expediente) -> list:
     if relacionados is None:
         return []
     return [{'nombre': _texto(a.nombre)} for a in relacionados.all()]
+
+
+def _jurisprudencia(expediente) -> list:
+    """Tesis seleccionadas para el expediente, en el orden del escrito.
+
+    El motor no decide qué jurisprudencia aplica: imprime lo que el abogado
+    eligió.  Cada entrada trae el rubro, el texto y los metadatos de la cita.
+    """
+    if not getattr(expediente, 'pk', None):
+        return []
+    relacionados = getattr(expediente, 'tesis_en_demanda', None)
+    if relacionados is None:
+        return []
+    resultado = []
+    for seleccion in relacionados.select_related('jurisprudencia').order_by(
+            'orden', 'pk'):
+        tesis = seleccion.jurisprudencia
+        resultado.append({
+            'id': seleccion.pk,
+            'jurisprudencia_id': tesis.pk,
+            'tipo': tesis.get_tipo_display(),
+            'tema': tesis.tema,
+            'tema_display': tesis.get_tema_display(),
+            'organo': tesis.organo,
+            'epoca': tesis.epoca,
+            'clave_tesis': tesis.clave_tesis,
+            'registro_digital': tesis.registro_digital,
+            'rubro': tesis.rubro,
+            'texto': tesis.texto,
+            'fuente': tesis.fuente,
+            'argumento': _texto(seleccion.argumento),
+            'orden': seleccion.orden,
+            'propia': tesis.expediente_id is not None,
+        })
+    return resultado
 
 
 def _banderas_prestaciones(cliente, expediente) -> dict:

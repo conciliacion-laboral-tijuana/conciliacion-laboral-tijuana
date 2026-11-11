@@ -1258,6 +1258,23 @@ def _fundamentos_derecho_docx(tipo_despido_key: str) -> list:
     return articulos_base + adicionales
 
 
+def _jurisprudencia_editor_html(expediente) -> str:
+    """Apartado de jurisprudencia para el editor de texto.
+
+    Usa el MISMO formato que la demanda por capítulos para que el editor y el
+    documento final no digan cosas distintas.  Se importa aquí (no arriba)
+    porque `expedientes.redaccion` importa este módulo.
+    """
+    from .redaccion import jurisprudencia_html
+    from .redaccion.adaptador import datos_de_expediente
+
+    tesis = datos_de_expediente(expediente).get('jurisprudencia') or []
+    if not tesis:
+        return ''
+    return ('<h3 style="color:#1F2937;">—  J U R I S P R U D E N C I A  —</h3>\n'
+            + jurisprudencia_html(tesis, con_encabezado=False))
+
+
 def generar_demanda_html(expediente: Expediente, tipo_despido_override: str | None = None) -> str:
     """
     Genera el contenido de la Demanda Laboral como HTML
@@ -1326,6 +1343,9 @@ def generar_demanda_html(expediente: Expediente, tipo_despido_override: str | No
         f"<p>{html_escape(p)}</p>"
         for p in _puntos_petitorios(calculo, expediente)
     )
+
+    # JURISPRUDENCIA (sólo si el abogado eligió tesis para este expediente)
+    jurisprudencia_html = _jurisprudencia_editor_html(expediente)
 
     # PRUEBAS (misma lista que el DOCX: documental, testimonial, instrumental,
     # presuncional).  Solo se ofrece la TESTIMONIAL si hay testigos capturados.
@@ -1440,6 +1460,8 @@ def generar_demanda_html(expediente: Expediente, tipo_despido_override: str | No
 <h3 style="color:#1F2937;">—  F U N D A M E N T O S   D E   D E R E C H O  —</h3>
 
 {_fundamentos_derecho_html(tipo_despido)}
+
+{jurisprudencia_html}
 
 <h3 style="color:#1F2937;">—  P U N T O S   P E T I T O R I O S  —</h3>
 

@@ -26,6 +26,7 @@ from .salida import (
     generar_demanda_capitulos_docx,
     generar_demanda_capitulos_html,
     guardar_demanda_capitulos,
+    jurisprudencia_html,
 )
 
 __all__ = [
@@ -39,5 +40,6 @@ __all__ = [
     'generar_demanda_capitulos_html',
     'generar_demanda_capitulos_docx',
     'guardar_demanda_capitulos',
+    'jurisprudencia_html',
     'ORDEN_HTML',
 ]

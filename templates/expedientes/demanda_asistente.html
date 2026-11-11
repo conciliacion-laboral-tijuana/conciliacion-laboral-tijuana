@@ -115,6 +115,34 @@
   .capitulo-doc > header .nota{font-size:11.5px;color:var(--gris);font-family:-apple-system,"Segoe UI",sans-serif}
   .capitulo-vacio{font-size:12.5px;color:var(--gris);font-style:italic}
 
+  /* ── Jurisprudencia ──────────────────────────────────────────────── */
+  .tesis-tema{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;
+              color:#374151;margin:18px 0 8px}
+  .tesis-tema:first-of-type{margin-top:4px}
+  .tesis-fila{border:1px solid var(--linea);border-radius:10px;padding:12px;margin-bottom:10px}
+  .tesis-fila.marcada{border-color:#93c5fd;background:var(--azul-suave)}
+  .tesis-check{display:flex;gap:10px;align-items:flex-start;cursor:pointer}
+  .tesis-check input{margin-top:3px}
+  .tesis-rubro{display:block;font-weight:700;font-size:13px;color:var(--tinta)}
+  .tesis-meta{display:block;font-size:11px;color:var(--gris);margin-top:3px}
+  .tesis-texto{display:block;font-size:12px;color:#374151;margin-top:6px}
+  .tesis-uso{margin-top:10px;padding-top:10px;border-top:1px dashed var(--linea)}
+  .tesis-orden{display:flex;align-items:center;gap:8px;margin-top:6px}
+  .tesis-orden label{margin:0}
+  .tesis-propia{font-size:10px;font-weight:700;color:#6d28d9;background:#f5f3ff;
+                border:1px solid #ddd6fe;border-radius:999px;padding:2px 8px;margin-left:6px}
+  .tesis-inactiva{font-size:10px;font-weight:700;color:#b45309;background:#fffbeb;
+                  border:1px solid #fde68a;border-radius:999px;padding:2px 8px;margin-left:6px}
+  .tesis-nueva{margin-top:18px;border-top:1px solid var(--linea);padding-top:12px}
+  .tesis-nueva summary{font-size:13px;font-weight:600;color:var(--azul);cursor:pointer}
+  .tesis-preview{font-family:Georgia,"Times New Roman",serif;font-size:12px;line-height:1.6;
+                 color:#111;margin-top:10px}
+  .tesis-preview p{margin:0 0 9px;text-align:justify}
+  .tesis-preview .tesis-rubro{font-weight:700;font-size:12px}
+  .tesis-preview .tesis-cita{font-size:10.5px;color:#4b5563}
+  .hoja .tesis-rubro{font-weight:700}
+  .hoja .tesis-cita{font-size:11.5px;color:#4b5563}
+
   /* ── Barra de acciones ───────────────────────────────────────────── */
   .dem-acciones{position:sticky;bottom:0;margin-top:18px;padding:10px 4px;
                 background:rgba(246,247,249,.95);backdrop-filter:blur(6px);
@@ -184,6 +212,10 @@
           <span class="cuenta {% if not pendientes_por_espacio.estrategia %}ok{% else %}pend{% endif %}">
             {% if not pendientes_por_espacio.estrategia %}✓{% else %}!{% endif %}
           </span>
+        {% elif clave == 'jurisprudencia' %}
+          <span class="cuenta {% if tesis_seleccionadas %}ok{% endif %}">
+            {{ tesis_seleccionadas }}
+          </span>
         {% else %}
           <span class="cuenta {% if estado_demanda.resumen.listo %}ok{% else %}pend{% endif %}">
             {% if estado_demanda.resumen.listo %}✓{% else %}{{ estado_demanda.resumen.pendientes }}{% endif %}
@@ -216,13 +248,17 @@
       {% include 'expedientes/_espacio_datos.html' %}
     {% elif espacio == 'estrategia' %}
       {% include 'expedientes/_espacio_estrategia.html' %}
+    {% elif espacio == 'jurisprudencia' %}
+      {% include 'expedientes/_espacio_jurisprudencia.html' %}
     {% else %}
       {% include 'expedientes/_espacio_documento.html' %}
     {% endif %}
 
     <div class="dem-acciones">
       <span class="estado-guardado" id="dem-guardado" role="status" aria-live="polite">
-        {% if errores %}Hay campos con error.{% else %}Borrador con guardado automático.{% endif %}
+        {% if errores %}Hay campos con error.
+        {% elif espacio == 'jurisprudencia' %}Se guarda con el botón «Guardar jurisprudencia».
+        {% else %}Borrador con guardado automático.{% endif %}
       </span>
 
       <a href="{% url 'demanda_capitulos_descargar' expediente.pk %}"
@@ -232,14 +268,15 @@
            aria-disabled="true" tabindex="-1"
            title="Faltan {{ bloqueos|length }} requisitos para presentar: {{ bloqueos|join:', ' }}"
          {% else %}
-           title="Descarga la demanda completa con los siete capítulos, lista para presentar"
+           title="Descarga la demanda completa con todos los capítulos, lista para presentar"
          {% endif %}>
         <i class="fas fa-file-word text-xs"></i> Descargar demanda final
       </a>
 
       {% if espacio != 'documento' %}
       <button type="submit" name="accion" value="guardar" class="btn-link btn-borde">
-        <i class="fas fa-save text-xs"></i> Guardar datos
+        <i class="fas fa-save text-xs"></i>
+        {% if espacio == 'jurisprudencia' %}Guardar jurisprudencia{% else %}Guardar datos{% endif %}
       </button>
       {% endif %}
 

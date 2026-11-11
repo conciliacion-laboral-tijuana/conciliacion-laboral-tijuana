@@ -1,5 +1,5 @@
 {% comment %}
-  Espacio 3 · Documento: la demanda capítulo por capítulo, con los huecos
+  Espacio 4 · Documento: la demanda capítulo por capítulo, con los huecos
   señalados en su lugar. Es el borrador real que se va a presentar, no una
   vista previa aparte.
 {% endcomment %}
@@ -51,6 +51,12 @@
           </header>
           {% if cap.presente %}
             {{ cap.html|safe }}
+          {% elif cap.clave == 'jurisprudencia' %}
+            <p class="capitulo-vacio">
+              Sin tesis seleccionadas: el apartado no aparece en el escrito.
+              Si el caso lo amerita,
+              <a href="{% url 'demanda_asistente' expediente.pk %}?espacio=jurisprudencia">elige la jurisprudencia aplicable</a>.
+            </p>
           {% else %}
             <p class="capitulo-vacio">
               Este capítulo todavía no se genera con los datos capturados.

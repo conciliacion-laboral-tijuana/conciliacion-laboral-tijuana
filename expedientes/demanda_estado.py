@@ -16,8 +16,9 @@ contradiciéndose entre sí:
    de la demandada. El documento se lee completo y afirma algo que nadie
    confirmó. Eso es lo que este módulo hace visible.
 
-Los tres espacios de la pantalla (datos · estrategia · documento) y el conteo
-del encabezado salen de aquí, para que el semáforo no pueda mentir.
+Los cuatro espacios de la pantalla (datos · estrategia · jurisprudencia ·
+documento) y el conteo del encabezado salen de aquí, para que el semáforo no
+pueda mentir.
 
 Regla de diseño: este módulo NO redacta ni calcula. Sólo compara lo que el
 motor (`expedientes.redaccion`) dice que consume contra lo que hay capturado.
@@ -25,18 +26,20 @@ motor (`expedientes.redaccion`) dice que consume contra lo que hay capturado.
 
 from .redaccion import datos_de_expediente, evaluar_condiciones
 
-# ─── Los tres espacios de trabajo ────────────────────────────────────────────
+# ─── Los cuatro espacios de trabajo ──────────────────────────────────────────
 
 ESPACIOS = (
     ('datos', 'Datos del caso',
      'Actor, relación laboral, patrón y representación. Nada jurídico.'),
     ('estrategia', 'Estrategia y prestaciones',
      'Cómo se separó, qué se reclama, con qué pruebas y con qué importes.'),
+    ('jurisprudencia', 'Jurisprudencia',
+     'Tesis que sostienen la acción. Opcional: no bloquea la descarga.'),
     ('documento', 'Documento',
      'La demanda capítulo por capítulo, con lo que falta señalado en su lugar.'),
 )
 
-# ─── Los siete capítulos del estándar del despacho ───────────────────────────
+# ─── Los capítulos del estándar del despacho ─────────────────────────────────
 
 CAPITULOS = (
     ('proemio', 'Proemio', 'Actor, domicilio para notificaciones y representación.'),
@@ -46,6 +49,8 @@ CAPITULOS = (
     ('hechos', 'Hechos', 'Contratación, jornada, separación y hechos condicionales.'),
     ('pruebas', 'Pruebas', 'Confesional, documental, testimonial e inspección.'),
     ('derecho', 'Derecho', 'Fundamentos. Texto fijo del despacho: sólo se verifica.'),
+    ('jurisprudencia', 'Jurisprudencia',
+     'Tesis que sostienen la acción. Opcional: si no hay, el escrito no las menciona.'),
     ('firma', 'Firma', 'El nombre del actor al calce, igual que en el proemio.'),
 )
 
@@ -320,6 +325,19 @@ _REQUISITOS_CRUDOS = (
         'marcador': '[MONTO]', 'obligatorio': True,
         'ayuda': 'La demanda no inventa montos: si el cálculo no está aprobado, los '
                  'numerales salen sin cifra.',
+    },
+
+    # ══════════════════ Espacio: jurisprudencia ══════════════════
+    {
+        'clave': 'jurisprudencia', 'etiqueta': 'Jurisprudencia aplicable al caso',
+        'dato': 'jurisprudencia', 'campos': (), 'ancla': 'sec-jurisprudencia',
+        'espacio': 'jurisprudencia', 'bloque': 'jurisprudencia',
+        'capitulo': 'jurisprudencia',
+        # Optativa: el escrito puede presentarse sólo con los artículos.
+        'obligatorio': False,
+        'ayuda': 'Si el caso lo amerita, elige tesis de la biblioteca del despacho o '
+                 'captura las que sólo aplican a este juicio. Sin tesis, el apartado '
+                 'de jurisprudencia no aparece.',
     },
 )
 
@@ -627,7 +645,27 @@ def coherencias(datos, condiciones, cliente, calculo_listo=False):
                      'blanco.',
         })
 
-    # 8. Los importes.
+    # 8. La jurisprudencia: opcional, pero el abogado debe saber qué llevará.
+    tesis = datos.get('jurisprudencia') or []
+    if tesis:
+        avisos.append({
+            'nivel': 'bien',
+            'texto': (
+                f'El escrito invoca {len(tesis)} '
+                + ('criterio jurisprudencial' if len(tesis) == 1
+                   else 'criterios jurisprudenciales')
+                + ' en el apartado de jurisprudencia.'
+            ),
+        })
+    else:
+        avisos.append({
+            'nivel': 'info',
+            'texto': 'El apartado de jurisprudencia va vacío: la demanda se sostiene '
+                     'sólo con los artículos. Se pueden elegir tesis en el espacio '
+                     'Jurisprudencia.',
+        })
+
+    # 9. Los importes.
     if calculo_listo:
         avisos.append({
             'nivel': 'bien',

@@ -1,6 +1,6 @@
 """Pruebas del estado de la demanda (`expedientes.demanda_estado`).
 
-Lo que se fija aquí es el contrato del que dependen los tres espacios de la
+Lo que se fija aquí es el contrato del que dependen los cuatro espacios de la
 pantalla: qué cuenta como hueco, qué como decisión, qué coherencias se avisan y
 cómo se marca el documento. El defecto que estas pruebas impiden que vuelva es
 el semáforo que decía «COMPLETA» con la sección vacía.
@@ -77,7 +77,7 @@ class HuecosTest(EstadoBaseTest):
         self.assertFalse(info['resumen']['listo'])
         self.assertGreater(info['resumen']['obligatorios'], 0)
 
-    def test_caso_completo_no_deja_huecos(self):
+    def test_caso_completo_solo_deja_la_precision_opcional(self):
         cliente = _cliente_completo()
         expediente = self._expediente(cliente=cliente, tipo_despido='injustificado')
         ApoderadoLegal.objects.create(
@@ -86,9 +86,15 @@ class HuecosTest(EstadoBaseTest):
 
         info = estado(expediente, calculo_listo=True)
 
-        self.assertEqual([h['etiqueta'] for h in info['pendientes']], [])
+        # Nada obligatorio pendiente: el escrito se puede presentar.
+        self.assertEqual([h['etiqueta'] for h in info['pendientes']
+                          if h['obligatorio']], [])
         self.assertTrue(info['resumen']['listo'])
         self.assertTrue(all(c['completo'] for c in info['capitulos'].values()))
+        # La jurisprudencia es opcional: se avisa como precisión del relato,
+        # pero no bloquea la descarga.
+        self.assertEqual([h['clave'] for h in info['pendientes']], ['jurisprudencia'])
+        self.assertFalse(info['resumen']['completo'])
 
     def test_el_domicilio_del_actor_es_un_hueco_y_el_motor_lo_marca(self):
         """El acordeón nunca capturaba la dirección: el proemio salía con [DOMICILIO]."""
@@ -167,7 +173,9 @@ class SemaforoTest(EstadoBaseTest):
         for requisito in REQUISITOS:
             for clave in capitulos_de(requisito):
                 self.assertIn(clave, validos, requisito['clave'])
-            self.assertIn(requisito['espacio'], ('datos', 'estrategia'), requisito['clave'])
+            self.assertIn(requisito['espacio'],
+                          ('datos', 'estrategia', 'jurisprudencia'),
+                          requisito['clave'])
 
     def test_el_nombre_del_actor_impacta_proemio_pruebas_y_firma(self):
         """Es el dato que más veces aparece: no puede vigilarse en un solo capítulo."""

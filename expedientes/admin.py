@@ -1,7 +1,62 @@
 from django.contrib import admin
 from django.utils import timezone
 
-from .models import Cliente, Expediente, Documento, Movimiento, Nota, SolicitudConciliacion, WhatsAppMessage, LegalConfig, CalculoLaboral, Machote, Aviso, SolicitudTransferencia, Notificacion, TareaConciliacion, Empresa, ApoderadoLegal, AutorizadoNotificacion, DemandadoAdicional
+from .models import Cliente, Expediente, Documento, Movimiento, Nota, SolicitudConciliacion, WhatsAppMessage, LegalConfig, CalculoLaboral, Machote, Aviso, SolicitudTransferencia, Notificacion, TareaConciliacion, Empresa, ApoderadoLegal, AutorizadoNotificacion, DemandadoAdicional, Jurisprudencia, TesisEnDemanda
+
+
+@admin.register(Jurisprudencia)
+class JurisprudenciaAdmin(admin.ModelAdmin):
+    """Biblioteca de tesis del despacho (también captura las de un caso)."""
+
+    list_display = ['rubro_corto', 'tipo', 'tema', 'organo', 'epoca',
+                    'registro_digital', 'activa']
+    list_filter = ['tipo', 'tema', 'activa', 'epoca']
+    search_fields = ['rubro', 'texto', 'registro_digital', 'clave_tesis',
+                     'organo', 'expediente__numero']
+    list_editable = ['activa']
+    autocomplete_fields = ['expediente']
+    readonly_fields = ['created_at', 'updated_at']
+    fieldsets = [
+        ('Identificación', {
+            'fields': ['tipo', 'tema', 'rubro'],
+        }),
+        ('Texto', {
+            'fields': ['texto'],
+        }),
+        ('Cita', {
+            'fields': ['organo', 'epoca', 'clave_tesis', 'registro_digital',
+                       'fuente'],
+        }),
+        ('Uso', {
+            'description': 'Sin expediente, la tesis vive en la biblioteca del '
+                           'despacho. Con expediente, sólo se ofrece en ese caso.',
+            'fields': ['expediente', 'activa', 'notas'],
+        }),
+        ('Metadatos', {'fields': ['created_at', 'updated_at'], 'classes': ['collapse']}),
+    ]
+
+    @admin.display(description='Rubro')
+    def rubro_corto(self, obj):
+        texto = (obj.rubro or '').strip()
+        return texto[:90] + ('…' if len(texto) > 90 else '')
+
+
+class TesisEnDemandaInline(admin.TabularInline):
+    model = TesisEnDemanda
+    extra = 0
+    autocomplete_fields = ['jurisprudencia']
+    fields = ['orden', 'jurisprudencia', 'argumento']
+
+
+@admin.register(TesisEnDemanda)
+class TesisEnDemandaAdmin(admin.ModelAdmin):
+    """Qué tesis lleva cada demanda y en qué orden."""
+
+    list_display = ['expediente', 'jurisprudencia', 'orden', 'created_at']
+    list_filter = ['created_at']
+    search_fields = ['expediente__numero', 'jurisprudencia__rubro']
+    autocomplete_fields = ['expediente', 'jurisprudencia']
+    ordering = ['expediente', 'orden']
 
 
 @admin.register(ApoderadoLegal)
@@ -76,6 +131,7 @@ class ClienteAdmin(admin.ModelAdmin):
 
 @admin.register(Expediente)
 class ExpedienteAdmin(admin.ModelAdmin):
+    inlines = [TesisEnDemandaInline]
     list_display = ['numero', 'cliente', 'asesor', 'estado', 'monto_reclamado',
                     'fecha_audiencia', 'prioridad', 'notificar_whatsapp_auto', 'created_at']
     list_filter = ['estado', 'prioridad', 'asesor', 'notificar_whatsapp_auto', 'created_at']
