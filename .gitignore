@@ -21,6 +21,10 @@ env/
 media/
 !media/.gitkeep
 
+# Cachés locales de herramientas (modelos de voz, uv)
+.uv-cache/
+.whisper-cache/
+
 # Estáticos compilados (collectstatic)
 staticfiles/
 

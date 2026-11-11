@@ -68,9 +68,9 @@ PASOS = (
     },
     {
         'campo': 'salario', 'grupo': 'Trabajo', 'tipo': 'dinero',
-        'pregunta': '¿Cuánto gana al mes?',
-        'ayuda': 'Dime la cantidad mensual. Si te pagan por semana o quincena, '
-                 'dime cuánto y cada cuándo para convertirlo.',
+        'pregunta': '¿Cuánto gana al mes? Di solo la cantidad.',
+        'ayuda': 'Por ejemplo: «doce mil cuatrocientos». Dilo sin la frase '
+                 'completa: así se entiende mejor la cifra.',
     },
     {
         'campo': 'fecha_ingreso', 'grupo': 'Trabajo', 'tipo': 'fecha',
@@ -270,6 +270,11 @@ def parse_dinero(texto) -> Decimal | None:
                 crudo = crudo.replace(',', '')
             else:
                 crudo = crudo.replace(',', '.')
+        elif '.' in crudo:
+            # En México «12.400» son doce mil cuatrocientos, no 12.4.
+            partes = crudo.split('.')
+            if len(partes) > 2 or (len(partes[-1]) == 3 and len(partes[0]) <= 3):
+                crudo = crudo.replace('.', '')
         try:
             return _a_decimal(Decimal(crudo))
         except InvalidOperation:

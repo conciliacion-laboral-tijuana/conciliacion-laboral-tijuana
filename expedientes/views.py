@@ -2563,12 +2563,18 @@ def captura_voz(request, pk):
         })
 
     from .captura_voz import pasos_con_valores
+    from .transcripcion import disponible as transcripcion_disponible
     pasos = pasos_con_valores(cliente)
     return render(request, 'expedientes/captura_voz.html', {
         'expediente': expediente,
         'cliente': cliente,
         'pasos': pasos,
         'faltantes': sum(1 for paso in pasos if not paso['capturado']),
+        'config_voz': {
+            'servidor': transcripcion_disponible(),
+            'transcribir_url': reverse('captura_voz_transcribir',
+                                       kwargs={'pk': expediente.pk}),
+        },
     })
 
 
@@ -2585,6 +2591,48 @@ def captura_voz_interpretar(request, pk):
         return JsonResponse({'error': 'Solicitud inválida.'}, status=400)
     from .captura_voz import interpretar
     return JsonResponse(interpretar(carga.get('campo', ''), carga.get('texto', '')))
+
+
+@login_required
+@require_POST
+def captura_voz_transcribir(request, pk):
+    """Transcribe en el servidor el audio del dictado (sin servicios externos).
+
+    El audio no se guarda: se escribe en un temporal, se transcribe y se borra.
+    Devuelve `{'texto': ...}`; si no se entendió, el texto viene vacío y con un
+    mensaje para la pantalla.
+    """
+    if not _puede_generar_documentos(request):
+        return JsonResponse({'error': 'No autorizado'}, status=403)
+    get_object_or_404(get_expedientes_queryset(request.user), pk=pk)
+
+    archivo = request.FILES.get('audio')
+    if archivo is None:
+        return JsonResponse({'error': 'No se recibió audio.'}, status=400)
+    if archivo.size > settings.MAX_AUDIO_DICTADO_BYTES:
+        return JsonResponse(
+            {'error': 'El audio es demasiado largo. Graba menos de un minuto.'},
+            status=400)
+
+    from .transcripcion import disponible, transcribir_audio
+    if not disponible():
+        return JsonResponse(
+            {'error': 'La transcripción en el servidor no está disponible en '
+                      'esta instalación.'},
+            status=503)
+    try:
+        texto = (transcribir_audio(archivo) or '').strip()
+    except Exception:
+        logger.exception('Error transcribiendo dictado del expediente %s', pk)
+        return JsonResponse(
+            {'error': 'No se pudo transcribir el audio. Intenta de nuevo o '
+                      'escribe el dato.'},
+            status=500)
+    return JsonResponse({
+        'texto': texto,
+        'error': '' if texto else
+        'No se entendió el audio. Intenta de nuevo o escribe el dato.',
+    })
 
 
 @login_required

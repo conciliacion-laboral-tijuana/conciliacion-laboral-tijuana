@@ -147,5 +147,6 @@
 </form>
 
 {{ pasos|json_script:"voz-pasos" }}
+{{ config_voz|json_script:"voz-config" }}
 <script src="{% static 'js/captura_voz.js' %}"></script>
 {% endblock %}

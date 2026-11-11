@@ -1,0 +1,12 @@
+# Dependencias OPCIONALES de la captura por voz (transcripción local).
+#
+# NO forman parte del despliegue normal: si no están instaladas, la pantalla de
+# captura por voz usa el dictado del navegador. Se instalan sólo donde se quiera
+# transcribir en el servidor:
+#
+#     uv pip install -r requirements-voz.txt
+#
+# `av` se fija <19 porque faster-whisper 1.2 todavía pasa `metadata_errors` a
+# `av.open`, parámetro que PyAV 19 quitó.
+faster-whisper>=1.2,<1.3
+av>=12,<19

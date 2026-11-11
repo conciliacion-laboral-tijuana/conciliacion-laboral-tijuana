@@ -219,3 +219,20 @@ def _celery_disponible():
 
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# ─── Captura por voz: transcripción del audio ───────────────────────────────
+#
+# `auto` usa el modelo local si está instalado; si no, la pantalla cae al
+# dictado del navegador. `local` obliga al modelo local. `browser` lo desactiva.
+# El audio se transcribe en el servidor y NO se guarda: se borra al terminar.
+TRANSCRIPCION_BACKEND = env('TRANSCRIPCION_BACKEND', default='auto')
+WHISPER_MODEL = env('WHISPER_MODEL', default='base')
+WHISPER_DEVICE = env('WHISPER_DEVICE', default='cpu')
+WHISPER_COMPUTE_TYPE = env('WHISPER_COMPUTE_TYPE', default='int8')
+WHISPER_IDIOMA = env('WHISPER_IDIOMA', default='es')
+# Texto de contexto para el modelo (opcional). Ayuda con nombres y vocabulario
+# del despacho; no debe contener datos de clientes.
+WHISPER_PROMPT = env('WHISPER_PROMPT', default='')
+WHISPER_CACHE = env('WHISPER_CACHE', default=str(BASE_DIR / 'media' / 'whisper'))
+# Tope del audio que se acepta por dictado (8 MB ≈ varios minutos de voz).
+MAX_AUDIO_DICTADO_BYTES = env.int('MAX_AUDIO_DICTADO_BYTES', default=8 * 1024 * 1024)

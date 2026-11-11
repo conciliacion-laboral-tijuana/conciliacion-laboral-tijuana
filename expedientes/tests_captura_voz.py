@@ -51,6 +51,12 @@ class DineroTest(SimpleTestCase):
         self.assertEqual(parse_dinero('2400'), Decimal('2400.00'))
         self.assertEqual(parse_dinero('12 400'), Decimal('12400.00'))
 
+    def test_punto_como_separador_de_miles(self):
+        """En México «12.400» son doce mil cuatrocientos, no 12.4."""
+        self.assertEqual(parse_dinero('12.400 pesos'), Decimal('12400.00'))
+        self.assertEqual(parse_dinero('1.234.567'), Decimal('1234567.00'))
+        self.assertEqual(parse_dinero('12.5'), Decimal('12.50'))
+
     def test_cantidades_dictadas_en_palabras(self):
         self.assertEqual(parse_dinero('dos mil cuatrocientos'), Decimal('2400.00'))
         self.assertEqual(parse_dinero('doce mil'), Decimal('12000.00'))

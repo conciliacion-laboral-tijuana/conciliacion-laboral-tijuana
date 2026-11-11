@@ -1,19 +1,24 @@
-/* Captura de datos por voz: guion guiado + dictado del navegador.
+/* Captura de datos por voz: guion guiado + dictado.
  *
  * El servidor manda el guion (con lo ya capturado) y la interpretación de
  * fechas, dinero, hora y modalidad se hace en `captura_voz_interpretar` para
  * que las reglas vivan en un solo lugar (Python). Este archivo sólo orquesta
  * la conversación: pregunta, escucha, muestra lo que entendió y guarda.
+ *
+ * El audio se transcribe en el servidor (`captura_voz_transcribir`, modelo
+ * local) cuando está disponible; si no, se usa el dictado del navegador.
  */
 (function () {
   'use strict';
 
   const el = (id) => document.getElementById(id);
   const pasos = JSON.parse(el('voz-pasos').textContent);
+  const config = JSON.parse(el('voz-config').textContent);
   const total = pasos.length;
   const csrfInput = document.querySelector('#voz-form input[name="csrfmiddlewaretoken"]');
   const csrf = csrfInput ? csrfInput.value : '';
   const interpretarUrl = new URL('interpretar/', window.location.href).toString();
+  const usaServidor = Boolean(config.servidor && config.transcribir_url);
 
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 
@@ -54,6 +59,9 @@
   if (primeroPendiente >= 0) idx = primeroPendiente;
 
   let reconocimiento = null;
+  let grabadora = null;
+  let flujoAudio = null;
+  let temporizadorGrabacion = null;
   let grabando = false;
   let textoFinal = '';
   let etiquetaTemporal = '';
@@ -126,7 +134,7 @@
       });
     }
 
-    mic.disabled = !SR;
+    mic.disabled = usaServidor ? false : !SR;
     mic.classList.remove('rec');
     mic.textContent = '🎤 Hablar';
     confirmarBtn.disabled = false;
@@ -150,6 +158,7 @@
 
   function interpretar(texto) {
     const p = pasos[idx];
+    const indice = idx;
     if (TIPOS_INTERPRETADOS.indexOf(p.tipo) === -1) {
       etiquetaTemporal = texto;
       ultimoInterpretado = texto;
@@ -167,6 +176,7 @@
     })
       .then(function (respuesta) { return respuesta.json(); })
       .then(function (datos) {
+        if (indice !== idx) return; // el asesor ya cambió de dato
         if (datos.error) {
           ultimoInterpretado = null;
           aviso(datos.error, 'error');
@@ -179,6 +189,7 @@
               datos.aviso ? 'aviso' : 'ok');
       })
       .catch(function () {
+        if (indice !== idx) return;
         aviso('No se pudo interpretar el dictado. Escribe el dato.', 'error');
       });
   }
@@ -187,6 +198,7 @@
     if (!SR || grabando) return;
     textoFinal = '';
     transcripcion.textContent = '';
+    const indice = idx;
     reconocimiento = new SR();
     reconocimiento.lang = 'es-MX';
     reconocimiento.interimResults = true;
@@ -230,6 +242,7 @@
       grabando = false;
       mic.classList.remove('rec');
       mic.textContent = '🎤 Hablar';
+      if (indice !== idx) return; // el asesor ya cambió de dato
       const texto = (textoFinal || transcripcion.textContent || '').trim();
       if (texto) {
         input.value = texto;
@@ -247,6 +260,119 @@
   function detenerMicrofono() {
     if (reconocimiento && grabando) {
       try { reconocimiento.stop(); } catch (error) { /* ya terminó */ }
+    }
+  }
+
+  // ─── Grabación y transcripción en el servidor ──────────────────────────
+
+  function liberarAudio() {
+    if (flujoAudio) {
+      flujoAudio.getTracks().forEach(function (pista) { pista.stop(); });
+      flujoAudio = null;
+    }
+  }
+
+  function iniciarGrabacion() {
+    if (typeof MediaRecorder === 'undefined' || !navigator.mediaDevices ||
+        !navigator.mediaDevices.getUserMedia) {
+      aviso('Este navegador no permite grabar audio. Escribe el dato.', 'error');
+      return;
+    }
+    aviso('Pidiendo permiso del micrófono…');
+    navigator.mediaDevices.getUserMedia({ audio: true }).then(function (flujo) {
+      flujoAudio = flujo;
+      const tipos = ['audio/webm;codecs=opus', 'audio/ogg;codecs=opus',
+        'audio/mp4', 'audio/webm'];
+      let tipo = '';
+      for (let i = 0; i < tipos.length; i += 1) {
+        if (MediaRecorder.isTypeSupported(tipos[i])) { tipo = tipos[i]; break; }
+      }
+      const trozos = [];
+      const rec = tipo ? new MediaRecorder(flujo, { mimeType: tipo })
+        : new MediaRecorder(flujo);
+      grabadora = rec;
+      rec.ondataavailable = function (evento) {
+        if (evento.data && evento.data.size) trozos.push(evento.data);
+      };
+      rec.onstop = function () {
+        liberarAudio();
+        grabadora = null;
+        const blob = new Blob(trozos, { type: rec.mimeType || tipo || 'audio/webm' });
+        grabando = false;
+        mic.classList.remove('rec');
+        mic.textContent = '🎤 Hablar';
+        if (!blob.size) {
+          aviso('No se grabó audio. Intenta de nuevo o escribe el dato.', 'aviso');
+          return;
+        }
+        enviarAudio(blob);
+      };
+      rec.start();
+      grabando = true;
+      mic.classList.add('rec');
+      mic.textContent = '⏹ Detener';
+      aviso('Grabando… habla y pulsa Detener (máximo 60 segundos).');
+      temporizadorGrabacion = setTimeout(detenerGrabacion, 60000);
+    }).catch(function (error) {
+      if (error && error.name === 'NotAllowedError') {
+        aviso('El micrófono está bloqueado. Permítelo en el navegador o escribe el dato.', 'error');
+      } else {
+        aviso('No se pudo usar el micrófono. Escribe el dato.', 'error');
+      }
+    });
+  }
+
+  function detenerGrabacion() {
+    if (temporizadorGrabacion) {
+      clearTimeout(temporizadorGrabacion);
+      temporizadorGrabacion = null;
+    }
+    if (grabadora && grabadora.state !== 'inactive') {
+      try { grabadora.stop(); } catch (error) { /* ya terminó */ }
+    }
+  }
+
+  function enviarAudio(blob) {
+    const indice = idx;
+    aviso('Transcribiendo el audio…');
+    const datos = new FormData();
+    datos.append('audio', blob, 'dictado.webm');
+    fetch(config.transcribir_url, {
+      method: 'POST',
+      body: datos,
+      headers: { 'X-CSRFToken': csrf }
+    })
+      .then(function (respuesta) {
+        return respuesta.json().then(function (cuerpo) {
+          return { ok: respuesta.ok, cuerpo: cuerpo };
+        });
+      })
+      .then(function (resultado) {
+        if (indice !== idx) return; // el asesor ya cambió de dato
+        if (!resultado.ok) {
+          aviso(resultado.cuerpo.error || 'No se pudo transcribir el audio.', 'error');
+          return;
+        }
+        const texto = (resultado.cuerpo.texto || '').trim();
+        if (!texto) {
+          aviso(resultado.cuerpo.error ||
+            'No se entendió el audio. Intenta de nuevo o escribe el dato.', 'aviso');
+          return;
+        }
+        input.value = texto;
+        interpretar(texto);
+      })
+      .catch(function () {
+        if (indice !== idx) return;
+        aviso('No se pudo transcribir el audio. Revisa la conexión o escribe el dato.', 'error');
+      });
+  }
+
+  function detenerTodo() {
+    if (usaServidor) {
+      detenerGrabacion();
+    } else {
+      detenerMicrofono();
     }
   }
 
@@ -276,7 +402,7 @@
   }
 
   function siguiente() {
-    detenerMicrofono();
+    detenerTodo();
     idx += 1;
     if (idx >= total) {
       mostrarResumen();
@@ -286,14 +412,14 @@
   }
 
   function anterior() {
-    detenerMicrofono();
+    detenerTodo();
     if (idx === 0) return;
     idx -= 1;
     pintar();
   }
 
   function mostrarResumen() {
-    detenerMicrofono();
+    detenerTodo();
     panel.hidden = true;
     resumen.hidden = false;
     errorBox.hidden = true;
@@ -384,7 +510,9 @@
 
   mic.addEventListener('click', function () {
     if (grabando) {
-      detenerMicrofono();
+      detenerTodo();
+    } else if (usaServidor) {
+      iniciarGrabacion();
     } else {
       iniciarMicrofono();
     }
@@ -402,13 +530,17 @@
     }
   });
 
-  if (!SR) {
+  if (usaServidor) {
+    soporte.textContent = 'Tu voz se transcribe en el servidor del despacho; el audio no se envía a terceros y se borra al terminar.';
+  } else if (!SR) {
     soporte.textContent = 'Este navegador no permite dictado. Puedes escribir el dato y confirmar; funciona igual.';
     mic.disabled = true;
     mic.title = 'Dictado no disponible en este navegador';
   } else {
     soporte.textContent = 'El audio se procesa con el servicio de dictado del navegador.';
   }
+
+  window.addEventListener('beforeunload', detenerTodo);
 
   pintar();
 })();

@@ -81,6 +81,8 @@ urlpatterns = [
     path('expedientes/<int:pk>/captura-voz/', views.captura_voz, name='captura_voz'),
     path('expedientes/<int:pk>/captura-voz/interpretar/',
          views.captura_voz_interpretar, name='captura_voz_interpretar'),
+    path('expedientes/<int:pk>/captura-voz/transcribir/',
+         views.captura_voz_transcribir, name='captura_voz_transcribir'),
     # Representación legal (apoderados y autorizados del proemio)
     path('expedientes/<int:pk>/demanda/copiar-representacion/',
          views.copiar_representacion, name='copiar_representacion'),
