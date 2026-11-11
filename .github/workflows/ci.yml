@@ -13,7 +13,9 @@ env:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    # ubuntu-latest pasó a 26.04, donde actions/setup-python aún no tiene
+    # 3.13.11; se fija 24.04 para que el runner tenga la versión del proyecto.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
@@ -74,7 +76,7 @@ jobs:
     # E2E en navegador real (Chromium headless) del acordeón de demanda:
     # levanta el servidor de desarrollo y ejecuta prueba_acordeon_navegador.py,
     # que crea usuario y expediente temporales y los limpia al terminar.
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
@@ -149,7 +151,7 @@ jobs:
   e2e-acordeon-pg:
     # Mismo E2E contra PostgreSQL (el stack de producción en Railway):
     # valida migraciones, Whitenoise manifest y el flujo completo con PG.
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     services:
       postgres:
         image: postgres:16-alpine
