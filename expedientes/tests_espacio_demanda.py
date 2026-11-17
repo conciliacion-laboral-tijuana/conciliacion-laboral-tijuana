@@ -231,6 +231,59 @@ class EspacioDocumentoTest(BaseEspacioDemanda):
         self.assertNotIn('[DOMICILIO PARA NOTIFICACIONES]', body)
 
 
+class CaminoUnicoTest(BaseEspacioDemanda):
+    """Una sola demanda (la de capítulos) y un solo camino hacia ella.
+
+    Antes la barra ofrecía «Generar demanda y editar» y «Editar el texto», que
+    llevaban a un editor con el motor viejo: otro escrito, sin bloqueo de huecos.
+    """
+
+    def test_la_barra_no_ofrece_el_editor_viejo(self):
+        for espacio in ('datos', 'estrategia', 'jurisprudencia', 'documento'):
+            body = self._get(espacio)
+            self.assertNotIn('href="%s"' % reverse('demanda_editor', args=[self.exp.pk]), body)
+            self.assertNotIn('Generar demanda y editar', body)
+
+    def test_cada_espacio_tiene_su_siguiente_paso(self):
+        self.assertIn('Guardar y seguir: Estrategia y prestaciones', self._get('datos'))
+        self.assertIn('Guardar y seguir: Revisar la demanda', self._get('estrategia'))
+        documento = self._get('documento')
+        self.assertNotIn('Guardar y seguir', documento)
+        self.assertIn(reverse('demanda_capitulos_descargar', args=[self.exp.pk]), documento)
+
+    def test_siguiente_guarda_y_avanza(self):
+        url = reverse('demanda_asistente', args=[self.exp.pk])
+        respuesta = self.client.post(url + '?espacio=datos', {
+            'espacio': 'datos', 'accion': 'siguiente',
+            'nombre': self.cliente.nombre, 'puesto': 'Supervisor de almacén',
+        })
+        self.assertRedirects(respuesta, url + '?espacio=estrategia',
+                             fetch_redirect_response=False)
+        self.cliente.refresh_from_db()
+        self.assertEqual(self.cliente.puesto, 'Supervisor de almacén')
+
+    def test_siguiente_desde_datos_con_hoja_de_prestaciones(self):
+        """Con hoja creada, la captura de Datos no trae los campos de la hoja:
+        avanzar no puede quedar bloqueado por ella."""
+        from .models import HojaPrestaciones
+        HojaPrestaciones.objects.create(expediente=self.exp)
+        url = reverse('demanda_asistente', args=[self.exp.pk])
+        respuesta = self.client.post(url + '?espacio=datos', {
+            'espacio': 'datos', 'accion': 'siguiente', 'nombre': self.cliente.nombre,
+        })
+        self.assertRedirects(respuesta, url + '?espacio=estrategia',
+                             fetch_redirect_response=False)
+
+    def test_las_urls_del_editor_viejo_llevan_al_documento(self):
+        destino = reverse('demanda_asistente', args=[self.exp.pk]) + '?espacio=documento'
+        for respuesta in (
+            self.client.get(reverse('demanda_editor', args=[self.exp.pk])),
+            self.client.post(reverse('demanda_descargar', args=[self.exp.pk]),
+                             {'contenido': '<p>texto viejo</p>'}),
+        ):
+            self.assertRedirects(respuesta, destino, fetch_redirect_response=False)
+
+
 class ComentariosDePlantillaTest(BaseEspacioDemanda):
     """`{# ... #}` sólo vale en UNA línea; en varias se imprime como texto.
 

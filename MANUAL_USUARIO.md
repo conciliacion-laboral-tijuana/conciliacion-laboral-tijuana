@@ -496,10 +496,15 @@ El **encabezado** muestra el semáforo real (`Falta N requisitos para poder pres
 sólo precisa el relato —hora del despido, frase textual, testigos— nunca bloquea, pero sí
 se te señala.
 
-Al terminar, **✨ Generar demanda y editar** abre el editor con el escrito armado.
-**Descargar demanda final** entrega el `.docx` con los siete capítulos y **sólo se
-habilita cuando no queda ningún requisito obligatorio**: es el documento que se lleva al
-Tribunal. Redactar el borrador nunca está bloqueado.
+El camino es uno solo: **Datos → Estrategia y prestaciones → Documento**. Al pie de cada
+espacio, **Guardar y seguir** guarda y pasa al siguiente. En **Documento** está el único
+botón final, **Descargar demanda (Word)**: entrega el `.docx` con los siete capítulos y
+**sólo se habilita cuando no queda ningún requisito obligatorio**. Es exactamente el
+escrito que se ve en pantalla. Si hace falta un ajuste de redacción, se hace sobre el Word
+descargado.
+
+> El editor de texto anterior (con plantillas y machotes) ya no forma parte de la demanda:
+> producía un escrito distinto al de capítulos. Sus direcciones llevan ahora a **Documento**.
 
 ---
 
@@ -534,8 +539,8 @@ Tribunal. Redactar el borrador nunca está bloqueado.
 
 ### 10.10 Generar la demanda directamente
 
-- En el expediente, presiona **Demanda** → se abre el editor con la demanda ya generada
-  (plantilla según el tipo de despido, datos y cálculos integrados).
+- En el expediente, presiona **Asistente de Demanda** → se abre el espacio de la demanda
+  por capítulos; la descarga está en **Documento**.
 
 > 💡 El administrador también puede crear plantillas desde el **admin de Django**
 > (Machotes → Añadir) o con el comando `importar_machotes` (convierte un lote de

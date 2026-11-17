@@ -380,9 +380,8 @@ class FlujoCompletoDemandaTests(TestCase):
             tipo_despido='injustificado',
         )
 
-        resp = self.client.post(
-            reverse('demanda_descargar', args=[exp_incompleto.pk]),
-            {'contenido': '<p>Demanda</p>'},
+        resp = self.client.get(
+            reverse('demanda_capitulos_descargar', args=[exp_incompleto.pk]),
         )
         self.assertEqual(resp.status_code, 302)
         self.assertIn('asistente', resp.url, 'Debe redirigir al asistente para completar datos')

@@ -49,7 +49,7 @@ from .whatsapp import (enviar_whatsapp, generar_deep_link, renderizar_plantilla,
 from .laboral_calculator import (calcular_desde_expediente, recalcular_calculo,
                                  _aplicar_conceptos_excluidos, datos_extra_de,
                                  advertencias_accion as advertencias_accion_cliente)
-from .demanda_generator import generar_demanda_word, generar_demanda_html, html_a_docx, PLANTILLAS_INFO, calculo_para_demanda
+from .demanda_generator import generar_demanda_word, generar_demanda_html, html_a_docx, calculo_para_demanda
 from .models import Machote
 from .marcadores import get_marcadores, get_datos_faltantes, get_completitud_stats, reemplazar_marcadores
 from . import demanda_estado as estado_demanda_mod
@@ -1636,91 +1636,32 @@ def _puede_generar_documentos(request):
 
 @login_required
 def demanda_editor(request, pk):
-    """
-    Editor WYSIWYG de la demanda laboral.
-    Muestra el contenido generado en un editor Quill.js para que
-    el usuario pueda editarlo antes de descargar.
-    Incluye selector de plantillas para diferentes tipos de despido
-    y machotes (plantillas desde casos reales).
+    """Antes: editor Quill con el motor viejo (`demanda_generator`), plantillas y
+    machotes. Producía un escrito distinto al que se revisa en el espacio
+    Documento y los abogados no sabían cuál era la demanda buena.
+
+    Ahora la única demanda es la de capítulos: esta URL se conserva para no
+    romper enlaces guardados y lleva al espacio Documento.
     """
     if not _puede_generar_documentos(request):
         messages.error(request, 'No tienes permiso para generar documentos legales.')
         return redirect('dashboard_asesor')
     expediente = get_object_or_404(get_expedientes_queryset(request.user), pk=pk)
-    from .hoja_prestaciones import hoja_de, resultado_vigente
-    if hoja_de(expediente) and resultado_vigente(expediente, aprobado=True) is None:
-        messages.error(request, 'Valida, calcula y aprueba las prestaciones vigentes antes de generar o descargar la demanda.')
-        return redirect('demanda_asistente', pk=expediente.pk)
+    return redirect(_url_espacio(expediente, 'documento'))
 
 
-    # Validación de coherencia temporal antes de redactar la demanda: el motor
-    # ya devuelve success=False, pero conviene avisar al asesor con el motivo
-    # exacto en lugar de mostrar una tabla vacía.
-    cliente_editor = expediente.cliente
-    if (cliente_editor.fecha_ingreso and cliente_editor.fecha_salida
-            and cliente_editor.fecha_salida < cliente_editor.fecha_ingreso):
-        messages.error(
-            request,
-            'La fecha de salida es anterior a la fecha de ingreso. Corrige los datos '
-            'del cliente antes de generar la demanda.',
-        )
-        return redirect('demanda_asistente', pk=expediente.pk)
+def _url_espacio(expediente, espacio):
+    return (reverse('demanda_asistente', kwargs={'pk': expediente.pk})
+            + f'?espacio={espacio}')
 
-    try:
-        contenido_html = generar_demanda_html(expediente)
-        # Generar todas las plantillas predefinidas para el selector
-        plantillas = {}
-        for tipo_key in PLANTILLAS_INFO:
-            plantillas[tipo_key] = generar_demanda_html(expediente, tipo_despido_override=tipo_key)
 
-        # Cargar machotes de demanda desde la BD (importados desde .docx)
-        machotes_demanda = _get_machotes_queryset().filter(
-            categoria='demanda',
-        )
-
-        # Reemplazar marcadores en cada machote con datos del expediente
-        machotes_renderizados = []
-        for m in machotes_demanda:
-            try:
-                contenido = reemplazar_marcadores(m.contenido_html, expediente)
-                machotes_renderizados.append({
-                    'id': m.pk,
-                    'nombre': m.nombre,
-                    'descripcion': m.descripcion,
-                    'tipo_despido': m.tipo_despido,
-                    'tipo_despido_display': m.get_tipo_despido_display() if m.tipo_despido else '',
-                    'icono': m.icono,
-                    'favorito': m.favorito,
-                    'html': contenido,
-                })
-            except Exception:
-                # Si falla el reemplazo de marcadores, incluir el HTML original
-                machotes_renderizados.append({
-                    'id': m.pk,
-                    'nombre': m.nombre,
-                    'descripcion': m.descripcion,
-                    'tipo_despido': m.tipo_despido,
-                    'tipo_despido_display': m.get_tipo_despido_display() if m.tipo_despido else '',
-                    'icono': m.icono,
-                    'favorito': m.favorito,
-                    'html': m.contenido_html,
-                })
-
-    except Exception as e:
-        logger.exception("Error generando HTML de demanda para expediente %s", expediente.numero)
-        messages.error(request, 'Error al cargar el editor de demanda.')
-        return redirect('expediente_detail', pk=expediente.pk)
-
-    return render(request, 'expedientes/demanda_editor.html', {
-        'expediente': expediente,
-        'contenido_html': contenido_html,
-        'plantillas': plantillas,
-        'plantillas_info': PLANTILLAS_INFO,
-        'machotes_demanda': machotes_renderizados,
-        'tipo_actual': expediente.tipo_despido or 'injustificado',
-        'datos_criticos_faltantes': _verificar_datos_criticos(expediente),
-        'ESTADO_COLORS': ESTADO_COLORS,
-    })
+# Orden del botón «Siguiente» al pie de cada espacio. Jurisprudencia es
+# opcional: no está en el camino, pero si se entra, sigue al documento.
+SIGUIENTE_ESPACIO = {
+    'datos': ('estrategia', 'Estrategia y prestaciones'),
+    'estrategia': ('documento', 'Revisar la demanda'),
+    'jurisprudencia': ('documento', 'Revisar la demanda'),
+}
 
 
 # ─── Acordeón de demanda (secciones en una sola página) ───────────────
@@ -2234,12 +2175,15 @@ def demanda_asistente(request, pk):
                                    calcular_hoja, resultado_vigente, huella, empaquetar,
                                    requisitos_para_calcular)
     from .models import HojaPrestaciones
-    # Un POST del espacio de jurisprudencia no trae la captura de prestaciones:
-    # validarla con ese POST la declararía incompleta y borraría el cálculo. Se
-    # reconstruye sólo para mostrarla.
+    # Sólo el espacio de Estrategia trae la captura de prestaciones (marca
+    # `hoja_calculos`). Un POST de Datos o de Jurisprudencia no la trae:
+    # validarla con ese POST la declararía incompleta, bloquearía el guardado y
+    # podría borrar el cálculo. En un GET se reconstruye sólo para mostrarla.
     postea_jurisprudencia = 'tesis_present' in request.POST
-    constructor = (request.POST.get('hoja_calculos') == '1'
-                   or (bool(hoja_de(expediente)) and not postea_jurisprudencia))
+    if request.method == 'POST':
+        constructor = request.POST.get('hoja_calculos') == '1'
+    else:
+        constructor = bool(hoja_de(expediente))
     hoja_context = formularios(expediente, request.POST if request.method == 'POST' and constructor else None)
     errores = {}
     seccion_abierta = request.GET.get('seccion') or request.POST.get('seccion_abierta') or ''
@@ -2356,6 +2300,9 @@ def demanda_asistente(request, pk):
                         messages.error(request, mensaje)
             seccion_abierta = 'prestaciones' if accion in ('calcular', 'aprobar') else seccion_abierta
 
+        if accion == 'siguiente' and not errores and espacio in SIGUIENTE_ESPACIO:
+            return redirect(_url_espacio(expediente, SIGUIENTE_ESPACIO[espacio][0]))
+
         if accion == 'finalizar':
             # Guardar tipo de despido y generar la demanda
             tipo = request.POST.get('tipo_despido', '')
@@ -2381,8 +2328,8 @@ def demanda_asistente(request, pk):
                         accion='actualizacion',
                         detalle='Demanda llenada con el acordeón de demanda'
                     )
-                    messages.success(request, '✅ Demanda lista. Revisa el contenido en el editor antes de descargar.')
-                    return redirect('demanda_editor', pk=expediente.pk)
+                    messages.success(request, '✅ Demanda lista. Revísala capítulo por capítulo y descárgala.')
+                    return redirect(_url_espacio(expediente, 'documento'))
             else:
                 seccion_abierta = 'revision'
         elif postea_acordeon and not errores:
@@ -2510,6 +2457,7 @@ def demanda_asistente(request, pk):
         # ─── Espacio de trabajo de la demanda ───
         'espacio': espacio,
         'espacios': estado_demanda_mod.ESPACIOS,
+        'siguiente_espacio': SIGUIENTE_ESPACIO.get(espacio),
         'estado_demanda': estado,
         'bloques_datos': bloques_datos,
         'bloques_estrategia': bloques_estrategia,
@@ -2785,70 +2733,13 @@ def demanda_guardar_machote(request, pk):
 
 @login_required
 def demanda_descargar(request, pk):
-    """
-    Recibe el HTML editado desde el editor Quill.js y genera
-    el documento Word para descarga.
-
-    Verifica primero que el cliente tenga los datos críticos completos
-    (evita descargar demandas con nombre/salario/fechas vacíos).
-    """
+    """Descarga del editor Quill retirado. La demanda se descarga desde el
+    espacio Documento (`demanda_capitulos_descargar`), que sí bloquea huecos."""
     if not _puede_generar_documentos(request):
         messages.error(request, 'No tienes permiso para descargar documentos legales.')
         return redirect('dashboard_asesor')
     expediente = get_object_or_404(get_expedientes_queryset(request.user), pk=pk)
-    from .hoja_prestaciones import hoja_de, resultado_vigente
-    if hoja_de(expediente) and resultado_vigente(expediente, aprobado=True) is None:
-        messages.error(request, 'Valida, calcula y aprueba las prestaciones vigentes antes de generar o descargar la demanda.')
-        return redirect('demanda_asistente', pk=expediente.pk)
-
-
-    if request.method != 'POST':
-        return redirect('demanda_editor', pk=expediente.pk)
-
-    # ─── Guard: datos críticos del cliente ────────────────────────────
-    faltantes = _verificar_datos_criticos(expediente)
-    if faltantes:
-        for f in faltantes:
-            messages.error(request, f'⚠️ No se puede descargar: falta {f["label"]}.')
-        messages.info(
-            request,
-            'Completa los datos del cliente (usando el asistente paso a paso o editando el cliente) '
-            'antes de descargar la demanda.'
-        )
-        return redirect('demanda_asistente', pk=expediente.pk)
-
-    contenido_html = request.POST.get('contenido', '')
-    if not contenido_html:
-        messages.error(request, 'No hay contenido para generar la demanda.')
-        return redirect('demanda_editor', pk=expediente.pk)
-
-    try:
-        from .demanda_generator import html_a_docx
-
-        doc = generar_demanda_word(expediente, desde_cero=False)
-        html_a_docx(contenido_html, doc)
-
-        response = HttpResponse(
-            content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-        )
-        nombre_archivo = f"Demanda_{expediente.numero}_{re.sub(r'[^\w\-]', '_', expediente.cliente.nombre)}.docx"
-        response['Content-Disposition'] = f'attachment; filename="{nombre_archivo}"'
-
-        doc.save(response)
-
-        registrar_movimiento(
-            expediente=expediente,
-            usuario=request.user,
-            accion='actualizacion',
-            detalle='Documento de demanda laboral generado desde el editor'
-        )
-
-        return response
-
-    except Exception as e:
-        logger.exception("Error generando demanda editada para expediente %s", expediente.numero)
-        messages.error(request, 'Error al generar la demanda. Intenta de nuevo.')
-        return redirect('demanda_editor', pk=expediente.pk)
+    return redirect(_url_espacio(expediente, 'documento'))
 
 
 @login_required

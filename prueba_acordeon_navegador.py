@@ -267,12 +267,20 @@ with sync_playwright() as p:
         }""")
         check('Sin scroll horizontal (sin desbordes)', not overflow)
 
-        # ─── 8. Flujo finalizar → editor de demanda ─────────────────
-        page.click('button[name=accion][value=finalizar]')
+        # ─── 8. Camino único: Datos → Estrategia → Documento ────────
+        page.goto(page.url.split('?')[0] + '?espacio=datos')
         page.wait_for_load_state('networkidle')
-        check('Finalizar redirige al editor',
-              '/demanda/' in page.url and '/asistente/' not in page.url, page.url)
-        _shot('editor_demanda', full_page=True)
+        page.click('button[name=accion][value=siguiente]')
+        page.wait_for_load_state('networkidle')
+        check('Siguiente lleva de Datos a Estrategia', 'espacio=estrategia' in page.url, page.url)
+        page.click('button[name=accion][value=siguiente]')
+        page.wait_for_load_state('networkidle')
+        check('Siguiente lleva de Estrategia al Documento', 'espacio=documento' in page.url, page.url)
+        check('El documento ofrece la descarga por capítulos',
+              page.locator('#dem-descargar').count() == 1)
+        check('Ya no se ofrece el editor viejo',
+              page.locator('text=Generar demanda y editar').count() == 0)
+        _shot('camino_documento', full_page=True)
     except Exception as e:
         # Excepción no esperada: capturar el estado del navegador ANTES de cerrarlo
         print(f'[EXCEPCION] {type(e).__name__}: {e}')

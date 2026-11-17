@@ -135,13 +135,14 @@ class HojaPrestacionesTests(TestCase):
         self.assertEqual(hoja.aprobado_por, self.user, str((response.context['errores'], response.context['captura_prestaciones'].errors, response.context['vacaciones_formset'].errors, response.context['semanas_formset'].errors)))
         self.assertTrue(calculo_para_demanda(self.exp)['success'])
         response = self.client.post(url, self.payload(accion='finalizar'))
-        self.assertRedirects(response, reverse('demanda_editor', args=[self.exp.pk]))
+        self.assertRedirects(response, url + '?espacio=documento')
         self.cliente.salario = D('19000')
         self.cliente.save()
         self.assertIsNone(resultado_vigente(self.exp, aprobado=True))
         self.assertFalse(calculo_para_demanda(self.exp)['success'])
-        response = self.client.post(reverse('demanda_descargar', args=[self.exp.pk]), {'contenido': '<p>Anterior</p>'})
-        self.assertRedirects(response, url)
+        response = self.client.get(reverse('demanda_capitulos_descargar', args=[self.exp.pk]))
+        self.assertRedirects(response, url + '?espacio=estrategia&seccion=prestaciones',
+                             fetch_redirect_response=False)
 
     def test_no_aprueba_resultado_que_no_vio_y_borrador_no_calcula(self):
         url = reverse('demanda_asistente', args=[self.exp.pk])

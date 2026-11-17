@@ -27,7 +27,7 @@ imprime si el abogado eligió tesis para ese expediente.
 ## Cómo usarlo
 
 Desde el **espacio Documento** del espacio de trabajo de la demanda (botón
-*Descargar demanda final*). O por URL: `GET /expedientes/<pk>/demanda/capitulos/` → `.docx`.
+*Descargar demanda (Word)*). O por URL: `GET /expedientes/<pk>/demanda/capitulos/` → `.docx`.
 
 La pantalla **Documento** muestra el mismo escrito que se descarga, capítulo por
 capítulo, con los datos que faltan señalados como huecos enlazados al campo que los

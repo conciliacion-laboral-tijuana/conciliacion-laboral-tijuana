@@ -95,14 +95,14 @@ class ConstructorNavegador(StaticLiveServerTestCase):
             hoja.refresh_from_db()
             self.assertIsNotNone(hoja.aprobado_en)
             self.assertFalse(errors, errors)
-            # The external Quill editor is outside this offline constructor test.
-            page.remove_listener('pageerror', on_page_error)
-            page.locator('button[value="finalizar"]').click()
-            page.wait_for_url('**/demanda/')
-            self.assertIn('dado de alta ante el IMSS', page.content())
-            self.assertIn('Desglose de prestaciones por periodos', page.content())
-            self.assertIn('Horas extraordinarias reclamadas', page.content())
-            self.assertIn('15:00 a 17:00', page.content())
+            # «Guardar y seguir» lleva a la demanda por capítulos (la única).
+            page.locator('button[name="accion"][value="siguiente"]').click()
+            page.wait_for_url('**espacio=documento**')
+            contenido = page.content()
+            self.assertIn('dado de alta como su empleado ante el IMSS', contenido)
+            self.assertIn('PRESTACIONES', contenido)
+            self.assertIn('HORAS EXTRAS', contenido)
+            self.assertNotIn('Generar demanda y editar', contenido)
             browser.close()
 
 

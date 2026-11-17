@@ -261,8 +261,23 @@
         {% else %}Borrador con guardado automático.{% endif %}
       </span>
 
+      {% if espacio != 'documento' %}
+      {# formnovalidate: la hoja de prestaciones tiene campos requeridos plegados #}
+      <button type="submit" name="accion" value="guardar" class="btn-link btn-borde"
+              formnovalidate>
+        <i class="fas fa-save text-xs"></i>
+        {% if espacio == 'jurisprudencia' %}Guardar jurisprudencia{% else %}Guardar{% endif %}
+      </button>
+      {% endif %}
+
+      {% if siguiente_espacio %}
+      <button type="submit" name="accion" value="siguiente" class="btn-link btn-azul"
+              formnovalidate>
+        Guardar y seguir: {{ siguiente_espacio.1 }} <i class="fas fa-arrow-right text-xs"></i>
+      </button>
+      {% else %}
       <a href="{% url 'demanda_capitulos_descargar' expediente.pk %}"
-         class="btn-link btn-rojo {% if not puede_descargar %}btn-deshabilitado{% endif %}"
+         class="btn-link btn-verde {% if not puede_descargar %}btn-deshabilitado{% endif %}"
          id="dem-descargar"
          {% if not puede_descargar %}
            aria-disabled="true" tabindex="-1"
@@ -270,26 +285,9 @@
          {% else %}
            title="Descarga la demanda completa con todos los capítulos, lista para presentar"
          {% endif %}>
-        <i class="fas fa-file-word text-xs"></i> Descargar demanda final
+        <i class="fas fa-file-word text-xs"></i> Descargar demanda (Word)
       </a>
-
-      {% if espacio != 'documento' %}
-      {# formnovalidate: la hoja de prestaciones tiene campos requeridos plegados #}
-      <button type="submit" name="accion" value="guardar" class="btn-link btn-borde"
-              formnovalidate>
-        <i class="fas fa-save text-xs"></i>
-        {% if espacio == 'jurisprudencia' %}Guardar jurisprudencia{% else %}Guardar datos{% endif %}
-      </button>
       {% endif %}
-
-      <a href="{% url 'demanda_editor' expediente.pk %}" class="btn-link btn-borde">
-        <i class="fas fa-file-edit text-xs"></i> Editar el texto
-      </a>
-
-      <button type="submit" name="accion" value="finalizar" class="btn-link btn-verde"
-              formnovalidate>
-        <i class="fas fa-magic text-xs"></i> Generar demanda y editar
-      </button>
     </div>
   </form>
 
