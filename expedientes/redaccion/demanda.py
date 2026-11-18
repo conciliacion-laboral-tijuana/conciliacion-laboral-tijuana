@@ -18,7 +18,6 @@ los generadores de salida se construyen sobre ella, de modo que HTML, DOCX y
 texto plano dicen exactamente lo mismo.
 """
 
-from ..demanda_generator import _ordinal
 from . import condiciones as mod_condiciones
 from . import demandados as mod_demandados
 from . import derecho as mod_derecho
@@ -71,9 +70,7 @@ def capitulos(datos: dict, calculo: dict, tipo_despido: str = 'injustificado') -
             'filas': mod_jornada.filas_jornada(datos, calculo),
             'encabezados': mod_jornada.ENCABEZADOS,
         },
-        'hechos': [
-            f'{_ordinal(i)}.- {texto}' for i, texto in enumerate(lista_hechos, start=1)
-        ],
+        'hechos': numerar_hechos(lista_hechos),
         'pruebas': lista_pruebas,
         'derecho': mod_derecho.derecho(datos, cond, tipo_despido),
         'jurisprudencia': {
@@ -84,6 +81,21 @@ def capitulos(datos: dict, calculo: dict, tipo_despido: str = 'injustificado') -
         },
         'condiciones': cond,
     }
+
+
+def numerar_hechos(lista_hechos) -> list:
+    """Numera los hechos como el estándar del despacho: `1.-`, `2.-` …
+
+    Un hecho puede ser texto o una tupla `(texto, [subhechos])`; los subhechos
+    salen como `9.1.-`, `9.2.-` debajo de su hecho (p. ej. los actos de una
+    separación que ocurrió en varios días).
+    """
+    numerados = []
+    for i, hecho in enumerate(lista_hechos, start=1):
+        texto, subhechos = (hecho, ()) if isinstance(hecho, str) else hecho
+        numerados.append(f'{i}.- {texto}')
+        numerados.extend(f'{i}.{j}.- {sub}' for j, sub in enumerate(subhechos, start=1))
+    return numerados
 
 
 def encabezado_capitulo(titulo: str) -> str:
@@ -138,7 +150,7 @@ def generar_texto_completo(datos: dict, calculo: dict,
     if cap['pruebas']:
         bloques.append('PRUEBAS')
         for i, prueba in enumerate(cap['pruebas'], start=1):
-            bloques.append(f'{i}.- {prueba["titulo"]}. {prueba["texto"]}')
+            bloques.append(f'{i}.- {prueba["titulo"]} {prueba["texto"]}')
             objeto = prueba.get('objeto')
             if isinstance(objeto, (list, tuple)):
                 bloques.append('Lo anterior con el fin de acreditar el objeto:')

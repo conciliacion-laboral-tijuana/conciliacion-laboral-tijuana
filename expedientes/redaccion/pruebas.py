@@ -143,7 +143,7 @@ def pruebas(datos: dict, condiciones: dict) -> list:
         salida.append({
             'titulo': 'INTERROGATORIO LIBRE',
             'texto': (
-                'A desahogar durante el desahogo de la prueba confesional como '
+                'a desahogar durante el desahogo de la prueba confesional como '
                 'un complemento de la misma y no como una prueba autónoma, de '
                 'acuerdo con los criterios jurisprudenciales sustentados por la '
                 'Suprema Corte de Justicia de la Nación, mediante las preguntas '

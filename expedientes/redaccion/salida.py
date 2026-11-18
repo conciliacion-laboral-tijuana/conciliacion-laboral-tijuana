@@ -153,7 +153,7 @@ def capitulos_html(datos: dict, calculo: dict,
         pruebas.append('<h3>PRUEBAS</h3>')
         for i, prueba in enumerate(cap['pruebas'], start=1):
             pruebas.append(
-                f'<p><strong>{i}.- {_e(prueba["titulo"])}.</strong> '
+                f'<p><strong>{i}.- {_e(prueba["titulo"])}</strong> '
                 f'{_e(prueba["texto"])}</p>'
             )
             objeto = _objeto_html(prueba.get('objeto'))
@@ -369,7 +369,7 @@ def generar_demanda_capitulos_docx(expediente, datos: dict | None = None,
         _encabezado(doc, 'PRUEBAS')
         for i, prueba in enumerate(cap['pruebas'], start=1):
             _parrafo_mixto(doc, [
-                (f'{i}.- {prueba["titulo"]}. ', True),
+                (f'{i}.- {prueba["titulo"]} ', True),
                 (prueba['texto'], False),
             ])
             objeto = prueba.get('objeto')

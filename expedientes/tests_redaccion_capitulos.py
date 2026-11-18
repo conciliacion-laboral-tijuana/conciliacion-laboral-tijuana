@@ -171,10 +171,22 @@ class EstructuraTest(TestCase):
         self.assertIn('Adriana Luna Peñaloza', proemio)
         self.assertIn('692, frac. I, 693 y 696', proemio)
 
-    def test_hechos_numerados_con_ordinales(self):
+    def test_hechos_numerados_como_el_estandar(self):
+        """El estándar del despacho numera `1.-`, `2.-`, no `PRIMERO.-`."""
         self.assertTrue(self.cap['hechos'])
-        self.assertTrue(self.cap['hechos'][0].startswith('PRIMERO.-'))
-        self.assertTrue(self.cap['hechos'][1].startswith('SEGUNDO.-'))
+        self.assertTrue(self.cap['hechos'][0].startswith('1.- '))
+        self.assertTrue(self.cap['hechos'][1].startswith('2.- '))
+        self.assertFalse(any(h.startswith('PRIMERO') for h in self.cap['hechos']))
+
+    def test_subhechos_numerados_debajo_de_su_hecho(self):
+        from .redaccion.demanda import numerar_hechos
+        self.assertEqual(
+            numerar_hechos(['Ingresé.', ('El despido ocurrió en tres días:',
+                                         ['El 16 de julio…', 'El 17 de julio…']),
+                            'Reclamo.']),
+            ['1.- Ingresé.', '2.- El despido ocurrió en tres días:',
+             '2.1.- El 16 de julio…', '2.2.- El 17 de julio…', '3.- Reclamo.'],
+        )
 
     def test_pruebas_incluyen_confesional_e_inspeccion_por_demandado(self):
         titulos = [p['titulo'] for p in self.cap['pruebas']]
@@ -182,6 +194,13 @@ class EstructuraTest(TestCase):
         self.assertEqual(titulos.count('LA INSPECCIÓN OCULAR'), 4)
         self.assertIn('INTERROGATORIO LIBRE', titulos)
         self.assertIn('LA DOCUMENTAL PRIVADA', titulos)
+
+    def test_titulo_de_prueba_sin_punto_antes_del_texto(self):
+        """`1.- LA CONFESIONAL POR POSICIONES a cargo de…`, como el despacho."""
+        texto = generar_texto_completo(self.datos, self.calculo, 'injustificado')
+        self.assertIn('LA CONFESIONAL POR POSICIONES a cargo de', texto)
+        self.assertNotIn('POSICIONES. a cargo', texto)
+        self.assertIn('INTERROGATORIO LIBRE a desahogar', texto)
 
     def test_hecho_conserva_instancia_conciliatoria_con_folio(self):
         unidos = ' '.join(self.cap['hechos'])
@@ -999,3 +1018,41 @@ class DemandadosAdicionalesTest(TestCase):
         self.assertEqual(extras[0]['nombre'], 'OTRA EMPRESA')
         self.assertEqual(extras[0]['domicilio'],
                          'AV. UNO NO. 5, TIJUANA, BAJA CALIFORNIA, C.P. 22000')
+
+
+class DomicilioParaEscritoTest(TestCase):
+    """El domicilio del proemio se escribe como en el estándar del despacho."""
+
+    def _domicilio(self, calle='', numero='', colonia='', cp='',
+                   ciudad='Tijuana', estado='Baja California'):
+        from types import SimpleNamespace
+        from expedientes.redaccion.adaptador import domicilio_para_escrito
+        cliente = SimpleNamespace(direccion_calle=calle, direccion_numero=numero,
+                                  direccion_colonia=colonia, direccion_cp=cp)
+        return domicilio_para_escrito(cliente, ciudad, estado)
+
+    def test_formato_del_estandar_sin_col_redundante(self):
+        self.assertEqual(
+            self._domicilio('Bulevar Díaz Ordaz', '12649',
+                            'Local 10-B primer nivel del Centro Comercial Plaza Patria, '
+                            'Fracc. El Paraíso', '22106'),
+            'BULEVAR DÍAZ ORDAZ #12649 LOCAL 10-B PRIMER NIVEL DEL CENTRO COMERCIAL '
+            'PLAZA PATRIA, FRACCIONAMIENTO EL PARAÍSO, C.P. 22106, '
+            'de la ciudad de Tijuana, Baja California',
+        )
+
+    def test_colonia_sin_tipo_lleva_colonia(self):
+        self.assertEqual(
+            self._domicilio('Calle Segunda', '2200', 'Libertad', '22000'),
+            'CALLE SEGUNDA #2200, COLONIA LIBERTAD, C.P. 22000, '
+            'de la ciudad de Tijuana, Baja California',
+        )
+
+    def test_abreviaturas_y_tipos_no_se_duplican(self):
+        self.assertIn(', COLONIA LIBERTAD,', self._domicilio('Calle 2', '1', 'Col. Libertad'))
+        self.assertIn(', FRACCIONAMIENTO EL PARAÍSO,', self._domicilio('Calle 2', '1', 'fracc el paraíso'))
+        self.assertIn(', EJIDO MATAMOROS,', self._domicilio('Calle 2', '1', 'Ejido Matamoros'))
+        self.assertNotIn('##', self._domicilio('Calle 2', '#1', 'Centro'))
+
+    def test_sin_calle_ni_colonia_queda_vacio_para_marcar_el_hueco(self):
+        self.assertEqual(self._domicilio(cp='22000'), '')

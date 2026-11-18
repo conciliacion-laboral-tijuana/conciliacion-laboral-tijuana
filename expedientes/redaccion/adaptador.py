@@ -31,6 +31,60 @@ def _texto(valor) -> str:
     return str(valor or '').strip()
 
 
+# Palabras con las que la colonia ya dice qué es: no se les antepone «COLONIA».
+_TIPOS_ASENTAMIENTO = (
+    'COL', 'COLONIA', 'FRACC', 'FRACCIONAMIENTO', 'EJIDO', 'POBLADO', 'BARRIO',
+    'UNIDAD', 'RESIDENCIAL', 'CONDOMINIO', 'CONJUNTO', 'INFONAVIT', 'PARQUE',
+    'ZONA', 'DELEGACION', 'DELEGACIÓN', 'CENTRO', 'PLAZA', 'LOCAL', 'INTERIOR',
+    'INT', 'DEPTO', 'DEPARTAMENTO', 'EDIFICIO', 'MANZANA', 'LOTE',
+)
+# Datos de unidad interior que siguen al número sin coma: «#12649 LOCAL 10-B».
+_INTERIORES = ('LOCAL', 'INTERIOR', 'INT', 'DEPTO', 'DEPARTAMENTO', 'EDIFICIO')
+_ABREVIATURAS = {'FRACC.': 'FRACCIONAMIENTO', 'FRACC': 'FRACCIONAMIENTO',
+                 'COL.': 'COLONIA', 'COL': 'COLONIA'}
+
+
+def _primera_palabra(texto: str) -> str:
+    return texto.split()[0].rstrip('.,') if texto.split() else ''
+
+
+def domicilio_para_escrito(cliente, ciudad: str, estado: str) -> str:
+    """Domicilio del actor como lo escribe el despacho.
+
+    `BULEVAR DÍAZ ORDAZ #12649 LOCAL 10-B PRIMER NIVEL DEL CENTRO COMERCIAL
+    PLAZA PATRIA, FRACCIONAMIENTO EL PARAÍSO, C.P. 22106, de la ciudad de
+    Tijuana, Baja California`
+
+    A diferencia de `Cliente.direccion_completa` (que usan otras pantallas), no
+    antepone «Col.» a una colonia que ya dice qué es (fraccionamiento, local,
+    ejido…) y cierra con la ciudad y el estado.
+    """
+    calle = _texto(cliente.direccion_calle).upper()
+    numero = _texto(cliente.direccion_numero).upper().lstrip('#').strip()
+    colonia = ' '.join(_texto(cliente.direccion_colonia).upper().split())
+    cp = _texto(cliente.direccion_cp)
+    if not (calle or colonia):
+        return ''
+
+    palabras = colonia.split()
+    if palabras and palabras[0] in _ABREVIATURAS:
+        colonia = ' '.join([_ABREVIATURAS[palabras[0]]] + palabras[1:])
+    colonia = colonia.replace(' FRACC. ', ' FRACCIONAMIENTO ')
+    if colonia and _primera_palabra(colonia) not in _TIPOS_ASENTAMIENTO:
+        colonia = f'COLONIA {colonia}'
+
+    domicilio = ' '.join(filter(None, [calle, f'#{numero}' if numero else '']))
+    if colonia:
+        separador = ' ' if _primera_palabra(colonia) in _INTERIORES and domicilio else ', '
+        domicilio = separador.join(filter(None, [domicilio, colonia]))
+    if cp:
+        domicilio += f', C.P. {cp}'
+    lugar = ', '.join(filter(None, [ciudad, estado]))
+    if lugar:
+        domicilio += f', de la ciudad de {lugar}'
+    return domicilio
+
+
 def datos_de_expediente(expediente) -> dict:
     """Aplana un Expediente (con su Cliente) al dict del motor.
 
@@ -50,7 +104,8 @@ def datos_de_expediente(expediente) -> dict:
     datos['actor_nacionalidad'] = _texto(getattr(cliente, 'nacionalidad', '')) or 'mexicana'
     datos['actor_ciudad'] = _texto(getattr(cliente, 'ciudad', '')) or 'Tijuana'
     datos['actor_estado'] = _texto(getattr(cliente, 'estado', '')) or 'Baja California'
-    datos['actor_domicilio'] = _texto(cliente.direccion_completa).upper()
+    datos['actor_domicilio'] = domicilio_para_escrito(
+        cliente, datos['actor_ciudad'], datos['actor_estado'])
     datos['actor_curp'] = _texto(cliente.curp)
     datos['actor_rfc'] = _texto(cliente.rfc)
     datos['actor_telefono'] = _texto(cliente.telefono)

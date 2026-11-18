@@ -17,7 +17,7 @@ El redactado de la separación se apoya en el artículo 47 LFT: sin aviso escrit
 de rescisión, la separación se presume injustificada.
 """
 
-from ..demanda_generator import _fecha_espanol, _ordinal, _texto_como_lista
+from ..demanda_generator import _fecha_espanol, _texto_como_lista
 
 
 def _horas(valor) -> str:
