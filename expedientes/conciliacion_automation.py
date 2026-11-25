@@ -1100,6 +1100,47 @@ def _descargar_acuse(page, href):
     except Exception as e:
         diag.append(f'clic=ERR {str(e)[:120]}')
 
+    # 4) Abrir la URL en una pestaña nueva de la misma sesión: el portal
+    #    puede servir el PDF como descarga o como respuesta de navegación.
+    nueva = None
+    try:
+        nueva = page.context.new_page()
+        capturado = {}
+
+        def _on_resp(r):
+            try:
+                if 'pdf' in (r.headers.get('content-type') or '').lower() and 'body' not in capturado:
+                    capturado['body'] = r.body()
+            except Exception:
+                pass
+
+        nueva.on('response', _on_resp)
+        try:
+            with nueva.expect_download(timeout=30000) as dl:
+                try:
+                    nueva.goto(url, referer=page.url, timeout=30000)
+                except Exception:
+                    pass  # "Download is starting" aborta la navegación
+            ruta = dl.value.path()
+            body = Path(ruta).read_bytes() if ruta else b''
+        except Exception:
+            body = capturado.get('body') or b''
+        if body[:4] == b'%PDF':
+            return body, 'pestaña'
+        try:
+            texto = nueva.inner_text('body')[:150].replace('\n', ' ')
+        except Exception:
+            texto = ''
+        diag.append(f'pestaña=no-PDF url={nueva.url} texto={texto!r}')
+    except Exception as e:
+        diag.append(f'pestaña=ERR {str(e)[:120]}')
+    finally:
+        if nueva:
+            try:
+                nueva.close()
+            except Exception:
+                pass
+
     return None, '; '.join(diag)
 
 
