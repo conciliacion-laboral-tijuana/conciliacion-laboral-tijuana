@@ -680,8 +680,14 @@ def _llenar_domicilio(page, vialidad, num_ext, cp, scope=None, colonia=''):
     def _en_scope(js_body, arg=None):
         return page.evaluate(
             """([scope, arg]) => {
-                const root = (scope && document.querySelector(scope)) || document;
-                const q = (sel) => root.querySelector(sel);
+                // Con un citado ya guardado, la página puede tener más de un
+                // formulario/campo con el mismo selector (uno oculto): se
+                // prefiere siempre el visible.
+                const visible = (el) => !!el && el.offsetParent !== null;
+                const elegir = (lista) => lista.find(visible) || lista[0] || null;
+                const root = (scope && elegir(Array.from(document.querySelectorAll(scope))))
+                    || document;
+                const q = (sel) => elegir(Array.from(root.querySelectorAll(sel)));
                 const setVal = (el, val) => {
                     if (!el) return false;
                     el.focus && el.focus();
@@ -740,6 +746,47 @@ def _llenar_domicilio(page, vialidad, num_ext, cp, scope=None, colonia=''):
     except Exception as e:
         logger.warning('  _llenar_domicilio(%s): error en municipio/colonia: %s', scope, e)
     page.wait_for_timeout(500)
+
+    # Verificar que el CP quedó puesto: con varios citados el portal llegó a
+    # recibirlo vacío ("El campo cp del domicilio es requerido"). Si no está,
+    # se escribe tecla por tecla en el campo visible y se espera al AJAX.
+    cp_txt = str(cp or '22000').strip()
+    try:
+        actual = _en_scope("""
+            const el = q('input[name="domicilio[cp]"]');
+            return el ? (el.value || '') : null;
+        """)
+        if (actual or '').strip() != cp_txt:
+            logger.warning('  _llenar_domicilio(%s): CP quedó %r, se reescribe %r',
+                           scope, actual, cp_txt)
+            sel = f'{scope} input[name="domicilio[cp]"]' if scope else 'input[name="domicilio[cp]"]'
+            loc = page.locator(f'{sel} >> visible=true').first
+            if loc.count():
+                loc.fill('')
+                loc.press_sequentially(cp_txt, delay=30)
+                loc.dispatch_event('change')
+                loc.press('Tab')
+            else:
+                _en_scope("setVal(q('input[name=\"domicilio[cp]\"]'), arg);", cp_txt)
+            page.wait_for_timeout(3000)
+            _en_scope("""
+                const [municipio, colonia] = arg;
+                const mun = q('select[name="municipio"]') || q('select[name="domicilio[municipio]"]');
+                if (mun && !mun.value) {
+                    const opt = Array.from(mun.options).find(o =>
+                        (o.value || '').trim().toUpperCase() === municipio);
+                    if (opt) setVal(mun, opt.value);
+                }
+                const col = q('select[name="asentamientoAutoc"]');
+                if (col && colonia && !col.value) {
+                    col.appendChild(new Option(colonia, colonia, true, true));
+                    setVal(col, colonia);
+                    const h = q('input[type="hidden"][name="domicilio[asentamiento]"]');
+                    if (h) h.value = colonia;
+                }
+            """, [municipio, (colonia or '').strip().upper()])
+    except Exception as e:
+        logger.warning('  _llenar_domicilio(%s): error verificando CP: %s', scope, e)
 
     # Poblar campos ocultos del domicilio que el portal espera (texto de cada select)
     try:
@@ -1635,6 +1682,12 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None, modo='au
                 _llenar_citado(page, citado)
                 page.wait_for_timeout(1000)
                 checkpoint(f'05_citado_{num}')
+                try:
+                    cp_antes = page.evaluate("""() => Array.from(
+                        document.querySelectorAll('#frmCitado input[name="domicilio[cp]"]'))
+                        .map(el => `${el.offsetParent !== null ? 'visible' : 'oculto'}:${el.value || ''}`)""")
+                except Exception:
+                    cp_antes = []
 
                 # Guardar citado: UN solo POST a /solicitud/store_citado y esperar
                 # la recarga. Solo si no hubo navegación se reintenta (con el mismo
@@ -1665,7 +1718,17 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None, modo='au
                         msg = ''
                     resultado.error = (f'[ver7] El portal no guardó al {etiqueta}. '
                                        'La solicitud NO se envió.')
-                    resultado.detalle = f'URL={page.url} | TEXTO={msg}'
+                    # Estado de los campos de CP (para diagnosticar el portal)
+                    try:
+                        campos_cp = page.evaluate("""() => Array.from(
+                            document.querySelectorAll('input[name="domicilio[cp]"]')).map(el => ({
+                                form: el.form ? (el.form.id || el.form.getAttribute('action') || '') : '',
+                                visible: el.offsetParent !== null, valor: el.value || ''}))""")
+                    except Exception:
+                        campos_cp = []
+                    resultado.detalle = (f'URL={page.url} | CITADO_CP={citado["cp"]!r} | '
+                                         f'CP_EN_FORM_ANTES_DE_GUARDAR={cp_antes} | '
+                                         f'CAMPOS_CP={campos_cp} | TEXTO={msg}')
                     checkpoint(f'05_citado_{num}_error')
                     browser.close()
                     return resultado
