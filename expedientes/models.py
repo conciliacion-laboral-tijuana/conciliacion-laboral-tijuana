@@ -1334,6 +1334,14 @@ class TareaConciliacion(models.Model):
     def __str__(self):
         return f'Tarea {self.pk} - {self.expediente.numero} ({self.get_estado_display()})'
 
+    @property
+    def acuse_url(self):
+        """URL servible (/media/...) del PDF del acuse, o '' si no hay."""
+        if not self.pdf_path:
+            return ''
+        from .conciliacion_automation import screenshots_a_urls
+        return screenshots_a_urls([self.pdf_path])[0]
+
     def tiempo_transcurrido(self):
         """Retorna el tiempo transcurrido desde la creación."""
         if not self.created_at:

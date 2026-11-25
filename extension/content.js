@@ -432,6 +432,16 @@
   }
 
   async function descargarAcuse() {
+    // 0) Link del modal "solicitud creada" (/getFile/<id>), aunque esté
+    //    oculto: es el que trae el id del documento del acuse.
+    for (const a of document.querySelectorAll('#modal-solicitud-creada a[href*="getFile/"], a[href*="getFile/"]')) {
+      const id = (a.getAttribute('href') || '').replace(/[?#].*$/, '').replace(/\/+$/, '').split('/').pop();
+      if (id && id !== 'getFile') {
+        const ok = await _fetchPdfSiValido(a.href, 'acuse_conciliacion.pdf');
+        if (ok) return ok;
+      }
+    }
+
     // 1) Intento directo por el endpoint oficial (siempre, aunque el modal
     //    ya no esté en la página — p. ej. si el asesor navegó a otra vista).
     const directo = await _fetchPdfSiValido(ENDPOINT_ACUSE, 'acuse_conciliacion.pdf');

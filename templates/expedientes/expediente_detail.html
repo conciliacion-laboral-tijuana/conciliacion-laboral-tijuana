@@ -305,13 +305,19 @@
                                 {% svg 'refresh' %} Reintentar
                             </a>
                             {% endif %}
-                            {% if tarea.estado == 'completado' and tarea.detalle %}
+                            {% if tarea.estado == 'completado' and tarea.acuse_url %}
+                            <a href="{{ tarea.acuse_url }}" target="_blank" class="btn btn-sm" style="background:#1a6b3c; color:white; padding: 2px 8px; font-size: 11px;">
+                                {% svg 'file-document' %} Ver acuse
+                            </a>
+                            {% elif tarea.estado == 'completado' and tarea.detalle %}
                             <span class="text-[10px] text-gray-400" title="{{ tarea.detalle }}">{% svg 'file-document' %}</span>
                             {% endif %}
                         </div>
                     </div>
                     {% if tarea.estado == 'fallido' and tarea.detalle %}
                     <p class="text-[10px] text-red-500 mt-1 ml-7">{{ tarea.detalle }}</p>
+                    {% elif tarea.estado == 'completado' and not tarea.acuse_url and tarea.modo != 'extension' and tarea.detalle %}
+                    <p class="text-[10px] text-amber-600 mt-1 ml-7">{{ tarea.detalle }}</p>
                     {% endif %}
                 </div>
                 {% endfor %}

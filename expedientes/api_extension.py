@@ -24,7 +24,7 @@ from django.http import JsonResponse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 
-from .conciliacion_automation import citados_de_cliente
+from .conciliacion_automation import citados_de_cliente, remuneracion_portal
 from .models import Documento, TareaConciliacion
 from .signals import registrar_movimiento
 
@@ -133,7 +133,7 @@ def _serializar_tarea(tarea):
             'direccion_cp': cliente.direccion_cp or '',
             # Laborales
             'puesto': cliente.puesto or 'Trabajador',
-            'salario': float(cliente.salario or 10000),  # mismo default que la automatización
+            'salario': remuneracion_portal(cliente),  # monto por periodo, como la automatización
             'periodicidad': PERIODICIDAD_PORTAL_IDS.get(cliente.periodo_pago, '2'),
             'horas_semanales': str(cliente.horas_semanales or 40),
             'jornada': JORNADA_PORTAL_IDS.get(cliente.jornada, '1'),

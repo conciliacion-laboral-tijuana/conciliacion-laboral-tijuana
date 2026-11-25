@@ -153,6 +153,15 @@ class CitadosConciliacionTests(TestCase):
                          ('Blvd. Industrial', '22500', 'Otay'))
         self.assertEqual(citados[2]['tipo_persona'], 'fisica')
 
+    def test_remuneracion_al_portal_es_por_periodo(self):
+        from decimal import Decimal
+        from .conciliacion_automation import remuneracion_portal
+        self.cliente.salario = Decimal('12400.00')
+        self.cliente.periodo_pago = 'quincenal'
+        self.assertEqual(remuneracion_portal(self.cliente), 6200.0)
+        self.cliente.periodo_pago = 'mensual'
+        self.assertEqual(remuneracion_portal(self.cliente), 12400.0)
+
     def test_payload_extension_incluye_todos_los_citados(self):
         from .api_extension import _serializar_tarea
         from .models import Expediente, TareaConciliacion

@@ -882,7 +882,7 @@ def _llenar_solicitante(page, cliente, fecha_nac_str, fecha_ing_str, fecha_sal_s
     jornada_id = JORNADA_PORTAL_IDS.get(cliente.jornada, '1')
 
     _fill_input(page, 'dato_laboral[puesto]', cliente.puesto or 'Trabajador')
-    _fill_input(page, 'dato_laboral[remuneracion]', str(float(cliente.salario or 10000)))
+    _fill_input(page, 'dato_laboral[remuneracion]', str(remuneracion_portal(cliente)))
     _select_option(page, 'dato_laboral[periodicidad_id]', periodicidad_id)
     _fill_input(page, 'dato_laboral[horas_semanales]', horas)
     _fill_input(page, 'dato_laboral[fecha_ingreso]', fecha_ing_str)
@@ -1008,6 +1008,111 @@ def _fill_input_scoped(page, name, valor, panel=None):
     except Exception:
         pass
     return False
+
+def _href_acuse(page):
+    """Busca en el DOM el link del acuse (/api/documentos/getFile/<id>).
+
+    Prefiere el del modal "solicitud creada" y acepta links ocultos: lo que
+    importa es que ya traiga el id del documento. Retorna '' si no hay.
+    """
+    try:
+        return page.evaluate("""() => {
+            const links = [
+                ...document.querySelectorAll('#modal-solicitud-creada a[href*="getFile/"]'),
+                ...document.querySelectorAll('a[href*="getFile/"]'),
+            ];
+            for (const a of links) {
+                const h = a.getAttribute('href') || '';
+                const id = h.replace(/[?#].*$/, '').replace(/\\/+$/, '').split('/').pop();
+                if (id && id !== 'getFile') return h;
+            }
+            return '';
+        }""") or ''
+    except Exception:
+        return ''
+
+
+def _descargar_acuse(page, href):
+    """Descarga el PDF del acuse con la sesión del navegador.
+
+    El endpoint /api/... del portal autentica la sesión solo si la petición
+    viene "desde el sitio" (Referer/Origin + XSRF), así que una petición
+    pelona con las cookies responde login/401 y no el PDF. Se intenta:
+      1. request del contexto con los encabezados del sitio,
+      2. fetch() dentro de la página (igual que el navegador),
+      3. clic en el link capturando la descarga.
+    Retorna (bytes_pdf | None, diagnóstico).
+    """
+    import base64
+    from urllib.parse import unquote
+
+    url = href if href.startswith('http') else URL_BASE + href
+    diag = []
+
+    # 1) Request del contexto con encabezados de navegador
+    try:
+        headers = {'Referer': page.url, 'Accept': 'application/pdf,*/*',
+                   'X-Requested-With': 'XMLHttpRequest'}
+        for c in page.context.cookies():
+            if c['name'] == 'XSRF-TOKEN':
+                headers['X-XSRF-TOKEN'] = unquote(c['value'])
+        resp = page.context.request.get(url, headers=headers, timeout=60000)
+        body = resp.body()
+        if resp.ok and body[:4] == b'%PDF':
+            return body, 'request'
+        diag.append(f'request={resp.status} {resp.headers.get("content-type", "")}')
+    except Exception as e:
+        diag.append(f'request=ERR {e}')
+
+    # 2) fetch() desde la página
+    try:
+        r = page.evaluate("""async (url) => {
+            const res = await fetch(url, {credentials: 'include',
+                                          headers: {'Accept': 'application/pdf,*/*'}});
+            const buf = new Uint8Array(await res.arrayBuffer());
+            let bin = '';
+            for (let i = 0; i < buf.length; i += 0x8000)
+                bin += String.fromCharCode(...buf.subarray(i, i + 0x8000));
+            return {status: res.status, ct: res.headers.get('content-type') || '', b64: btoa(bin)};
+        }""", url)
+        body = base64.b64decode(r.get('b64') or '')
+        if body[:4] == b'%PDF':
+            return body, 'fetch'
+        diag.append(f'fetch={r.get("status")} {r.get("ct")}')
+    except Exception as e:
+        diag.append(f'fetch=ERR {e}')
+
+    # 3) Clic en el link (como el usuario), capturando la descarga
+    try:
+        link = page.locator(f'a[href="{href}"]').first
+        if link.count():
+            # En la misma pestaña: Chromium headless descarga el PDF.
+            link.evaluate("a => a.removeAttribute('target')")
+            with page.expect_download(timeout=30000) as dl:
+                link.click(force=True, timeout=5000)
+            ruta = dl.value.path()
+            body = Path(ruta).read_bytes() if ruta else b''
+            if body[:4] == b'%PDF':
+                return body, 'clic'
+            diag.append(f'clic=no-PDF ({len(body)} bytes)')
+        else:
+            diag.append('clic=sin link')
+    except Exception as e:
+        diag.append(f'clic=ERR {str(e)[:120]}')
+
+    return None, '; '.join(diag)
+
+
+def remuneracion_portal(cliente):
+    """Remuneración que se captura en el portal: el monto de CADA pago.
+
+    El portal la pide junto con la periodicidad, así que espera lo que se paga
+    por periodo; `cliente.salario` es mensual y se convierte. Sin salario se
+    usa el mismo default de siempre ($10,000 mensuales).
+    """
+    from .salario import por_periodo
+    return float(por_periodo(cliente.salario or 10000, cliente.periodo_pago))
+
 
 def citados_de_cliente(cliente):
     """Lista de citados para el portal: el patrón principal y los adicionales.
@@ -1200,9 +1305,9 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None, modo='au
                 pdf_descargado = dest
                 logger.info('  PDF descargado: %s', dest)
 
-            context.on('download', on_download)
-
             page = context.new_page()
+            # 'download' es evento de Page (BrowserContext no lo emite).
+            page.on('download', on_download)
 
             def screenshot(name):
                 path = str(Path(download_dir) / f'{name}.png')
@@ -1981,46 +2086,53 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None, modo='au
                 logger.info('[7a] Solicitud enviada. URL=%s', page.url)
                 # Tras recargar, el portal abre #modal-solicitud-creada con el
                 # link "Descargar acuse" (/api/documentos/getFile/<id>).
+                # El modal puede tardar o el id llegar después: sondear el DOM
+                # (aunque el link esté oculto) hasta ~30 s.
                 acuse_href = ''
-                try:
-                    modal_ok = page.locator('#modal-solicitud-creada')
-                    modal_ok.wait_for(state='visible', timeout=30000)
-                    acuse_href = modal_ok.locator('a[href*="getFile/"]').first.get_attribute('href') or ''
-                    logger.info('[7a] Modal "solicitud creada". Acuse: %s', acuse_href)
-                except Exception as e:
-                    logger.warning('[7a] No apareció el modal de solicitud creada: %s', e)
+                for _ in range(30):
+                    acuse_href = _href_acuse(page)
+                    if acuse_href:
+                        break
+                    page.wait_for_timeout(1000)
+                if acuse_href:
+                    logger.info('[7a] Solicitud creada. Acuse: %s', acuse_href)
+                else:
+                    logger.warning('[7a] No apareció el link del acuse tras el envío')
 
-                if acuse_href.rstrip('/').split('/')[-1] not in ('', 'getFile'):
+                if acuse_href:
                     checkpoint('07_solicitud_creada')
+                    diag_acuse = ''
                     try:
                         from .acuse_parser import parsear_acuse_pdf
-                        resp = page.context.request.get(
-                            acuse_href if acuse_href.startswith('http') else URL_BASE + acuse_href,
-                            timeout=60000,
-                        )
-                        contenido = resp.body()
-                        if resp.ok and contenido[:4] == b'%PDF':
-                            pdf_path = Path(download_dir) / f'acuse_{solicitud_id}.pdf'
+                        contenido, diag_acuse = _descargar_acuse(page, acuse_href)
+                        if contenido:
+                            pdf_path = Path(download_dir) / f'acuse_{solicitud_id or "conciliacion"}.pdf'
                             pdf_path.write_bytes(contenido)
                             resultado.pdf_path = str(pdf_path)
                             resultado.folio = parsear_acuse_pdf(contenido).get('folio', '')
                             if not resultado.folio:
                                 resultado.folio = _extraer_folio_desde_pdf(str(pdf_path), pdf_path.stem)
-                            logger.info('[8] Acuse descargado (%d bytes). Folio=%s',
-                                        len(contenido), resultado.folio)
+                            logger.info('[8] Acuse descargado vía %s (%d bytes). Folio=%s',
+                                        diag_acuse, len(contenido), resultado.folio)
                         else:
-                            logger.warning('[8] getFile respondió %s (%s)', resp.status,
-                                           resp.headers.get('content-type'))
+                            logger.warning('[8] No se pudo descargar el acuse: %s', diag_acuse)
                     except Exception as e:
+                        diag_acuse = f'ERR {e}'
                         logger.warning('[8] Error descargando acuse: %s', e)
 
                     # La solicitud ya quedó registrada en el portal aunque
                     # fallara la descarga del acuse: no reintentar el envío.
                     resultado.success = True
+                    acuse_url = acuse_href if acuse_href.startswith('http') else URL_BASE + acuse_href
                     resultado.detalle = (
                         f'Solicitud enviada (solicitud_id={solicitud_id}). '
-                        f'Folio: {resultado.folio or "N/A"}. Acuse: {URL_BASE}{acuse_href}'
+                        f'Folio: {resultado.folio or "N/A"}. Acuse: {acuse_url}'
                     )
+                    if not resultado.pdf_path:
+                        resultado.detalle += (
+                            f' | No se pudo descargar el acuse ({diag_acuse}); '
+                            'descárgalo del portal y súbelo al expediente.'
+                        )
                     browser.close()
                     return resultado
             except Exception as e:
@@ -2396,12 +2508,23 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None, modo='au
 
                 if doc_url:
                     resultado.detalle = f'Solicitud enviada. URL documento: {doc_url}'
-                    m = re.search(r'getFile/([\w-]+)|folio=([\w-]+)', doc_url)
-                    if m:
-                        resultado.folio = (m.group(1) or m.group(2))
+                    # getFile/<id> es el id del DOCUMENTO, no el folio:
+                    # descargar el PDF y leer el folio de adentro.
+                    href_acuse = _href_acuse(page)
+                    if href_acuse:
+                        from .acuse_parser import parsear_acuse_pdf
+                        contenido, diag_acuse = _descargar_acuse(page, href_acuse)
                         resultado.success = True
-                        resultado.detalle = f'Solicitud enviada. Folio: {resultado.folio} (desde URL)'
-                        logger.info('[8d] Folio extraído de URL: %s', resultado.folio)
+                        if contenido:
+                            pdf_path = Path(download_dir) / 'acuse_conciliacion.pdf'
+                            pdf_path.write_bytes(contenido)
+                            resultado.pdf_path = str(pdf_path)
+                            resultado.folio = (parsear_acuse_pdf(contenido).get('folio', '')
+                                               or _extraer_folio_desde_pdf(str(pdf_path), pdf_path.stem))
+                        resultado.detalle = (f'Solicitud enviada. Folio: {resultado.folio or "N/A"}. '
+                                             f'Acuse: {doc_url}' +
+                                             ('' if contenido else f' | No se pudo descargar ({diag_acuse})'))
+                        logger.info('[8d] Acuse vía %s. Folio=%s', diag_acuse, resultado.folio)
                     else:
                         logger.info('[8d] Navegando a doc_url para descargar PDF: %s', doc_url)
                         try:
@@ -2447,7 +2570,7 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None, modo='au
                                 resultado.detalle = f'Solicitud enviada. Folio: {resultado.folio}'
                                 logger.info('[8d] Éxito con PDF. Folio=%s', resultado.folio)
 
-                    if not resultado.folio:
+                    if not resultado.folio and not resultado.success:
                         resultado.error = 'Solicitud enviada al portal pero no se pudo obtener el folio'
                         try:
                             url_final = page.url
