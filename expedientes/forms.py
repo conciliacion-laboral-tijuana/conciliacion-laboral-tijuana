@@ -99,6 +99,45 @@ class ClienteForm(forms.ModelForm):
         }
 
 
+class ClienteCapturaForm(ClienteForm):
+    """Alta y edición del cliente (pantalla del asesor).
+
+    El asesor captura el salario que el trabajador recibe en cada pago, según
+    el «Periodo de pago»; aquí se convierte a mensual, que es como se guarda
+    `Cliente.salario` y lo que usan los cálculos.
+    """
+
+    class Meta(ClienteForm.Meta):
+        fields = ClienteForm.Meta.fields + ['descripcion_hechos']
+        widgets = {
+            **ClienteForm.Meta.widgets,
+            'salario': forms.NumberInput(attrs={'class': 'input', 'step': '0.01', 'min': '0'}),
+            'descripcion_hechos': forms.Textarea(attrs={
+                'class': 'input', 'rows': 6,
+                'placeholder': 'Cuenta con tus palabras qué pasó: cómo entró a trabajar, '
+                               'qué hacía, cómo y cuándo lo despidieron, quién se lo dijo…'}),
+        }
+        labels = {'salario': 'Salario'}
+        help_texts = {
+            'salario': 'Lo que recibe en cada pago, según el «Periodo de pago» '
+                       '(si le pagan por semana, el monto semanal).',
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from .salario import por_periodo
+        inst = self.instance
+        if inst.pk and inst.salario is not None and not self.is_bound:
+            self.initial['salario'] = por_periodo(inst.salario, inst.periodo_pago)
+
+    def clean(self):
+        cleaned = super().clean()
+        from .salario import a_mensual
+        if cleaned.get('salario') is not None:
+            cleaned['salario'] = a_mensual(cleaned['salario'], cleaned.get('periodo_pago'))
+        return cleaned
+
+
 class SolicitudConciliacionForm(forms.ModelForm):
     class Meta:
         model = SolicitudConciliacion

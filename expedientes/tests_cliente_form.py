@@ -81,6 +81,28 @@ class ClienteFormRenderTests(TestCase):
         self.assertEqual(list(cliente.demandados_adicionales.values_list('nombre', 'orden')),
                          [('Juan Dueño', 1)])
 
+    def test_salario_por_periodo_se_guarda_mensual_y_hechos(self):
+        """El asesor captura el salario de cada pago; se guarda el mensual."""
+        from decimal import Decimal
+        self.client.force_login(self.user)
+        data = self.defaults_por_tipo()
+        data.update({'nombre': 'Cliente Semanal', 'curp': 'CCCC900101HBCBBB03',
+                     'salario': '2000', 'periodo_pago': 'semanal',
+                     'fecha_ingreso': '2024-01-01', 'fecha_salida': '2026-07-01',
+                     'puesto': 'Operador', 'empresa': 'Empresa ejemplo',
+                     'descripcion_hechos': 'Lo despidieron el lunes sin explicación.'})
+        resp = self.client.post(self.get_url(), data)
+        self.assertEqual(resp.status_code, 302, get_form_errors(resp))
+        cliente = Cliente.objects.get(nombre='Cliente Semanal')
+        self.assertEqual(cliente.salario, Decimal('8571.43'))  # 2000 × 30 / 7
+        self.assertEqual(cliente.descripcion_hechos, 'Lo despidieron el lunes sin explicación.')
+
+        # Al editar se vuelve a mostrar el monto semanal, con el nuevo título
+        resp = self.client.get(reverse('cliente_update', args=[cliente.pk]))
+        self.assertEqual(resp.context['form'].initial['salario'], Decimal('2000.00'))
+        self.assertContains(resp, '>Salario</label>')
+        self.assertContains(resp, 'Descripción de los hechos')
+
     def test_get_edicion_muestra_seccion_demandados(self):
         self.client.force_login(self.user)
         resp = self.client.get(self.get_url())

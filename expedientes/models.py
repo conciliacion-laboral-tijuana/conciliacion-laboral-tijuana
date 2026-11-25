@@ -203,6 +203,10 @@ class Cliente(models.Model):
         'Circunstancias del despido (texto libre)', blank=True,
         help_text='Anotaciones adicionales del asesor. Se suman al redactado '
                   'estructurado como último hecho de la demanda.')
+    descripcion_hechos = models.TextField(
+        'Descripción de los hechos', blank=True,
+        help_text='Relato del asesor de lo ocurrido. Es de referencia: el abogado '
+                  'lo consulta si el caso pasa a demanda; no entra solo al escrito.')
     testigos = models.TextField(
         'Testigos de los hechos', blank=True,
         help_text='Nombres y datos de personas que pueden corroborar los hechos (una por línea si son varios)')

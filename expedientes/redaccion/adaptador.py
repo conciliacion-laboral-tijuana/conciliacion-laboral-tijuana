@@ -148,7 +148,11 @@ def datos_de_expediente(expediente) -> dict:
     datos['fecha_despido'] = cliente.fecha_salida
 
     # ─── Salario ──────────────────────────────────────────────────────────
-    datos['salario'] = _dec(cliente.salario)
+    # `cliente.salario` es mensual; el hecho del salario lo expresa por periodo
+    # de pago («$2,000.00 pesos semanales»), así que se convierte.
+    from ..salario import por_periodo
+    datos['salario'] = _dec(por_periodo(cliente.salario, cliente.periodo_pago)
+                            if cliente.salario is not None else None)
     datos['salario_tipo'] = cliente.get_periodo_pago_display().lower() if cliente.periodo_pago else 'mensual'
     datos['forma_pago'] = _texto(getattr(cliente, 'forma_pago', '')) or 'semanalmente'
     datos['dia_pago'] = _texto(getattr(cliente, 'dia_pago', ''))

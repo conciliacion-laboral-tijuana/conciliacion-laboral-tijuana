@@ -29,7 +29,7 @@ from django.views.generic import (
     CreateView, DetailView, ListView, TemplateView, UpdateView, View
 )
 
-from .forms import (ClienteForm, DocumentoForm, ExpedienteForm, NotaForm,
+from .forms import (ClienteForm, ClienteCapturaForm, DocumentoForm, ExpedienteForm, NotaForm,
                        SolicitudConciliacionForm, WhatsAppMessageForm,
                        CalculoLaboralForm, SimulacionForm, MachoteForm,
                        formularios_representacion, apoderados_de_referencia,
@@ -869,7 +869,7 @@ class DemandadosAdicionalesMixin:
 
 class ClienteCreateView(LoginRequiredMixin, DemandadosAdicionalesMixin, CreateView):
     model = Cliente
-    form_class = ClienteForm
+    form_class = ClienteCapturaForm
     template_name = 'expedientes/cliente_form.html'
 
     def post(self, request, *args, **kwargs):
@@ -932,7 +932,7 @@ class ClienteCreateView(LoginRequiredMixin, DemandadosAdicionalesMixin, CreateVi
 
 class ClienteUpdateView(LoginRequiredMixin, DemandadosAdicionalesMixin, UpdateView):
     model = Cliente
-    form_class = ClienteForm
+    form_class = ClienteCapturaForm
     template_name = 'expedientes/cliente_form.html'
     success_url = reverse_lazy('cliente_list')
 

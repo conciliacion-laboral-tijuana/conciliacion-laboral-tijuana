@@ -240,6 +240,7 @@
                         <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.salario.label }}</label>
                         {{ form.salario }}
                         {% if form.salario.errors %}<p class="text-red-500 text-xs mt-1">{{ form.salario.errors.0 }}</p>{% endif %}
+                        <p class="text-xs text-gray-400 mt-0.5">{{ form.salario.help_text }}</p>
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.periodo_pago.label }} <span class="text-red-500">*</span></label>
@@ -284,6 +285,14 @@
                         {% if form.tipo_despido.errors %}<p class="text-red-500 text-xs mt-1">{{ form.tipo_despido.errors.0 }}</p>{% endif %}
                     </div>
                 </div>
+            </div>
+
+            <!-- Descripción de los hechos (referencia para una eventual demanda) -->
+            <div>
+                <h2 class="text-sm font-semibold text-gray-800 mb-3 border-b pb-1.5">Descripción de los hechos</h2>
+                <p class="text-xs text-gray-500 mb-2">Relato de lo que pasó, con las palabras del cliente. Si el caso se va a demanda, el abogado lo consulta para redactar los hechos.</p>
+                {{ form.descripcion_hechos }}
+                {% if form.descripcion_hechos.errors %}<p class="text-red-500 text-xs mt-1">{{ form.descripcion_hechos.errors.0 }}</p>{% endif %}
             </div>
 
             <!-- Asesoría Gratuita -->
