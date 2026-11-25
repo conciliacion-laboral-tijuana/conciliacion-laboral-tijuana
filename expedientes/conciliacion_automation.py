@@ -1119,6 +1119,10 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None, modo='au
     pdf_descargado = None
     url_final = ''
 
+    # Toda consulta a la BD debe ir ANTES de sync_playwright(): dentro de su
+    # bloque Django la rechaza con SynchronousOnlyOperation.
+    citados = citados_de_cliente(cliente)
+
     try:
         with sync_playwright() as p:
             # ── En producción (Railway/Docker) siempre forzar headless ──
@@ -1567,7 +1571,9 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None, modo='au
             # ════════════════════════════════════════════════════════════════
             #  FASE 5: Citado (Empresa/Patrón)
             # ════════════════════════════════════════════════════════════════
-            citados = citados_de_cliente(cliente)
+            # `citados` se calcula antes de abrir Playwright: consultar la BD
+            # aquí dentro lanza SynchronousOnlyOperation (Playwright corre un
+            # event loop de asyncio en este hilo).
             logger.info('[5] Llenando datos de %d citado(s)...', len(citados))
 
             def _citados_guardados():
