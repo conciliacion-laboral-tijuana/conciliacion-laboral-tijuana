@@ -138,15 +138,8 @@ _REQUISITOS_CRUDOS = (
         'obligatorio': True,
         'ayuda': 'Identifica al actor en el proemio.',
     },
-    {
-        'clave': 'actor_domicilio', 'etiqueta': 'Domicilio para notificaciones',
-        'dato': 'actor_domicilio',
-        'campos': ('direccion_calle', 'direccion_numero', 'direccion_colonia', 'direccion_cp'),
-        'ancla': 'grupo-domicilio-actor',
-        'espacio': 'datos', 'bloque': 'trabajador', 'capitulo': 'proemio',
-        'marcador': '[DOMICILIO PARA NOTIFICACIONES]', 'obligatorio': True,
-        'ayuda': 'Es el domicilio donde el Tribunal notificará al actor.',
-    },
+    # El domicilio para notificaciones no es un requisito: el proemio señala
+    # siempre el del despacho (`redaccion.proemio.DOMICILIO_NOTIFICACIONES`).
     {
         'clave': 'actor_ciudad', 'etiqueta': 'Ciudad de contratación',
         'dato': 'actor_ciudad', 'crudo': 'ciudad', 'campos': ('ciudad',), 'ancla': 'id_ciudad',

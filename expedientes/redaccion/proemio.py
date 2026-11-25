@@ -20,6 +20,15 @@ Estructura del estándar del despacho (pág. 1):
     documental que se exhibe en la presente demanda.
 """
 
+# Domicilio que el despacho señala para oír y recibir notificaciones, tal como
+# aparece en su estándar. Es el mismo en todas las demandas: lo atienden los
+# apoderados, no el actor. Se cambia con `DESPACHO_DOMICILIO_NOTIFICACIONES`.
+DOMICILIO_NOTIFICACIONES = (
+    'BULEVAR DÍAZ ORDAZ #12649 LOCAL 10-B PRIMER NIVEL DEL CENTRO COMERCIAL '
+    'PLAZA PATRIA, FRACCIONAMIENTO EL PARAÍSO de la ciudad de Tijuana, '
+    'Baja California'
+)
+
 FACULTADES = (
     'a quienes les confiero las más amplias facultades de representación, '
     'para que se apersonen en mi nombre de manera conjunta o separada de '
@@ -73,7 +82,7 @@ def proemio(datos: dict) -> str:
     """Texto del proemio."""
     actor = datos.get('actor_nombre', '')
     nacionalidad = datos.get('actor_nacionalidad') or 'mexicana'
-    domicilio = datos.get('actor_domicilio') or '[DOMICILIO PARA NOTIFICACIONES]'
+    domicilio = datos.get('domicilio_notificaciones') or DOMICILIO_NOTIFICACIONES
 
     partes = [
         f'C. {actor}, con nacionalidad {nacionalidad}, mayor de edad, por mi '

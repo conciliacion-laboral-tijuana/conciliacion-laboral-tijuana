@@ -161,6 +161,15 @@ valores vigentes). El modelo `CalculoLaboral.recalcular()` hace lo mismo por pro
 > ⚠️ **No** cambies estos valores sin confirmar el dato oficial. Un error en la UMA o el
 > salario mínimo altera **todos** los cálculos del despacho.
 
+### 3.3.1 Domicilio del despacho para notificaciones
+
+Todas las demandas señalan el mismo domicilio para oír y recibir notificaciones: el
+del despacho, como en su escrito estándar (`BULEVAR DÍAZ ORDAZ #12649 LOCAL 10-B
+PRIMER NIVEL DEL CENTRO COMERCIAL PLAZA PATRIA, FRACCIONAMIENTO EL PARAÍSO de la
+ciudad de Tijuana, Baja California`). Si cambia, define la variable de entorno
+`DESPACHO_DOMICILIO_NOTIFICACIONES` con el texto completo tal como debe aparecer en
+el proemio y reinicia el servidor.
+
 ---
 
 ## 3.4 Acción preferida y modalidad del despido

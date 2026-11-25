@@ -13,6 +13,10 @@ más ricas que las del original.
 
 from decimal import Decimal, InvalidOperation
 
+from django.conf import settings
+
+from .proemio import DOMICILIO_NOTIFICACIONES
+
 # Días de la semana en el orden en que se capturan las horas extras.
 DIAS_SEMANA = ('lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado',
                'domingo')
@@ -104,8 +108,12 @@ def datos_de_expediente(expediente) -> dict:
     datos['actor_nacionalidad'] = _texto(getattr(cliente, 'nacionalidad', '')) or 'mexicana'
     datos['actor_ciudad'] = _texto(getattr(cliente, 'ciudad', '')) or 'Tijuana'
     datos['actor_estado'] = _texto(getattr(cliente, 'estado', '')) or 'Baja California'
+    # Domicilio particular del trabajador. El proemio no lo usa: señala el
+    # del despacho (`domicilio_notificaciones`).
     datos['actor_domicilio'] = domicilio_para_escrito(
         cliente, datos['actor_ciudad'], datos['actor_estado'])
+    datos['domicilio_notificaciones'] = getattr(
+        settings, 'DESPACHO_DOMICILIO_NOTIFICACIONES', '') or DOMICILIO_NOTIFICACIONES
     datos['actor_curp'] = _texto(cliente.curp)
     datos['actor_rfc'] = _texto(cliente.rfc)
     datos['actor_telefono'] = _texto(cliente.telefono)

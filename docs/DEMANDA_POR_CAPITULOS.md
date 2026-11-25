@@ -202,9 +202,11 @@ la prueba `test_campos_nuevos_de_la_hoja_de_datos_se_guardan` verifica que persi
 guardar, y `expedientes/tests_espacio_demanda.py` verifica que cada uno se capture en la
 pantalla que le toca.
 
-> El **domicilio del actor** se agregó a `WIZARD_PASOS['trabajador']`: el proemio lo exige
-> y la pantalla no lo capturaba, así que el escrito salía con el marcador
-> `[DOMICILIO PARA NOTIFICACIONES]`.
+> El proemio señala para notificaciones **el domicilio del despacho**
+> (`redaccion.proemio.DOMICILIO_NOTIFICACIONES`, configurable con
+> `DESPACHO_DOMICILIO_NOTIFICACIONES`), como el estándar. El domicilio del actor se
+> sigue capturando en `WIZARD_PASOS['trabajador']` como dato del expediente, pero ya
+> no es requisito de la demanda.
 
 ## Banderas vs. motor legal
 

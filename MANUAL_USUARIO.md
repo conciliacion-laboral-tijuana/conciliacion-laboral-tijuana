@@ -458,8 +458,10 @@ desde el expediente con **Asistente de Demanda**.
 
 - **1. Datos del caso** — lo que se captura, sin nada jurídico todavía:
   - **Actor:** nombre (aparece en la carátula, el proemio, las pruebas y la firma), CURP,
-    RFC, contacto, nacionalidad, ciudad de contratación y el **domicilio para oír y
-    recibir notificaciones** (calle, número, colonia y CP).
+    RFC, contacto, nacionalidad, ciudad de contratación y su domicilio particular
+    (calle, número, colonia y CP). El domicilio particular es para el expediente: la
+    demanda señala para oír y recibir notificaciones **el domicilio del despacho**
+    (Plaza Patria), no el del trabajador.
   - **Relación laboral:** puesto, funciones, tipo de contrato, **salario mensual**,
     periodo de pago, fechas de ingreso y de separación, horario y días de trabajo.
   - **Patrón demandado:** con el **buscador de empresas** del catálogo para autocompletar

@@ -430,18 +430,14 @@ class DescargaCapitulosTest(TestCase):
         self.assertEqual(respuesta.content[:2], b'PK', 'no es un DOCX válido')
 
     def test_no_descarga_si_falta_un_hueco_obligatorio(self):
-        """Sin domicilio del actor el .docx salía con «[DOMICILIO PARA NOTIFICACIONES]».
+        """Sin puesto el .docx saldría con «[PUESTO DESEMPEÑADO]».
 
         El guard ya no se limita a los datos críticos y al cálculo aprobado:
         bloquea el escrito que se presenta mientras quede cualquier hueco
         obligatorio, y manda a la pantalla donde se ve la lista.
         """
-        self.cliente.direccion_calle = ''
-        self.cliente.direccion_numero = ''
-        self.cliente.direccion_colonia = ''
-        self.cliente.direccion_cp = ''
-        self.cliente.save(update_fields=['direccion_calle', 'direccion_numero',
-                                         'direccion_colonia', 'direccion_cp'])
+        self.cliente.puesto = ''
+        self.cliente.save(update_fields=['puesto'])
 
         respuesta = self.client.get(self._url())
 
@@ -495,6 +491,34 @@ class DescargaCapitulosTest(TestCase):
         )
         self.assertEqual(respuesta.status_code, 302)
         self.assertIn('/dashboard/asesor/', respuesta['Location'])
+
+
+class DomicilioNotificacionesTest(TestCase):
+    """El proemio señala el domicilio del despacho, no el del trabajador."""
+
+    def setUp(self):
+        cliente = Cliente.objects.create(
+            nombre='ANA RUIZ', direccion_calle='Calle Segunda', direccion_numero='2200',
+            direccion_colonia='Libertad')
+        from django.contrib.auth.models import User
+        self.exp = Expediente.objects.create(
+            cliente=cliente, asesor=User.objects.create_user('asesor_domicilio'),
+            tipo_despido='injustificado')
+
+    def _proemio(self):
+        from expedientes.redaccion import datos_de_expediente
+        return capitulos(datos_de_expediente(self.exp), _calculo(), 'injustificado')['proemio']
+
+    def test_por_omision_el_del_estandar(self):
+        from expedientes.redaccion.proemio import DOMICILIO_NOTIFICACIONES
+        proemio = self._proemio()
+        self.assertIn(f'notificaciones el ubicado en {DOMICILIO_NOTIFICACIONES}', proemio)
+        self.assertNotIn('CALLE SEGUNDA', proemio)
+
+    def test_se_cambia_por_configuracion(self):
+        from django.test import override_settings
+        with override_settings(DESPACHO_DOMICILIO_NOTIFICACIONES='AV. NUEVA #1, TIJUANA'):
+            self.assertIn('el ubicado en AV. NUEVA #1, TIJUANA', self._proemio())
 
 
 class RepresentacionTest(TestCase):

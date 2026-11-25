@@ -10,8 +10,8 @@ Fijan el contrato visible del rediseño:
 Lo que estas pruebas impiden que vuelva: un dato capturable en dos pantallas a
 la vez, un campo que no se puede capturar desde ninguna (el domicilio del actor
 sólo se podía editar desde «Editar cliente»), un semáforo que dice «Completo»
-con la sección vacía y un documento que sale con `[DOMICILIO PARA
-NOTIFICACIONES]` dentro.
+con la sección vacía y un documento que sale con un marcador como
+`[PUESTO DESEMPEÑADO]` dentro.
 """
 
 from datetime import date
@@ -79,13 +79,14 @@ class EspacioDatosTest(BaseEspacioDemanda):
         self.assertNotIn('name="modalidad_despido"', body)
 
     def test_el_domicilio_del_actor_se_captura_en_esta_pantalla(self):
-        """Antes no se podía: el proemio salía con el marcador de hueco."""
+        """Domicilio particular, para el expediente: ya no es requisito."""
         body = self._get('datos')
 
         for campo in ('direccion_calle', 'direccion_numero', 'direccion_colonia',
                       'direccion_cp'):
             self.assertIn(f'name="{campo}"', body)
         self.assertIn('grupo-domicilio-actor', body)
+        self.assertIn('Domicilio particular del trabajador', body)
 
     def test_los_tres_espacios_se_anuncian_siempre(self):
         for espacio in ESPACIOS:
@@ -172,15 +173,24 @@ class EspacioDocumentoTest(BaseEspacioDemanda):
         # El capítulo de derecho es plantilla del despacho: no se captura
         self.assertIn('Texto fijo del despacho', body)
 
+    def _sin_puesto(self):
+        self.cliente.puesto = ''
+        self.cliente.save(update_fields=['puesto'])
+
     def test_los_datos_que_faltan_son_huecos_enlazados(self):
         """El marcador suelto del motor se convierte en un enlace al campo."""
+        self._sin_puesto()
         body = self._get('documento')
 
         self.assertIn('hueco-doc', body)
-        self.assertNotIn('[DOMICILIO PARA NOTIFICACIONES]', body)
+        self.assertNotIn('[PUESTO DESEMPEÑADO]', body)
         self.assertIn('espacio=datos', body)
-        self.assertIn('seccion=trabajador', body)
-        self.assertIn('#grupo-domicilio-actor', body)
+        self.assertIn('seccion=laboral', body)
+        self.assertIn('#id_puesto', body)
+
+    def test_el_proemio_senala_el_domicilio_del_despacho(self):
+        from .redaccion.proemio import DOMICILIO_NOTIFICACIONES
+        self.assertIn(DOMICILIO_NOTIFICACIONES, self._get('documento'))
 
     def test_el_panel_de_coherencia_avisa_lo_que_el_escrito_afirmara(self):
         body = self._get('documento')
@@ -192,7 +202,8 @@ class EspacioDocumentoTest(BaseEspacioDemanda):
         self.assertIn('domicilio de la demandada', body)
 
     def test_el_semaforo_del_encabezado_refleja_lo_que_falta(self):
-        """Sólo falta el domicilio del actor: el chip no puede exagerar ni ocultar."""
+        """Sólo falta el puesto: el chip no puede exagerar ni ocultar."""
+        self._sin_puesto()
         body = re.sub(r'\s+', ' ', self._get('documento'))
 
         self.assertIn('Falta 1 requisito para poder presentar', body)
@@ -208,27 +219,21 @@ class EspacioDocumentoTest(BaseEspacioDemanda):
         self.assertIn('son decisiones del abogado', body)
 
     def test_no_se_puede_descargar_mientras_falte_un_obligatorio(self):
+        self._sin_puesto()
         body = self._get('documento')
 
         # El enlace se deshabilita en el servidor (no sólo con CSS)
         self.assertIn('aria-disabled="true"', body)
         self.assertIn('Para poder presentarla falta', body)
-        self.assertIn('Domicilio para notificaciones', body)
+        self.assertIn('Puesto desempeñado', body)
 
-    def test_al_completar_el_domicilio_se_habilita_la_descarga(self):
-        """El mismo estado alimenta el semáforo y el guard de la descarga."""
-        self.cliente.direccion_calle = 'Av. Reforma'
-        self.cliente.direccion_numero = '123'
-        self.cliente.direccion_colonia = 'Centro'
-        self.cliente.direccion_cp = '22000'
-        self.cliente.save(update_fields=['direccion_calle', 'direccion_numero',
-                                         'direccion_colonia', 'direccion_cp'])
-
+    def test_sin_domicilio_del_actor_se_puede_descargar(self):
+        """El mismo estado alimenta el semáforo y el guard de la descarga; el
+        domicilio particular del trabajador no lo bloquea."""
         body = self._get('documento')
 
         self.assertNotIn('aria-disabled="true"', body)
         self.assertIn('Se puede presentar', body)
-        self.assertNotIn('[DOMICILIO PARA NOTIFICACIONES]', body)
 
 
 class CaminoUnicoTest(BaseEspacioDemanda):

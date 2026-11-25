@@ -1673,11 +1673,9 @@ WIZARD_PASOS = {
         'descripcion': 'Nombre completo, CURP y contacto del trabajador.',
         'campos': ['nombre', 'curp', 'rfc', 'telefono', 'whatsapp', 'email',
                    'fecha_nacimiento', 'genero', 'como_supo', 'oficina',
-                   # Proemio de la demanda: nacionalidad, ciudad de contratación
-                   # y domicilio para oír y recibir notificaciones. La dirección
-                   # faltaba en esta lista, así que el proemio salía con
-                   # «[DOMICILIO PARA NOTIFICACIONES]» y no había forma de
-                   # capturarla desde el asistente.
+                   # Proemio y hechos: nacionalidad y ciudad de contratación.
+                   # El domicilio es el particular del trabajador; el proemio
+                   # señala el del despacho para notificaciones.
                    'nacionalidad', 'ciudad', 'estado',
                    'direccion_calle', 'direccion_numero', 'direccion_colonia',
                    'direccion_cp'],

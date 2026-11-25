@@ -69,7 +69,7 @@ class HuecosTest(EstadoBaseTest):
         info = estado(expediente, calculo_listo=False)
         claves = {h['clave'] for h in info['huecos']}
 
-        for esperada in ('actor_nombre', 'actor_curp', 'actor_domicilio', 'puesto',
+        for esperada in ('actor_nombre', 'actor_curp', 'puesto',
                          'salario', 'fecha_ingreso', 'fecha_salida', 'empresa',
                          'empresa_razon_social', 'empresa_domicilio', 'apoderados'):
             self.assertIn(esperada, claves, f'{esperada} debe ser un hueco')
@@ -96,15 +96,11 @@ class HuecosTest(EstadoBaseTest):
         self.assertEqual([h['clave'] for h in info['pendientes']], ['jurisprudencia'])
         self.assertFalse(info['resumen']['completo'])
 
-    def test_el_domicilio_del_actor_es_un_hueco_y_el_motor_lo_marca(self):
-        """El acordeón nunca capturaba la dirección: el proemio salía con [DOMICILIO]."""
-        expediente = self._expediente()
-        info = estado(expediente)
-        hueco = next(h for h in info['huecos'] if h['clave'] == 'actor_domicilio')
-
-        self.assertEqual(hueco['marcador'], '[DOMICILIO PARA NOTIFICACIONES]')
-        self.assertIn('direccion_calle', hueco['campos'])
-        self.assertEqual(hueco['ancla'], 'grupo-domicilio-actor')
+    def test_el_domicilio_del_actor_no_es_requisito(self):
+        """El proemio señala el domicilio del despacho, no el del trabajador."""
+        info = estado(self._expediente())
+        claves = {h['clave'] for h in info['huecos']}
+        self.assertNotIn('actor_domicilio', claves)
 
     def test_la_curp_corta_cuenta_como_hueco(self):
         cliente = _cliente_completo(curp='PELJ890312')
@@ -152,7 +148,7 @@ class SemaforoTest(EstadoBaseTest):
         info = estado(expediente)
 
         trabajador = info['por_bloque']['trabajador']
-        self.assertGreater(trabajador['total'], 1)
+        self.assertGreaterEqual(trabajador['total'], 1)
         self.assertIn('CURP', trabajador['faltantes'])
 
     def test_representacion_vacia_no_esta_completa(self):
@@ -289,14 +285,14 @@ class MarcadoDelDocumentoTest(EstadoBaseTest):
         self.urls.append((requisito['clave'], url))
         return url
 
-    def test_sustituye_el_marcador_del_proemio_por_un_enlace(self):
-        html = '<p>señalando como domicilio [DOMICILIO PARA NOTIFICACIONES], y</p>'
+    def test_sustituye_el_marcador_de_los_hechos_por_un_enlace(self):
+        html = '<p>con el puesto de [PUESTO DESEMPEÑADO], y</p>'
         marcado = marcar_html(html, self.info['pendientes'], self._url_de)
 
-        self.assertNotIn('[DOMICILIO PARA NOTIFICACIONES]', marcado)
+        self.assertNotIn('[PUESTO DESEMPEÑADO]', marcado)
         self.assertIn('hueco-doc', marcado)
-        self.assertIn('+ Domicilio para notificaciones', marcado)
-        self.assertIn('seccion=trabajador', marcado)
+        self.assertIn('+ Puesto desempeñado', marcado)
+        self.assertIn('seccion=laboral', marcado)
 
     def test_no_toca_marcadores_de_datos_que_si_estan(self):
         html = '<p>[PUESTO DESEMPEÑADO]</p>'

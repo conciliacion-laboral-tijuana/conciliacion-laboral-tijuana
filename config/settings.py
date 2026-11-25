@@ -236,3 +236,7 @@ WHISPER_PROMPT = env('WHISPER_PROMPT', default='')
 WHISPER_CACHE = env('WHISPER_CACHE', default=str(BASE_DIR / 'media' / 'whisper'))
 # Tope del audio que se acepta por dictado (8 MB ≈ varios minutos de voz).
 MAX_AUDIO_DICTADO_BYTES = env.int('MAX_AUDIO_DICTADO_BYTES', default=8 * 1024 * 1024)
+
+# Domicilio que señalan las demandas para oír y recibir notificaciones (el del
+# despacho). Vacío = el del estándar (Plaza Patria), ver redaccion/proemio.py.
+DESPACHO_DOMICILIO_NOTIFICACIONES = os.environ.get('DESPACHO_DOMICILIO_NOTIFICACIONES', '')
