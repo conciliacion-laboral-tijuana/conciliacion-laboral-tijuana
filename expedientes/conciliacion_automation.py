@@ -1032,7 +1032,95 @@ def _href_acuse(page):
         return ''
 
 
-def _descargar_acuse(page, href):
+class _CapturaAcuse:
+    """Vigila TODAS las ventanas del navegador para quedarse con el acuse.
+
+    El portal abre el acuse en una ventana nueva; si nadie la atiende, el PDF
+    se pierde. Esto se engancha al contexto desde el inicio y guarda el
+    primer PDF que pase por cualquier ventana (respuesta HTTP, descarga o
+    ventana con URL blob:).
+    """
+
+    def __init__(self, context, download_dir):
+        self.body = None
+        self.via = ''
+        self.page = None  # página principal (para esperar procesando eventos)
+        self.ventanas = []
+        self.download_dir = download_dir
+        context.on('response', self._on_response)
+        context.on('page', self._on_page)
+
+    def _guardar(self, body, via):
+        if self.body is None and body and body[:4] == b'%PDF':
+            self.body, self.via = body, via
+            logger.info('[acuse] PDF capturado vía %s (%d bytes)', via, len(body))
+
+    def _on_response(self, r):
+        try:
+            ct = (r.headers.get('content-type') or '').lower()
+            if 'pdf' in ct or 'getfile' in r.url.lower():
+                self._guardar(r.body(), f'respuesta {r.url}')
+        except Exception:
+            pass
+
+    def on_download(self, download):
+        try:
+            dest = Path(self.download_dir) / (download.suggested_filename or 'acuse.pdf')
+            download.save_as(str(dest))
+            self._guardar(dest.read_bytes(), 'descarga')
+        except Exception as e:
+            logger.warning('[acuse] Descarga no guardada: %s', e)
+
+    def _on_page(self, p):
+        logger.info('[acuse] Se abrió una ventana nueva')
+        self.ventanas.append(p)
+        p.on('download', self.on_download)
+
+    def revisar_ventanas(self):
+        """Lee el PDF de ventanas nuevas que lo muestren (incluye blob:)."""
+        import base64
+        for p in list(self.ventanas):
+            if self.body is not None:
+                return
+            try:
+                if p.is_closed():
+                    continue
+                try:
+                    p.wait_for_load_state('load', timeout=10000)
+                except Exception:
+                    pass
+                url = p.url
+                if not url or url == 'about:blank':
+                    continue
+                b64 = p.evaluate("""async () => {
+                    const res = await fetch(location.href, {credentials: 'include'});
+                    const buf = new Uint8Array(await res.arrayBuffer());
+                    let bin = '';
+                    for (let i = 0; i < buf.length; i += 0x8000)
+                        bin += String.fromCharCode(...buf.subarray(i, i + 0x8000));
+                    return btoa(bin);
+                }""")
+                self._guardar(base64.b64decode(b64 or ''), f'ventana {url[:80]}')
+            except Exception as e:
+                logger.info('[acuse] Ventana sin PDF legible: %s', e)
+
+    def esperar(self, segundos):
+        """Espera hasta `segundos` a que aparezca el PDF en alguna ventana."""
+        import time
+        fin = time.time() + segundos
+        while self.body is None and time.time() < fin:
+            self.revisar_ventanas()
+            if self.body is None:
+                # wait_for_timeout (no time.sleep): en la API síncrona los
+                # eventos solo se procesan durante llamadas a Playwright.
+                try:
+                    self.page.wait_for_timeout(500)
+                except Exception:
+                    time.sleep(0.5)
+        return self.body
+
+
+def _descargar_acuse(page, href, captura=None):
     """Descarga el PDF del acuse con la sesión del navegador.
 
     El endpoint /api/... del portal autentica la sesión solo si la petición
@@ -1046,8 +1134,17 @@ def _descargar_acuse(page, href):
     import base64
     from urllib.parse import unquote
 
-    url = href if href.startswith('http') else URL_BASE + href
     diag = []
+
+    # 0) ¿Ya llegó el PDF por alguna ventana (el portal lo abre solo)?
+    if captura is not None:
+        if captura.esperar(5):
+            return captura.body, captura.via
+        diag.append(f'ventanas={len(captura.ventanas)} sin PDF')
+    if not href:
+        return None, '; '.join(diag) or 'sin link del acuse'
+
+    url = href if href.startswith('http') else URL_BASE + href
 
     # 1) Request del contexto con encabezados de navegador
     try:
@@ -1082,12 +1179,16 @@ def _descargar_acuse(page, href):
     except Exception as e:
         diag.append(f'fetch=ERR {e}')
 
-    # 3) Clic en el link (como el usuario), capturando la descarga
+    # 3) Clic en el link como el usuario: el portal abre el acuse en una
+    #    ventana nueva, que la captura vigila (respuesta, descarga o blob).
     try:
         link = page.locator(f'a[href="{href}"]').first
-        if link.count():
-            # En la misma pestaña: Chromium headless descarga el PDF.
-            link.evaluate("a => a.removeAttribute('target')")
+        if link.count() and captura is not None:
+            link.click(force=True, timeout=5000)
+            if captura.esperar(30):
+                return captura.body, f'clic → {captura.via}'
+            diag.append(f'clic=sin PDF (ventanas={len(captura.ventanas)})')
+        elif link.count():
             with page.expect_download(timeout=30000) as dl:
                 link.click(force=True, timeout=5000)
             ruta = dl.value.path()
@@ -1345,10 +1446,20 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None, modo='au
                 download.save_as(dest)
                 pdf_descargado = dest
                 logger.info('  PDF descargado: %s', dest)
+                try:
+                    captura_acuse._guardar(Path(dest).read_bytes(), 'descarga')
+                except Exception:
+                    pass
 
             page = context.new_page()
             # 'download' es evento de Page (BrowserContext no lo emite).
             page.on('download', on_download)
+
+            # Vigilar las ventanas nuevas que abra el portal (ahí sale el
+            # acuse). Se crea después de la página principal para no
+            # contarla como ventana nueva.
+            captura_acuse = _CapturaAcuse(context, download_dir)
+            captura_acuse.page = page
 
             def screenshot(name):
                 path = str(Path(download_dir) / f'{name}.png')
@@ -2129,23 +2240,27 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None, modo='au
                 # link "Descargar acuse" (/api/documentos/getFile/<id>).
                 # El modal puede tardar o el id llegar después: sondear el DOM
                 # (aunque el link esté oculto) hasta ~30 s.
+                # El acuse puede llegar como link en el modal o abrirse solo
+                # en una ventana nueva: esperar cualquiera de los dos.
                 acuse_href = ''
                 for _ in range(30):
                     acuse_href = _href_acuse(page)
-                    if acuse_href:
+                    if acuse_href or captura_acuse.esperar(0.5):
                         break
-                    page.wait_for_timeout(1000)
+                    page.wait_for_timeout(500)
                 if acuse_href:
                     logger.info('[7a] Solicitud creada. Acuse: %s', acuse_href)
+                elif captura_acuse.body:
+                    logger.info('[7a] Acuse abierto en ventana nueva (%s)', captura_acuse.via)
                 else:
                     logger.warning('[7a] No apareció el link del acuse tras el envío')
 
-                if acuse_href:
+                if acuse_href or captura_acuse.body:
                     checkpoint('07_solicitud_creada')
                     diag_acuse = ''
                     try:
                         from .acuse_parser import parsear_acuse_pdf
-                        contenido, diag_acuse = _descargar_acuse(page, acuse_href)
+                        contenido, diag_acuse = _descargar_acuse(page, acuse_href, captura_acuse)
                         if contenido:
                             pdf_path = Path(download_dir) / f'acuse_{solicitud_id or "conciliacion"}.pdf'
                             pdf_path.write_bytes(contenido)
@@ -2164,7 +2279,8 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None, modo='au
                     # La solicitud ya quedó registrada en el portal aunque
                     # fallara la descarga del acuse: no reintentar el envío.
                     resultado.success = True
-                    acuse_url = acuse_href if acuse_href.startswith('http') else URL_BASE + acuse_href
+                    acuse_url = (acuse_href if acuse_href.startswith('http')
+                                 else URL_BASE + acuse_href) if acuse_href else 'ventana nueva'
                     resultado.detalle = (
                         f'Solicitud enviada (solicitud_id={solicitud_id}). '
                         f'Folio: {resultado.folio or "N/A"}. Acuse: {acuse_url}'
@@ -2552,9 +2668,9 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None, modo='au
                     # getFile/<id> es el id del DOCUMENTO, no el folio:
                     # descargar el PDF y leer el folio de adentro.
                     href_acuse = _href_acuse(page)
-                    if href_acuse:
+                    if href_acuse or captura_acuse.body:
                         from .acuse_parser import parsear_acuse_pdf
-                        contenido, diag_acuse = _descargar_acuse(page, href_acuse)
+                        contenido, diag_acuse = _descargar_acuse(page, href_acuse, captura_acuse)
                         resultado.success = True
                         if contenido:
                             pdf_path = Path(download_dir) / 'acuse_conciliacion.pdf'
