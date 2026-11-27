@@ -64,3 +64,6 @@ e2e_artifacts/
 # copiaría al repo del despacho)
 usuarios_asesores.xlsx
 app-codigo/
+
+# Demanda real usada como base del machote de despido injustificado B.C. (datos personales del cliente)
+demandas/DEMANDA LABORAL POR DESPIDO INJUSTIFICADO.pdf
