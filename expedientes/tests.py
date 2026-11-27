@@ -729,6 +729,8 @@ class FlujoCompletoDemandaTests(TestCase):
     def test_catalogo_busqueda_y_filtro_por_categoria(self):
         """El catálogo permite buscar por texto y filtrar por categoría, combinados."""
         from expedientes.models import Machote
+        # Las migraciones de datos siembran machotes; partimos de un catálogo vacío.
+        Machote.objects.all().delete()
 
         Machote.objects.create(
             nombre='Demanda por Despido Injustificado',
